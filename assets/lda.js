@@ -1,4 +1,4 @@
-/* Regularised linear discriminant analysis, SMOTE, and stratified k-fold
+/* Regularized linear discriminant analysis, SMOTE, and stratified k-fold
    cross-validation -- a JavaScript port of what the MATLAB pipeline does in
    scripts/classifiers/run_lda_auc.m and scripts/classifiers/applySMOTE.m.
 
@@ -16,7 +16,7 @@ export function dist2(a, b) {
 }
 
 /**
- * Regularised LDA. Mirrors fitcdiscr(..., 'Gamma', g): the *correlation* matrix
+ * Regularized LDA. Mirrors fitcdiscr(..., 'Gamma', g): the *correlation* matrix
  * is shrunk toward the identity and then rescaled by the standard deviations.
  * Returns a scoring function; only the ordering of its output matters for AUC.
  */

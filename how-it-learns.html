@@ -169,7 +169,9 @@
     <div class="figure figure--wide">
       <div class="figure__title">The same trials, two opinions about where the line goes</div>
       <div class="figure__sub">
-        Switch between them. Watch which trials each one is actually paying attention to.
+        LDA and SVM, on identical data. Switch between them and watch which trials each one
+        is actually paying attention to. (The RVM is described below but not drawn: what
+        makes it different is not visible in two dimensions.)
       </div>
       <div class="controls" id="clf-controls"></div>
       <div class="split split--wide-left">
@@ -226,7 +228,7 @@
         the information LDA was using, and when classes overlap as heavily as ours do,
         almost every trial ends up near the boundary anyway. One knob controls how much it
         tolerates trials on the wrong side of the margin — a tighter setting fits the
-        training trials harder, which is chapter 4's whole hazard in another guise.
+        training trials harder, which is the hazard the next section is about.
       </p>
 
       <h3>RVM — Relevance Vector Machine</h3>
@@ -354,7 +356,7 @@
         The dashed line is what the model scores on the trials it trained on. It only
         ever goes up — of course it does; you are marking your own homework. The solid
         line is what it scores on trials held back. That one turns around and heads
-        down, because past a point the model is memorising noise that will not repeat.
+        down, because past a point the model is memorizing noise that will not repeat.
       </p>
       <div class="callout callout--warn">
         <strong>This is why a suspiciously high AUC is bad news, not good news.</strong>
@@ -479,7 +481,7 @@
       <p>
         The obvious way to balance classes is to duplicate the rare ones — copy the 14
         false alarms fifteen times each. That fails, because exact copies tell the model
-        nothing new; it just weights those same 14 points more heavily and memorises them
+        nothing new; it just weights those same 14 points more heavily and memorizes them
         harder. SMOTE's insight is to make new points that are <em>plausible</em> rather
         than identical:
       </p>
@@ -541,7 +543,7 @@
 <footer class="footer">
   <div class="wrap">
     Computational Memory Lab, University of Alberta ·
-    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a> <span class="muted">(lab access)</span>
   </div>
 </footer>
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>7. The question we are trying to answer | CML primer</title>
-<meta name="description" content="Why do spectrographic features outperform time-domain features in EEG memory classification? The open problem this lab is working on.">
+<meta name="description" content="Why do spectrographic features outperform time-domain features in EEG memory classification? The open problem behind this project.">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -40,7 +40,7 @@
         wins.
       </p>
       <p>
-        <a href="https://doi.org/10.1007/s42113-025-00234-y">Danyluik, Chakravarty &amp; Caplan (2025)</a>
+        <a href="https://doi.org/10.1007/s42113-025-00259-3">Danyluik, Chakravarty &amp; Caplan (2025)</a>
         did exactly that comparison, in this lab, on a learning task. Their result:
       </p>
     </div>
@@ -98,20 +98,22 @@
         <div class="n">POSSIBILITY 2</div>
         <h3>It is an artifact of the transformation</h3>
         <p>
-          Computing a spectrogram is a specific mathematical operation: window the signal,
-          transform it, take the magnitude, and — crucially — throw away the phase. Maybe
-          that operation happens to package the same information in a form a linear
-          classifier can use more easily. If so, the “oscillation” story is a
-          misinterpretation of a data-processing side effect.
+          Computing a spectrogram is a specific mathematical operation: chop the signal
+          into windows, work out how much of each frequency is present in each one, and
+          keep the amount — the <em>magnitude</em> — while discarding the
+          <em>phase</em>, which is where in its cycle each rhythm happened to be. Maybe
+          that operation packages the same information in a form a linear classifier can
+          use more easily. If so, the “oscillation” story is a misinterpretation of a
+          data-processing side effect.
         </p>
       </a>
     </div>
 
     <div class="prose" style="margin-top:1.6rem">
       <p>
-        These are not academic hair-splitting. One says the brain works a particular way.
-        The other says our maths does. Telling them apart requires exactly the kind of
-        careful, unglamorous methodological work this repository contains.
+        This is not hair-splitting. One answer says something about how the brain works;
+        the other says something about how our analysis works. Telling them apart takes
+        careful, unglamorous methodological work — which is what this project is.
       </p>
     </div>
   </section>
@@ -143,13 +145,14 @@
       <p>
         And there is a clue in <em>which</em> transformations failed. Absolute value and
         squaring both discard the sign of the voltage; cube keeps it, and cube survives.
-        So the sign carries a lot of what the classifier was using. Which raises the
-        obvious next question, since a spectrogram also throws away sign information when
-        it discards phase — so why doesn't it suffer the same way?
+        So the sign carries a lot of what the classifier was using. That raises the obvious
+        next question. A spectrogram discards phase, which is sign information of a kind —
+        so why does it not suffer the same way?
       </p>
       <div class="keypoint">
-        <strong>That is roughly where the project is now.</strong> The simplest explanation
-        is dead, the result is a genuine puzzle, and the next steps are open.
+        <strong>That is roughly where the project is now.</strong> The simplest
+        explanation is ruled out, the result is still unexplained, and the next steps are
+        open.
       </div>
     </div>
   </section>
@@ -165,8 +168,7 @@
         table of spectral results whose generating code nobody has found.
       </p>
       <p>
-        Which means the single most valuable thing an incoming person could do is
-        straightforward to state:
+        Which means the most useful thing an incoming person could do is easy to state:
       </p>
     </div>
 
@@ -176,13 +178,13 @@
           <thead><tr><th style="text-align:left">Open thread</th><th style="text-align:left">What it involves</th></tr></thead>
           <tbody>
             <tr><td style="text-align:left"><b>Rebuild the spectral pipeline</b></td>
-              <td style="text-align:left">Extract time-frequency features from our 67 participants and run them through the same classifiers. The comparison has never been done on this dataset. This is the big one.</td></tr>
+              <td style="text-align:left">Extract time-frequency features from our 67 participants and run them through the same classifiers. The comparison has never been done on this dataset, and nothing else on this list would settle as much.</td></tr>
             <tr><td style="text-align:left"><b>Test the phase question</b></td>
               <td style="text-align:left">A spectrogram discards phase. Our sweep says sign matters. Build features that keep magnitude but scramble phase, and see which side of that the advantage falls on.</td></tr>
             <tr><td style="text-align:left"><b>Try more electrodes</b></td>
               <td style="text-align:left">Ten of 256 were chosen for even scalp coverage, following an earlier study, with no test of whether they are the right ten. Nobody has swept this.</td></tr>
             <tr><td style="text-align:left"><b>Nail down the montage</b></td>
-              <td style="text-align:left">The scalp positions in chapter 3 come from a channel-location file that may not be the one the data was recorded with. If it is the wrong one, every claim about <em>where</em> the signal is needs revisiting.</td></tr>
+              <td style="text-align:left">The scalp positions in chapter 3 come from a montage — the file listing where each electrode physically sits — that may not be the one the data was recorded with. If it is the wrong one, every claim about <em>where</em> the signal is needs revisiting.</td></tr>
           </tbody>
         </table>
       </div>
@@ -212,11 +214,11 @@
         and go think about what the features represent.
       </p>
       <div class="callout">
-        <strong>The most important sentence on this site.</strong> A modest, reliable,
-        honestly-reported effect that tells you where to look next is worth more than an
-        impressive number that turns out to be leakage. Chapter 5's “test on the training
-        trials” button produces 0.73 in one click. Anyone can produce big numbers. The
-        job is producing true ones.
+        <strong>Which is why the modest number is worth more than an impressive one.</strong>
+        A small, reliable, honestly-reported effect that tells you where to look next is
+        more use than a large one that turns out to be leakage — and large numbers are
+        easy to produce by accident. Chapter 5's “test on the training trials” button
+        gets to 0.73 in one click, and means nothing.
       </div>
     </div>
   </section>
@@ -227,7 +229,7 @@
 <footer class="footer">
   <div class="wrap">
     Computational Memory Lab, University of Alberta ·
-    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a> <span class="muted">(lab access)</span>
   </div>
 </footer>
 

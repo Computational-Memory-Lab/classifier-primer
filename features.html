@@ -45,7 +45,8 @@
         than a response. Subtracting its average from the rest of the trial puts every
         trial on a common zero, which is what makes trials comparable at all. The 1,200 ms
         after is long enough to contain the responses anyone expects to matter — the
-        visual response by ~200 ms, the memory-related effects between 300 and 800 ms —
+        visual response in the first 200 ms, the memory-related effects between 300 and
+        800 ms —
         with room to spare. Stop at 500 ms and you would cut off the later effects; run to
         3 seconds and you would mostly be recording the next trial.
       </p>
@@ -56,7 +57,7 @@
       <div id="cube"></div>
       <div class="figure__note">
         That is 37.6 million numbers per participant, about 140 MB on disk. Multiply by
-        67 people and you have the 8.7 GB sitting on the lab Drive.
+        67 people and you have the 9.3 GB sitting on the lab Drive.
       </div>
     </div>
 
@@ -70,7 +71,7 @@
         to learn from, it has far more knobs to turn than facts to constrain them — so
         there will always be some combination of weights that separates <em>these</em> 450
         trials perfectly, even when the inputs are pure noise. The model can simply assign
-        weights that memorise which trial is which, the way you could draw a line through
+        weights that memorize which trial is which, the way you could draw a line through
         any two points. It has learned the trials rather than the pattern, so it scores
         beautifully on them and no better than chance on anything new. That is
         <strong>overfitting</strong>, and it is the central hazard of this whole
@@ -132,14 +133,14 @@
       </p>
       <p class="small">
         <b>Why these:</b> even coverage of the scalp, following the earlier study this
-        project builds on (<a href="https://doi.org/10.1152/jn.00293.2020">Chakravarty et
+        project builds on (<a href="https://doi.org/10.1152/jn.00193.2020">Chakravarty et
         al., 2020</a>) so the results can be compared with it. The map shows the logic —
         a midline chain plus symmetric pairs. Two of them are the sites the classic ERP
         analysis uses anyway: Fz for the FN400 and P3 for the LPP.
       </p>
       <p class="small">
         <b>What is not known:</b> whether a different ten would do better. Nobody has
-        swept it. It is on the list of unclaimed threads at the end of chapter 7.
+        swept it. It is on the list of unclaimed threads in chapter 7.
       </p>
     </details>
   </section>
@@ -155,8 +156,9 @@
       </p>
       <p>
         Because the step is smaller than the window, consecutive bins overlap by 60 ms.
-        That is deliberate: it means a feature is never split awkwardly across a
-        boundary.
+        That is deliberate. With non-overlapping bins, a brief response landing on a bin
+        edge would be split across two of them and half-cancelled in each; overlapping
+        windows mean every moment sits somewhere near the middle of some bin.
       </p>
     </div>
 
@@ -185,7 +187,7 @@
       <p>
         The window starts at 0 ms — the baseline before the word is skipped entirely,
         since it is by definition the period before anything happened. Sliding to the end
-        gives <strong>28 bins</strong>, the last one finishing at about 1,176 ms.
+        gives <strong>28 bins</strong>, the last one covering 1,080–1,180 ms.
       </p>
       <div class="callout">
         <strong>10 electrodes × 28 bins = 280 features.</strong> That is the number you
@@ -254,7 +256,7 @@
 <footer class="footer">
   <div class="wrap">
     Computational Memory Lab, University of Alberta ·
-    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a> <span class="muted">(lab access)</span>
   </div>
 </footer>
 
@@ -528,7 +530,7 @@ const NBINS = F.binStartMs.length;
     }
     el('line', { x1: pad.l, x2: w - pad.r, y1: by + bh / 2, y2: by + bh / 2, stroke: token('--baseline') }, svg);
     el('text', { x: pad.l, y: by + bh + 14, class: 'tick' }, svg).textContent = 'bin 1 (0 ms)';
-    el('text', { x: w - pad.r, y: by + bh + 14, 'text-anchor': 'end', class: 'tick' }, svg).textContent = 'bin 28 (1080 ms)';
+    el('text', { x: w - pad.r, y: by + bh + 14, 'text-anchor': 'end', class: 'tick' }, svg).textContent = 'bin 28 (1080\u20131180 ms)';
 
     note.innerHTML = `Bin <b>${b + 1}</b> covers <b>${lo}–${lo + F.binWidthMs} ms</b>. `
       + `Its 25 voltage samples average to <b>${vals[b].toFixed(2)} µV</b>, and that single number is `

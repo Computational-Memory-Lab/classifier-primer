@@ -26,8 +26,7 @@
         A hands-on introduction to predicting memory from single trials of EEG: what the
         experiment is, what a classifier does, and what the results actually show. It
         assumes no background in machine learning and no programming. You will build the
-        intuition by playing with the real thing — real EEG, real participants, real
-        results.
+        intuition by working with the real data rather than an illustration of it.
       </p>
     </div>
   </section>
@@ -35,6 +34,10 @@
   <!-- The hook: the classic effect, and the question. -->
   <figure class="figure figure--wide" id="hook" style="margin-top: 2.5rem;">
     <div class="figure__title" id="hook-title">The FN400 old/new effect, at test</div>
+    <div class="figure__sub" style="margin-bottom:0.2rem">
+      An <b>ERP</b> — an event-related potential: the average voltage across many trials,
+      lined up on the moment the word appeared.
+    </div>
     <div class="figure__sub" id="hook-sub"></div>
     <div id="hook-chart"></div>
     <div class="legend" id="hook-legend" style="margin-top: 0.6rem;"></div>
@@ -50,7 +53,7 @@
         We record their EEG the whole time.
       </p>
       <p>
-        The traditional way to analyse this is to average hundreds of trials together
+        The traditional way to analyze this is to average hundreds of trials together
         and show that some bump in the waveform is reliably bigger for remembered
         words. That is the chart above, and it is real. But it only establishes that
         the activity is <strong>correlated</strong> with memory. It does not show the
@@ -103,8 +106,8 @@
       <div class="keypoint">
         <strong>Read that honestly.</strong> An AUC of 0.58 is a long way from 1.0.
         Single-trial EEG carries real memory information — reliably, across dozens of
-        participants — but not very much of it. That modest number is the finding, not
-        a bug. Getting comfortable with that is most of what it means to work here.
+        participants — but not very much of it. That modest number is the finding, not a
+        bug, and the rest of this site is about what follows from it.
       </div>
     </div>
   </section>
@@ -114,8 +117,8 @@
       <h2>What this site covers</h2>
       <p>
         Eight short chapters. Chapters 1–4 assume nothing at all. Chapter 5 lets you
-        train a real classifier in your browser, and chapters 6–7 are where the actual
-        open research question lives.
+        train a real classifier in your browser, chapter 6 is the results, chapter 7 is
+        the open research question, and chapter 8 is where to go next.
       </p>
     </div>
     <div class="cards" id="chapter-cards" style="margin-top: 1.6rem;"></div>
@@ -145,7 +148,7 @@
 <footer class="footer">
   <div class="wrap">
     Computational Memory Lab, University of Alberta ·
-    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a> ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a> <span class="muted">(lab access)</span> ·
     Built for incoming lab members. Corrections welcome.
   </div>
 </footer>
@@ -172,7 +175,7 @@ const blurbs = {
 document.getElementById('chapter-cards').innerHTML = CHAPTERS
   .filter((c) => c.href !== 'index.html')
   .map((c) => `<a href="${c.href}">
-      <div class="n">${c.short.split('.')[0].padStart(2, '0')}</div>
+      <div class="n">${(c.short.match(/^\d+/) || [''])[0].padStart(2, '0')}</div>
       <h3>${c.title}</h3>
       <p>${blurbs[c.href] || ''}</p>
     </a>`).join('');
@@ -212,7 +215,7 @@ const wave = G.channels[String(G.fz)];
 
 document.getElementById('hook-sub').innerHTML =
   `Brain response at the front of the head, averaged over all <b>${G.nParticipants} participants</b>, `
-  + `for words correctly recognised as old (Hits) versus new words correctly called new `
+  + `for words correctly recognized as old (Hits) versus new words correctly called new `
   + `(Correct Rejections). Shaded bands are ±1 standard error across participants.`;
 document.getElementById('hook-legend').innerHTML = series.map((s) =>
   `<span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token(s.color)}"></span>${s.label}</span>`
@@ -234,8 +237,8 @@ document.getElementById('hook-legend').innerHTML = series.map((s) =>
     + `more positive than Correct Rejections there `
     + `(t(${s.df}) = ${s.t.toFixed(2)}, p = ${s.p < 0.001 ? '< 0.001' : s.p.toFixed(3)}). `
     + `That is the <b>FN400 old/new effect</b>: a reliable, much-replicated difference between `
-    + `studied and unstudied words, about a fifth of a microvolt in size. This site is about `
-    + `what you can and cannot conclude from a difference that size.`;
+    + `studied and unstudied words. Note the size of it — roughly a seventh of a microvolt. `
+    + `This site is about what you can and cannot conclude from a difference that small.`;
 }
 
 const tip = tooltip();

@@ -6,7 +6,7 @@ export const CHAPTERS = [
   { href: 'index.html', short: 'Start', title: 'A primer on classifying memory from EEG' },
   { href: 'task.html', short: '1 Task', title: 'The memory task' },
   { href: 'why-classifiers.html', short: '2 Why', title: 'Why classifiers, not just averages' },
-  { href: 'features.html', short: '3 Features', title: 'From brain waves to 280 numbers' },
+  { href: 'features.html', short: '3 Features', title: 'From EEG to 280 numbers' },
   { href: 'how-it-learns.html', short: '4 Learning', title: 'How a classifier actually learns' },
   { href: 'try-it.html', short: '5 Try it', title: 'Train one yourself, on real data' },
   { href: 'results.html', short: '6 Results', title: 'What we have found so far' },

@@ -106,8 +106,28 @@
       <h2>Does the pipeline choice matter?</h2>
       <p>
         This is the actual research question, so here is the actual answer. Each row below
-        is a full re-run of everything with one thing changed.
+        is a full re-run of everything with one thing changed. Two of the rows need a word
+        of explanation:
       </p>
+      <ul style="line-height:1.7">
+        <li>
+          <strong>The stages</strong> are the pipeline's exclusion filters, applied in
+          order. Stage 1 drops participants on behaviour alone — too few misses to work
+          with, or accuracy at chance. Stage 2 drops trials with obvious artifacts
+          (a blink swings the voltage far harder than any brain response) and then drops
+          participants who lost too many. Stage 3 drops participants with too few false
+          alarms to score FA vs CR. Each filter buys cleaner data by spending
+          participants, which is the trade the chart is about.
+        </li>
+        <li>
+          <strong>The Laplacian</strong> (or <strong>CSD</strong>, current source density)
+          is a spatial filter. Voltage at one electrode is blurred: the skull smears
+          activity outward, so neighbouring electrodes see much the same thing. The
+          Laplacian subtracts each electrode's surroundings from it, leaving what is
+          locally distinctive. It sharpens the map at the cost of throwing away anything
+          broad and shared.
+        </li>
+      </ul>
     </div>
 
     <div class="figure figure--wide">
@@ -155,8 +175,9 @@
     <div class="figure figure--wide">
       <div class="figure__title">Feature transformations</div>
       <div class="figure__sub">
-        LDA, moving bins, from <code>docs/feature_label_fixed_bins_results.txt</code>.
-        N = 61 (61 for Old/New and Hit/Miss, 57 for FA/CR).
+        LDA on moving-bin features. N = 61 for Old/New and Hit/Miss, 57 for FA/CR — this
+        sweep was run on a smaller set of participants than the headline table, which is
+        why its raw baseline reads 0.579 rather than 0.580.
       </div>
       <div id="trans-chart"></div>
       <div class="legend" id="trans-legend" style="margin-top:0.6rem"></div>
@@ -249,8 +270,9 @@
       <p>
         The famous components, used one at a time, predict almost nothing — 0.508 is a
         rounding error away from chance, even though it is “statistically significant”
-        across 67 people. Using all 280 features together roughly triples the distance
-        above chance.
+        across 67 people. Measure it as distance above chance and the gap is stark: the
+        FN400 manages 0.008, the LPP 0.035, and all 280 features together 0.080 — ten
+        times the FN400 and more than double the better of the two components.
       </p>
       <p>
         That is the entire argument of chapter 2 in one table. The FN400 is a real,
@@ -287,7 +309,7 @@
 <footer class="footer">
   <div class="wrap">
     Computational Memory Lab, University of Alberta ·
-    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a> <span class="muted">(lab access)</span>
   </div>
 </footer>
 
@@ -522,7 +544,7 @@ const TASKS = [
       OldNew: [0.579, 0.563, 0.594, '< 0.0001'], HitMiss: [0.581, 0.563, 0.599, '< 0.0001'], FAvsCR: [0.549, 0.528, 0.570, '< 0.0001'] },
     { name: 'Absolute', sub: '|v| — discards the sign', keeps: false,
       OldNew: [0.528, 0.517, 0.539, '< 0.0001'], HitMiss: [0.543, 0.524, 0.563, '< 0.0001'], FAvsCR: [0.497, 0.469, 0.524, '0.83'] },
-    { name: 'Square', sub: 'v² — discards the sign', keeps: false,
+    { name: 'Squared', sub: 'v² — discards the sign', keeps: false,
       OldNew: [0.530, 0.519, 0.541, '< 0.0001'], HitMiss: [0.550, 0.529, 0.571, '< 0.0001'], FAvsCR: [0.494, 0.467, 0.522, '0.69'] },
     { name: 'Cube', sub: 'v³ — keeps the sign', keeps: true,
       OldNew: [0.557, 0.542, 0.571, '< 0.0001'], HitMiss: [0.564, 0.547, 0.581, '< 0.0001'], FAvsCR: [0.543, 0.521, 0.565, '0.0002'] },

@@ -55,11 +55,11 @@
         <label class="field">
           Time window
           <select id="window">
-            <option value="all">All 28 bins (0–1176 ms)</option>
-            <option value="early">Early only (0–400 ms)</option>
-            <option value="fn400">FN400 window (300–500 ms)</option>
-            <option value="lpp">LPP window (500–800 ms)</option>
-            <option value="late">Late only (600–1176 ms)</option>
+            <option value="all">All 28 bins (0–1180 ms)</option>
+            <option value="early">Early only (0–420 ms, 9 bins)</option>
+            <option value="fn400">Around the FN400 (280–500 ms, 4 bins)</option>
+            <option value="lpp">Around the LPP (480–820 ms, 7 bins)</option>
+            <option value="late">Late only (600–1180 ms, 13 bins)</option>
           </select>
         </label>
       </div>
@@ -121,10 +121,21 @@
       </ul>
       <p>
         It is the same trade as chapter 4's flexibility slider, applied to a different
-        knob. And it is not optional here: with 280 features and sometimes fewer than 100
-        trials in a class, the correlation estimates are singular — mathematically
-        unusable — and the model cannot be fitted at all without some shrinkage. Drag γ to
-        0 above and watch what happens.
+        knob — and how much it matters depends on how many trials the task has to spare.
+      </p>
+      <p>
+        <strong>Old vs New</strong> uses all 450 trials, so a training fold has about 405
+        of them against 280 features. That is just enough to estimate the whole
+        correlation matrix, and dragging γ to 0 costs surprisingly little.
+        <strong>Hit vs Miss</strong> and <strong>FA vs CR</strong> use only the 225 old or
+        225 new trials, so a fold has around 200 — <em>fewer trials than features</em>.
+        There the correlation matrix is <strong>singular</strong>: there is not enough data
+        to pin down all 39,060 numbers, so infinitely many answers fit equally well and the
+        model has no principled way to choose. Shrinkage is what makes the problem solvable
+        at all, and on those tasks γ = 0 visibly hurts.
+      </p>
+      <p>
+        Try it: switch to Hit vs Miss and drag γ from 0.5 to 0.
       </p>
 
     </div>
@@ -150,15 +161,15 @@
             </tr>
             <tr>
               <td style="text-align:left"><b>Drag γ to 0</b></td>
-              <td style="text-align:left">Turns the safety off, and the AUC usually drops. See below for what γ is actually doing. The pipeline fixes it at 0.5.</td>
+              <td style="text-align:left">Turns the safety off. On Old vs New it barely matters — there are just enough trials to manage without it. On Hit vs Miss it costs real AUC, because that task has fewer trials than features. See below for what γ does. The pipeline fixes it at 0.5.</td>
             </tr>
             <tr>
               <td style="text-align:left"><b>One electrode instead of ten</b></td>
               <td style="text-align:left">AUC drops but usually stays above chance. No single electrode carries the signal — it is spread out, which is exactly the argument for a multivariate approach over a single ERP measurement.</td>
             </tr>
             <tr>
-              <td style="text-align:left"><b>FN400 or LPP window only</b></td>
-              <td style="text-align:left">You have just reduced the classifier to roughly the classic ERP analysis. Compare it to all 28 bins to see what the extra time points buy you.</td>
+              <td style="text-align:left"><b>The FN400 or LPP window only</b></td>
+              <td style="text-align:left">You have just reduced the classifier to roughly the classic ERP analysis. Compare it to all 28 bins to see what the extra time points buy you. The bins are 100 ms wide on a 40 ms grid, so they cannot land on 300–500 exactly — the nearest four cover 280–500 ms.</td>
             </tr>
             <tr>
               <td style="text-align:left"><b>FA vs CR, SMOTE off</b></td>
@@ -213,7 +224,7 @@
       <p>
         Honest enough to be checkable, which is the only useful kind. The feature
         extraction is a port of <code>feature_label_moving_bin.m</code>; the classifier
-        mirrors <code>run_lda_auc.m</code> — regularised linear discriminant with
+        mirrors <code>run_lda_auc.m</code> — regularized linear discriminant with
         γ = 0.5, stratified folds, SMOTE on the training fold only, AUC averaged across
         folds.
       </p>
@@ -257,7 +268,7 @@
 <footer class="footer">
   <div class="wrap">
     Computational Memory Lab, University of Alberta ·
-    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a> <span class="muted">(lab access)</span>
   </div>
 </footer>
 
@@ -391,8 +402,8 @@ function report(ms) {
   if (o.cheat) {
     cc.className = 'callout callout--warn';
     cc.innerHTML = `<strong>Mean AUC ${fmtAuc(m)} — and it is meaningless.</strong> `
-      + `You just scored the model on the trials it learned from. It has partly memorised them, so this number `
-      + `measures memorisation, not prediction. Untick the box and watch it fall back to reality. `
+      + `You just scored the model on the trials it learned from. It has partly memorized them, so this number `
+      + `measures memorization, not prediction. Untick the box and watch it fall back to reality. `
       + `Every result the lab publishes is the unticked number.`;
   } else {
     const ref = MATLAB[task];

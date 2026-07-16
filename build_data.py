@@ -2,7 +2,7 @@
 """
 Precompute the small derived data files the website runs on.
 
-The website is static, so it cannot read the 8.7 GB of EEG on the lab Drive.
+The website is static, so it cannot read the 9.3 GB of EEG on the lab Drive.
 This script reads the real data and writes a few hundred KB of derived
 summaries into site/data/. Run it from the repo root:
 

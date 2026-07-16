@@ -3,7 +3,7 @@
 Build the grand-average ERP across all 67 participants.
 
 Why this is separate from build_data.py: it has to read all 67 test_NN.mat files
-(~8.7 GB). The Drive keeps them as cloud stubs, so this pulls each one down,
+(~9.3 GB). The Drive keeps them as cloud stubs, so this pulls each one down,
 averages it, caches the (tiny) result, and evicts the local copy again. Disk use
 stays flat at roughly one file, and a re-run costs nothing because of the cache.
 

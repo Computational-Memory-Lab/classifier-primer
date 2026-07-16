@@ -22,8 +22,8 @@
       <p class="eyebrow">Chapter 2</p>
       <h1>Why classifiers, not just averages</h1>
       <p class="lede">
-        This chapter is the argument for the whole project. If you take one idea away
-        from this site, take this one.
+        This chapter is the argument for the whole project: why a classifier is worth
+        the trouble when averaging is so much simpler.
       </p>
     </div>
   </section>
@@ -66,10 +66,13 @@
         time; averaging just cancelled the noise around it.
       </p>
       <div class="callout">
-        <strong>This is what ERP research is.</strong> Averaging is a standard and
-        effective tool, and most of what is known about the electrical correlates of
-        memory was established with it. The issue is not accuracy. It is that an average
-        discards the individual trials, and those are what the rest of this site needs.
+        <strong>This is what ERP research is.</strong> An <strong>ERP</strong> is an
+        <em>event-related potential</em>: the average voltage across many trials of the
+        same kind, lined up on the moment the event happened — here, the word appearing.
+        The chart above is one. Averaging is a standard and effective tool, and most of
+        what is known about the electrical correlates of memory was established with it.
+        The issue is not accuracy. It is that an average discards the individual trials,
+        and those are what the rest of this site needs.
       </div>
     </div>
   </section>
@@ -196,7 +199,9 @@
         A classifier is a program that learns from labelled examples. You show it many
         trials, each paired with its answer — this one was a Hit, that one was a Miss —
         and it finds a <strong>weighting of the 280 features</strong> that best separates
-        the two groups. Concretely, it assigns each feature a number saying how much that
+        the two groups. Because it weighs many measurements at once rather than one at a
+        time, this is called a <strong>multivariate</strong> approach — as opposed to the
+        <strong>univariate</strong> ERP analysis, which takes a single number per trial. Concretely, it assigns each feature a number saying how much that
         feature counts and in which direction, then scores a new trial by multiplying its
         280 values by those weights and adding them up. A high score means Hit, a low one
         means Miss. Chapter 4 shows this happening on screen.
@@ -204,10 +209,10 @@
       <p>
         The crucial discipline is that the trials it is tested on are <strong>held back
         from training entirely</strong>. If the model has already seen a trial, it can get
-        that trial right by having memorised its quirks rather than by having learned
-        anything general — and memorising is exactly what a model with 280 knobs and a few
+        that trial right by having memorized its quirks rather than by having learned
+        anything general — and memorizing is exactly what a model with 280 knobs and a few
         hundred examples is good at. Scoring it on trials it trained on measures how well
-        it memorised, and tells you nothing about whether it would work on a new
+        it memorized, and tells you nothing about whether it would work on a new
         participant, a new session, or tomorrow. The test has to be on unseen trials or it
         answers the wrong question.
       </p>
@@ -240,7 +245,7 @@
     <div class="prose">
       <p>
         This is exactly the argument
-        <a href="https://doi.org/10.1152/jn.00293.2020">Chakravarty, Chen &amp; Caplan (2020)</a>
+        <a href="https://doi.org/10.1152/jn.00193.2020">Chakravarty, Chen &amp; Caplan (2020)</a>
         made for the study phase of this very dataset, and it is the paper this project
         follows. In their words, the field distinguishes
         “descriptive analysis, subject to overfitting, and true prediction, that can
@@ -270,27 +275,31 @@
         each class is:
       </p>
       <div class="callout">
-        <strong>Pick one random Hit and one random Miss. What is the probability the
-        classifier rated the Hit higher?</strong> That probability is the AUC.
+        <strong>Pick one random false alarm and one random correct rejection. What is the
+        probability the classifier rated the false alarm higher?</strong> That probability
+        is the AUC.
       </div>
       <p>
-        You can compute it by brute force: take every possible pairing of one Hit with one
-        Miss, count how many the classifier ordered correctly, and divide.
+        You can compute it by brute force: take every possible pairing of one false alarm
+        with one correct rejection, count how many the classifier ordered correctly, and
+        divide.
       </p>
       <p style="text-align:center">
-        <code>AUC = (pairs ordered correctly + ½ × ties) / (number of Hits × number of Misses)</code>
+        <code>AUC = (pairs ordered correctly + ½ × ties) / (false alarms × correct rejections)</code>
       </p>
       <p>
-        With 147 Hits and 78 Misses that is 147 × 78 = 11,466 pairs. Get all of them right
-        and AUC = 11,466/11,466 = <strong>1.0</strong>. Order them at random and you win
-        about half, so AUC ≈ <strong>0.5</strong>. Get every pair backwards and you score
-        0 — which would mean a perfect classifier with its labels swapped.
+        For participant 45 that is 14 × 211 = 2,954 pairs. Get all of them right and
+        AUC = 2,954/2,954 = <strong>1.0</strong>. Order them at random and you win about
+        half, so AUC ≈ <strong>0.5</strong>. Get every pair backwards and you score 0 —
+        which would be a perfect classifier with its labels swapped.
       </p>
       <p>
-        The always-say-CR classifier gives every trial the same score, so every pair is a
-        tie, and the ½ makes it exactly 0.5 — correctly identified as worthless. That
-        immunity to lopsided classes is the whole reason we use it. For now the scale is
-        all you need:
+        Notice what the always-say-“correct rejection” classifier does here. It gives every
+        trial the same score, so every one of those 2,954 pairs is a tie, the ½ applies to
+        all of them, and the AUC is exactly 0.5 — correctly identified as worthless, where
+        accuracy called it 93.8%. Because the count of pairs sits in the denominator, it
+        makes no difference that one class is fifteen times rarer than the other. That
+        immunity is the whole reason we use it. For now the scale is all you need:
       </p>
     </div>
 
@@ -311,7 +320,7 @@
 <footer class="footer">
   <div class="wrap">
     Computational Memory Lab, University of Alberta ·
-    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a> <span class="muted">(lab access)</span>
   </div>
 </footer>
 
