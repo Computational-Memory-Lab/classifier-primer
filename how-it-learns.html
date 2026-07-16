@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>4. How a classifier actually learns | CML primer</title>
-<meta name="description" content="Decision boundaries, ROC curves, AUC, overfitting and cross-validation, built up by hand.">
+<meta name="description" content="Decision boundaries, ROC and AUC, how LDA, SVM and RVM each choose a line, overfitting, cross-validation and SMOTE.">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -157,6 +157,146 @@
 
   <section class="chapter">
     <div class="prose">
+      <h2>Three classifiers, three ideas</h2>
+      <p>
+        “Let the classifier solve it” produced <em>a</em> line. But which line is best is a
+        matter of opinion, and different classifiers hold different opinions. This project
+        uses three, and their names all follow the same pattern — a word describing the
+        idea, then what it operates on.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The same trials, two opinions about where the line goes</div>
+      <div class="figure__sub">
+        Switch between them. Watch which trials each one is actually paying attention to.
+      </div>
+      <div class="controls" id="clf-controls"></div>
+      <div class="split split--wide-left">
+        <div id="clf-chart"></div>
+        <div>
+          <div id="clf-explain" class="figure__note" style="margin-top:0"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="prose">
+      <h3>LDA — Linear Discriminant Analysis</h3>
+      <p>
+        A <em>discriminant</em> is a rule that discriminates: feed it a trial, it returns a
+        number, and the sign of that number is your answer. <em>Linear</em> means the rule
+        is a weighted sum of the features and nothing fancier — no squaring, no
+        interactions, just <code>w₁×feature₁ + w₂×feature₂ + …</code>, which geometrically
+        is a straight line (or in 280 dimensions, a flat plane).
+      </p>
+      <p>
+        LDA's opinion is that <strong>each class is a cloud, and the line belongs where the
+        two clouds are equally plausible.</strong> It measures where each cloud's centre
+        is, and how the cloud is stretched and tilted, and then draws the boundary
+        accordingly. Crucially it uses <em>every</em> trial to do this: a trial far from the
+        boundary still helps pin down where its cloud sits and how wide it is.
+      </p>
+      <p>
+        That is its strength here. It answers in one step of arithmetic, with nothing to
+        tune and nothing to converge, and its assumption — two clouds of roughly the same
+        shape — is a strong one. Strong assumptions are exactly what you want when you have
+        450 trials and 280 features, because they leave the model less room to invent
+        structure that is not there. Chapter 6 shows LDA quietly beating the more
+        sophisticated option.
+      </p>
+
+      <h3>SVM — Support Vector Machine</h3>
+      <p>
+        The SVM's opinion is the opposite: <strong>the clouds are irrelevant, only the
+        borderline trials matter.</strong> It looks for the line with the widest
+        <em>margin</em> — the biggest gap between the line and the nearest trial on either
+        side. Push the line anywhere else and some trial gets closer to it, so the margin
+        shrinks.
+      </p>
+      <p>
+        The trials that end up touching that margin are the <strong>support vectors</strong>
+        — they support the boundary, in the sense that they alone hold it in place. This is
+        the striking part: <em>move a trial that is far from the line and the answer does
+        not change at all.</em> Only the borderline cases have a vote. A “machine” here is
+        just old terminology for a learning procedure.
+      </p>
+      <p>
+        Because it ignores everything except the boundary cases, an SVM is unbothered by
+        oddly-shaped clouds and outliers far from the line. The price is that it throws away
+        the information LDA was using, and when classes overlap as heavily as ours do,
+        almost every trial ends up near the boundary anyway. One knob controls how much it
+        tolerates trials on the wrong side of the margin — a tighter setting fits the
+        training trials harder, which is chapter 4's whole hazard in another guise.
+      </p>
+
+      <h3>RVM — Relevance Vector Machine</h3>
+      <p>
+        The RVM (<a href="https://jmlr.org/papers/v1/tipping01a.html">Tipping, 2001</a>) is
+        the SVM's question asked in a Bayesian way. It makes predictions from the same kind
+        of ingredients, but instead of solving for the widest margin, it starts by allowing
+        <em>every</em> trial to contribute and then lets the arithmetic switch off the ones
+        it cannot justify keeping. The survivors are the <strong>relevance vectors</strong>
+        — the trials the model decided were genuinely relevant.
+      </p>
+      <p>
+        Two things follow. It usually keeps far fewer trials than an SVM keeps support
+        vectors, so the final rule is simpler. And because it is Bayesian it returns a
+        <em>probability</em> rather than a bare distance from a line — it can say “70%
+        likely a Hit” rather than just “Hit”.
+      </p>
+      <p>
+        It also has the most ways to go wrong. It has to be told how to compare two trials
+        (its <em>kernel</em>), and in 280 dimensions the intuitive choices misbehave badly:
+        every pair of trials is roughly equidistant, so a distance-based comparison finds
+        every trial equally unlike every other, keeps nothing, and predicts the same value
+        for everything. AUC then comes out at exactly 0.500 — not because there is no
+        signal, but because the model collapsed.
+      </p>
+      <div class="callout callout--warn">
+        <strong>An AUC of exactly 0.500 is a symptom, not a result.</strong> Real chance
+        performance wobbles around 0.5 — it lands on 0.497, 0.512, 0.503. A clean 0.500 to
+        three decimals usually means the model gave every trial an identical score, so
+        every pair tied. Something collapsed. It is worth knowing the difference before you
+        report one.
+      </div>
+
+      <div class="figure" style="max-width:46rem">
+        <div class="table-scroll">
+          <table class="data data--prose">
+            <thead><tr>
+              <th style="text-align:left">Classifier</th>
+              <th style="text-align:left">Its opinion about the line</th>
+              <th style="text-align:left">Which trials get a vote</th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td style="text-align:left"><b>LDA</b><br><span class="muted">Linear Discriminant Analysis</span></td>
+                <td style="text-align:left">Put it where the two clouds are equally plausible.</td>
+                <td style="text-align:left">All of them — every trial shapes its cloud.</td>
+              </tr>
+              <tr>
+                <td style="text-align:left"><b>SVM</b><br><span class="muted">Support Vector Machine</span></td>
+                <td style="text-align:left">Put it as far as possible from the nearest trial on each side.</td>
+                <td style="text-align:left">Only the borderline ones: the support vectors.</td>
+              </tr>
+              <tr>
+                <td style="text-align:left"><b>RVM</b><br><span class="muted">Relevance Vector Machine</span></td>
+                <td style="text-align:left">Start with every trial, switch off the ones you cannot justify.</td>
+                <td style="text-align:left">Whichever few survive: the relevance vectors.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="figure__note">
+          All three draw a straight boundary in this project. They disagree only about
+          where to put it — and chapter 6 shows how little that disagreement is worth.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
       <h2>The trap: learning the noise</h2>
       <p>
         Here is the thing that makes machine learning hard, and the reason for all the
@@ -183,7 +323,7 @@
         The classifiers in this project have the same knob, wearing a different name. Each
         of the 280 features gets its own weight, so a classifier given all 280 has 280
         knobs; give it one electrode's 28 bins and it has 28. That is why chapter 3 spent
-        so long cutting 83,200 numbers down to 280 — and why chapter 5's regularisation
+        so long cutting 83,200 numbers down to 280 — and why chapter 5's regularization
         slider, which limits how extreme those weights may get, is doing the same job as
         this one.
       </p>
@@ -630,6 +770,165 @@ const tip = tooltip();
   responsive(host, draw);
 }
 
+/* ============ LDA vs SVM: who gets a vote ============ */
+{
+  const host = document.getElementById('clf-chart');
+  const ctrls = document.getElementById('clf-controls');
+  const explain = document.getElementById('clf-explain');
+  let which = 'lda';
+
+  ctrls.innerHTML = `<div class="segmented" id="clf-seg">
+      <button data-v="lda" aria-pressed="true">LDA</button>
+      <button data-v="svm" aria-pressed="false">SVM</button>
+    </div>`;
+  ctrls.querySelectorAll('#clf-seg button').forEach((b) => {
+    b.onclick = () => {
+      which = b.dataset.v;
+      ctrls.querySelectorAll('#clf-seg button').forEach((o) =>
+        o.setAttribute('aria-pressed', o.dataset.v === which));
+      draw();
+    };
+  });
+
+  // one modest, overlapping pair of clouds -- like the real thing
+  const r = rng(24);
+  const pts = [];
+  for (let i = 0; i < 45; i++) pts.push({ x: gauss(r) * 0.95 + 1.0, y: gauss(r) * 0.95 + 0.85, c: 1 });
+  for (let i = 0; i < 45; i++) pts.push({ x: gauss(r) * 0.95 - 1.0, y: gauss(r) * 0.95 - 0.85, c: 0 });
+
+  const g1 = pts.filter((p) => p.c === 1), g0 = pts.filter((p) => p.c === 0);
+  const m1 = [mean(g1.map((p) => p.x)), mean(g1.map((p) => p.y))];
+  const m0 = [mean(g0.map((p) => p.x)), mean(g0.map((p) => p.y))];
+
+  /* --- LDA: pooled covariance, boundary where the clouds are equally likely --- */
+  const lda = (() => {
+    let s00 = 0, s01 = 0, s11 = 0;
+    for (const [g, m] of [[g1, m1], [g0, m0]]) {
+      for (const p of g) {
+        const a = p.x - m[0], b = p.y - m[1];
+        s00 += a * a; s01 += a * b; s11 += b * b;
+      }
+    }
+    const n = pts.length - 2;
+    s00 /= n; s01 /= n; s11 /= n;
+    const det = s00 * s11 - s01 * s01;
+    const dx = m1[0] - m0[0], dy = m1[1] - m0[1];
+    const wx = (s11 * dx - s01 * dy) / det;
+    const wy = (-s01 * dx + s00 * dy) / det;
+    const cx = (m1[0] + m0[0]) / 2, cy = (m1[1] + m0[1]) / 2;
+    return { wx, wy, b: -(wx * cx + wy * cy) };
+  })();
+
+  /* --- SVM: a small hinge-loss solve, enough to find the margin honestly --- */
+  const svm = (() => {
+    let wx = 0, wy = 0, b = 0;
+    const C = 1.0, n = pts.length;
+    for (let epoch = 1; epoch <= 4000; epoch++) {
+      const lr = 0.5 / epoch;
+      let gx = wx / (C * n), gy = wy / (C * n), gb = 0;   // regularizer pulls w small
+      for (const p of pts) {
+        const y = p.c === 1 ? 1 : -1;
+        if (y * (wx * p.x + wy * p.y + b) < 1) {          // inside the margin
+          gx -= y * p.x / n; gy -= y * p.y / n; gb -= y / n;
+        }
+      }
+      wx -= lr * gx; wy -= lr * gy; b -= lr * gb;
+    }
+    return { wx, wy, b };
+  })();
+
+  const score = (mdl, p) => mdl.wx * p.x + mdl.wy * p.y + mdl.b;
+
+  let draw;
+  draw = () => {
+    const mdl = which === 'lda' ? lda : svm;
+    const w = 470, h = 400;
+    const pad = { l: 40, r: 14, t: 14, b: 34 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(-4.2, 4.2, pad.l, w - pad.r);
+    const ys = scale(-4.2, 4.2, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, { xLabel: 'a feature', yLabel: 'another feature', xTicks: [], yTicks: [] });
+
+    const defs = el('defs', {}, svg);
+    const clip = el('clipPath', { id: 'clfclip' }, defs);
+    el('rect', { x: pad.l, y: pad.t, width: w - pad.l - pad.r, height: h - pad.t - pad.b }, clip);
+    const plot = el('g', { 'clip-path': 'url(#clfclip)' }, svg);
+
+    // the boundary, and for the SVM the two margin lines
+    const norm = Math.hypot(mdl.wx, mdl.wy);
+    const lineAt = (off) => {
+      // w.x + b = off  ->  draw across the plot
+      const dx = -mdl.wy / norm, dy = mdl.wx / norm;          // along the line
+      const px = (mdl.wx / norm) * (off - mdl.b) / norm;
+      const py = (mdl.wy / norm) * (off - mdl.b) / norm;
+      return [[px - dx * 40, py - dy * 40], [px + dx * 40, py + dy * 40]];
+    };
+    if (which === 'svm') {
+      for (const off of [-1, 1]) {
+        const [a, b2] = lineAt(off);
+        el('line', { x1: xs(a[0]), y1: ys(a[1]), x2: xs(b2[0]), y2: ys(b2[1]),
+          stroke: token('--text-muted'), 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }, plot);
+      }
+      // shade the margin band
+      const [a1, b1] = lineAt(1), [a0, b0] = lineAt(-1);
+      el('polygon', {
+        points: [[xs(a1[0]), ys(a1[1])], [xs(b1[0]), ys(b1[1])],
+                 [xs(b0[0]), ys(b0[1])], [xs(a0[0]), ys(a0[1])]].map((q) => q.join(',')).join(' '),
+        fill: token('--text-muted'), opacity: 0.1,
+      }, plot);
+    }
+    const [a, b2] = lineAt(0);
+    el('line', { x1: xs(a[0]), y1: ys(a[1]), x2: xs(b2[0]), y2: ys(b2[1]),
+      stroke: token('--text-primary'), 'stroke-width': 2.5 }, plot);
+
+    // LDA: show the cloud centres it is built from
+    if (which === 'lda') {
+      for (const [m, col] of [[m1, '--c-hit'], [m0, '--c-miss']]) {
+        el('line', { x1: xs(m[0]) - 8, x2: xs(m[0]) + 8, y1: ys(m[1]), y2: ys(m[1]),
+          stroke: token(col), 'stroke-width': 3 }, plot);
+        el('line', { x1: xs(m[0]), x2: xs(m[0]), y1: ys(m[1]) - 8, y2: ys(m[1]) + 8,
+          stroke: token(col), 'stroke-width': 3 }, plot);
+      }
+      el('line', { x1: xs(m0[0]), y1: ys(m0[1]), x2: xs(m1[0]), y2: ys(m1[1]),
+        stroke: token('--text-muted'), 'stroke-width': 1.5, 'stroke-dasharray': '3 3' }, plot);
+    }
+
+    // the trials; for the SVM, mark the ones holding the boundary up
+    let nSup = 0;
+    for (const p of pts) {
+      const col = p.c === 1 ? '--c-hit' : '--c-miss';
+      const sup = which === 'svm' && Math.abs(score(svm, p)) <= 1.02;
+      if (sup) nSup++;
+      el('circle', {
+        cx: xs(p.x), cy: ys(p.y), r: sup ? 6 : 4.4,
+        fill: token(col),
+        opacity: which === 'svm' && !sup ? 0.28 : 0.9,
+        stroke: sup ? token('--text-primary') : token('--surface-1'),
+        'stroke-width': sup ? 2 : 1.4,
+      }, plot);
+    }
+
+    if (which === 'lda') {
+      el('text', { x: w - pad.r - 4, y: pad.t + 12, 'text-anchor': 'end', class: 'tick' }, svg)
+        .textContent = 'crosses = each cloud\u2019s centre';
+      explain.innerHTML = `<b>LDA uses all ${pts.length} trials.</b> Each one helps locate its `
+        + `cloud\u2019s centre (the crosses) and measure how the cloud is stretched. The boundary `
+        + `sits where the two clouds are equally plausible — roughly across the middle of the `
+        + `dashed line joining them, but tilted by the clouds\u2019 shape rather than square to it. `
+        + `Every trial, near the line or far from it, had a say.`;
+    } else {
+      el('text', { x: w - pad.r - 4, y: pad.t + 12, 'text-anchor': 'end', class: 'tick' }, svg)
+        .textContent = 'ringed = support vectors';
+      explain.innerHTML = `<b>The SVM listens to ${nSup} of ${pts.length} trials.</b> Only the ringed `
+        + `ones — those on or inside the margin, the shaded band — hold the boundary in place. `
+        + `The faded trials are ignored entirely: drag one further away and the line does not `
+        + `move. The margin is the widest gap that can be fitted between the classes, and the `
+        + `boundary runs down its middle.`;
+    }
+  };
+  responsive(host, draw);
+}
+
 /* ============ 2. distributions + ROC ============ */
 {
   const dHost = document.getElementById('dist-chart');
@@ -752,14 +1051,33 @@ const tip = tooltip();
   ovl.addEventListener('input', () => { make(); draw(); });
   // "Solving" here means putting the threshold where it does least damage: the
   // point where the two distributions cross, which is midway between them.
+  // Eased into place, to match the line in the card above.
+  let thrAnim = null;
+  function slideThresholdTo(target, ms = 650) {
+    cancelAnimationFrame(thrAnim);
+    const from = +thr.value;
+    const to = Math.max(0, Math.min(1000, Math.round(((target - LO) / (HI - LO)) * 1000)));
+    const settle = () => { thr.value = to; draw(); };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { settle(); return; }
+    const t0 = performance.now();
+    let landed = false;
+    const tick = (now) => {
+      const u = Math.min(1, (now - t0) / ms);
+      const e = u < 0.5 ? 2 * u * u : 1 - ((-2 * u + 2) ** 2) / 2;
+      thr.value = Math.round(from + (to - from) * e);
+      draw();
+      if (u < 1) thrAnim = requestAnimationFrame(tick); else landed = true;
+    };
+    thrAnim = requestAnimationFrame(tick);
+    setTimeout(() => { if (!landed) { cancelAnimationFrame(thrAnim); settle(); } }, ms + 250);
+  }
   document.getElementById('best2').onclick = () => {
     const m1 = mean(data.filter((d) => d.c === 1).map((d) => d.s));
     const m0 = mean(data.filter((d) => d.c === 0).map((d) => d.s));
-    const target = (m1 + m0) / 2;
-    thr.value = Math.round(((target - LO) / (HI - LO)) * 1000);
-    draw();
+    slideThresholdTo((m1 + m0) / 2);
   };
-  document.getElementById('reset-thr').onclick = () => { thr.value = 500; draw(); };
+  document.getElementById('reset-thr').onclick = () => { slideThresholdTo(0); };
+  thr.addEventListener('pointerdown', () => cancelAnimationFrame(thrAnim));
   responsive(dHost, draw);
 }
 
@@ -850,10 +1168,15 @@ const tip = tooltip();
         el('circle', { cx: xs(p.x), cy: ys(p.y), r: 5, fill: token('--series-1'),
           stroke: token('--surface-1'), 'stroke-width': 1.5 }, svg);
       }
-      el('text', { x: pad.l + 4, y: pad.t + 11, class: 'tick', fill: token('--series-1'),
-        'font-weight': 620 }, svg).textContent = '\u25cf 14 training trials';
-      el('text', { x: pad.l + 4, y: pad.t + 25, class: 'tick', fill: token('--text-muted') }, svg)
-        .textContent = '\u25cf held-back trials';
+      // swatches drawn as marks, not glyphs: the .tick class sets a muted fill
+      // that was overriding the colour on the text bullets
+      el('circle', { cx: pad.l + 8, cy: pad.t + 8, r: 4, fill: token('--series-1'),
+        stroke: token('--surface-1'), 'stroke-width': 1.2 }, svg);
+      el('text', { x: pad.l + 17, y: pad.t + 11.5, class: 'tick', fill: token('--text-secondary'),
+        'font-weight': 620 }, svg).textContent = '14 training trials';
+      el('circle', { cx: pad.l + 8, cy: pad.t + 23, r: 2.6, fill: token('--text-muted') }, svg);
+      el('text', { x: pad.l + 17, y: pad.t + 26, class: 'tick' }, svg)
+        .textContent = 'held-back trials';
     }
     {
       const w = 430, h = 290;

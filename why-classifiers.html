@@ -164,7 +164,7 @@
       <div class="controls">
         <label class="field" style="flex:1;min-width:18rem">
           Places you look
-          <input type="range" id="n-look" min="1" max="83200" value="1" style="flex:1;width:auto">
+          <input type="range" id="n-look" min="1" max="83200" step="1" value="1" style="flex:1;width:auto">
           <output id="look-out" style="min-width:5em">1</output>
         </label>
         <button class="btn" id="look-again">New random data</button>
@@ -457,9 +457,11 @@ function averageOf(idxs) {
   const note = document.getElementById('grand-note');
   const SITES = [
     { ch: G.fz, name: 'Fz', blurb: 'front midline', win: 'FN400', range: [300, 500],
-      what: 'the <b>FN400</b>, classically linked to a feeling of familiarity' },
+      what: 'the <b>FN400</b> (frontal negativity at 400 ms), classically linked to a '
+          + 'feeling of familiarity' },
     { ch: G.p3, name: 'P3', blurb: 'left parietal', win: 'LPP', range: [500, 800],
-      what: 'the <b>LPP</b>, classically linked to actually recollecting the word' },
+      what: 'the <b>LPP</b> (late parietal positivity), classically linked to actually '
+          + 'recollecting the word' },
   ];
   let cur = 0;
 
@@ -530,8 +532,7 @@ function averageOf(idxs) {
     note.innerHTML = `In the shaded window, Hits are <b>${mean(diffs).toFixed(2)} µV</b> more positive `
       + `than Correct Rejections — ${S.what}. Paired across ${diffs.length} participants: `
       + `t(${st.df}) = ${st.t.toFixed(2)}, p = ${st.p < 0.001 ? '< 0.001' : st.p.toFixed(3)}. `
-      + `The effect held in the same direction for ${above} of ${diffs.length} people. `
-      + `Computed here in your browser from each participant's window mean.`;
+      + `The effect held in the same direction for ${above} of ${diffs.length} people.`;
   };
   responsive(host, draw);
 }
@@ -643,22 +644,35 @@ function averageOf(idxs) {
   }
   ts = makeTs(seed);
 
-  // running count of "significant" places, so the readout is instant
+  // The places you have looked at are scattered over the whole scalp and the
+  // whole epoch -- you do not search electrode 1 exhaustively before moving to
+  // electrode 2. So reveal them in a random order across the full width rather
+  // than sweeping a front from left to right.
+  let order = null;
+  const reshuffle = (seed) => {
+    const r = rng(seed + 7);
+    order = new Int32Array(TOTAL);
+    for (let i = 0; i < TOTAL; i++) order[i] = i;
+    for (let i = TOTAL - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1));
+      const t = order[i]; order[i] = order[j]; order[j] = t;
+    }
+  };
+  reshuffle(seed);
+  if (location.hash === '#max') slider.value = TOTAL;
+  // running count of "significant" places, in reveal order, so the readout is instant
   const cum = new Int32Array(TOTAL + 1);
   const recount = () => {
-    for (let i = 0; i < TOTAL; i++) cum[i + 1] = cum[i] + (Math.abs(ts[i]) > CRIT ? 1 : 0);
+    for (let i = 0; i < TOTAL; i++) {
+      cum[i + 1] = cum[i] + (Math.abs(ts[order[i]]) > CRIT ? 1 : 0);
+    }
   };
   recount();
 
-  // The slider is logarithmic: the lesson at 20 places matters as much as the
-  // one at 83,200, and a linear slider would make the first unreachable.
-  const toN = (v) => Math.max(1, Math.round(10 ** ((v / 1000) * Math.log10(TOTAL))));
-  const fromN = (n) => Math.round((Math.log10(n) / Math.log10(TOTAL)) * 1000);
-  slider.min = 0; slider.max = 1000; slider.value = fromN(1); if (location.hash === "#max") slider.value = 1000;
 
   let draw;
   draw = () => {
-    const n = toN(+slider.value);
+    const n = +slider.value;
     out.textContent = n.toLocaleString();
     const sig = cum[n];
 
@@ -680,10 +694,6 @@ function averageOf(idxs) {
       el('line', { x1: pad.l, x2: w - pad.r, y1: ys(c), y2: ys(c),
         stroke: token('--critical'), 'stroke-dasharray': '4 3' }, svg);
     }
-    el('text', { x: pad.l + 4, y: ys(CRIT) - 6, class: 'tick', fill: token('--critical'),
-      'font-weight': 620, stroke: token('--surface-1'), 'stroke-width': 3,
-      'stroke-linejoin': 'round', style: 'paint-order:stroke fill' }, svg)
-      .textContent = 'p < 0.05 — anything past this line looks “significant”';
 
     // Up to 83,200 points: far too many for SVG nodes, so paint them.
     const pw = Math.round(w - pad.l - pad.r), ph = Math.round(h - pad.t - pad.b);
@@ -693,25 +703,29 @@ function averageOf(idxs) {
     const px = (i) => (i / TOTAL) * pw;
     const py = (t) => ((4.6 - t) / 9.2) * ph;
     ctx.fillStyle = token('--text-muted');
-    ctx.globalAlpha = n > 5000 ? 0.35 : 0.5;
+    ctx.globalAlpha = n > 5000 ? 0.35 : 0.55;
     for (let i = 0; i < n; i++) {
-      if (Math.abs(ts[i]) > CRIT) continue;
-      ctx.fillRect(px(i), py(ts[i]), 1.6, 1.6);
+      const k = order[i];
+      if (Math.abs(ts[k]) > CRIT) continue;
+      ctx.fillRect(px(k), py(ts[k]), 1.6, 1.6);
     }
     ctx.fillStyle = token('--critical');
     ctx.globalAlpha = 0.9;
     for (let i = 0; i < n; i++) {
-      if (Math.abs(ts[i]) <= CRIT) continue;
-      ctx.fillRect(px(i), py(ts[i]), 2, 2);
+      const k = order[i];
+      if (Math.abs(ts[k]) <= CRIT) continue;
+      ctx.fillRect(px(k), py(ts[k]), 2, 2);
     }
     el('image', { x: pad.l, y: pad.t, width: pw, height: ph,
       href: cvs.toDataURL(), preserveAspectRatio: 'none' }, svg);
+    el('text', { x: pad.l + 4, y: ys(CRIT) - 6, class: 'tick', fill: token('--critical'),
+      'font-weight': 620, stroke: token('--surface-1'), 'stroke-width': 3,
+      'stroke-linejoin': 'round', style: 'paint-order:stroke fill' }, svg)
+      .textContent = 'p < 0.05 — anything past this line looks “significant”';
 
-    el('line', { x1: xs(n), x2: xs(n), y1: pad.t, y2: h - pad.b,
-      stroke: token('--text-primary'), 'stroke-width': 1.5, opacity: 0.5 }, svg);
-    el('text', { x: Math.min(xs(n) + 5, w - pad.r - 95), y: pad.t + 12, class: 'tick',
+    el('text', { x: w - pad.r - 4, y: pad.t + 12, 'text-anchor': 'end', class: 'tick',
       fill: token('--text-secondary'), 'font-weight': 620 }, svg)
-      .textContent = `${n.toLocaleString()} of ${TOTAL.toLocaleString()}`;
+      .textContent = `${n.toLocaleString()} of ${TOTAL.toLocaleString()} places tested`;
 
     note.innerHTML = sig === 0
       ? `You have looked in <b>${n.toLocaleString()}</b> place${n > 1 ? 's' : ''} and found nothing yet. Keep dragging.`
@@ -726,7 +740,7 @@ function averageOf(idxs) {
   };
   slider.addEventListener('input', draw);
   document.getElementById('look-again').onclick = () => {
-    seed = (seed * 13 + 7) % 9973; ts = makeTs(seed); recount(); draw();
+    seed = (seed * 13 + 7) % 9973; ts = makeTs(seed); reshuffle(seed); recount(); draw();
   };
   responsive(host, draw);
 }

@@ -476,7 +476,8 @@ const counts = E.counts;
       return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
     };
-    const d = z(hr) - z(fr);
+    const zh = z(hr), zf = z(fr);
+    const d = zh - zf;
     host.innerHTML = `<div style="padding:0.6rem 0.2rem">
       <div class="eyebrow" style="text-align:center">Your block, coded</div>
       <div class="stats" style="margin:1rem 0">
@@ -485,12 +486,32 @@ const counts = E.counts;
           <div class="stat__label">${NAMES[c]}<br><span class="muted">code ${c}</span></div></div>`).join('')}
       </div>
       <p class="small" style="color:var(--text-secondary)">
-        Those four numbers get summarised into one, <b>d′</b> (“d-prime”), and yours is
-        <b>${d.toFixed(2)}</b>. It compares how often you said “old” to an old word (your hit
-        rate, ${(hr * 100).toFixed(0)}%) with how often you said “old” to a new word (your
-        false-alarm rate, ${(fr * 100).toFixed(0)}%). Saying “old” a lot inflates both, so the
-        gap between them — not the hit rate alone — is what shows you could actually tell them
-        apart. d′ = 0 means the two rates are equal and you are guessing.
+        Those four numbers get summarised into one: <b>d′</b> (“d-prime”). It compares how
+        often you said “old” to an old word with how often you said “old” to a
+        <em>new</em> one. Saying “old” a lot inflates both, so it is the gap between them,
+        not the hit rate alone, that shows you could tell them apart. Here is yours, worked
+        through:
+      </p>
+      <div class="table-scroll" style="margin:0.7rem 0">
+        <table class="data" style="font-size:0.82rem">
+          <tbody>
+            <tr><td style="text-align:left">Hit rate</td>
+              <td style="text-align:left" class="mono">(${tally[1]} hits + 0.5) / (8 old + 1) = <b>${hr.toFixed(3)}</b></td></tr>
+            <tr><td style="text-align:left">False-alarm rate</td>
+              <td style="text-align:left" class="mono">(${tally[4]} false alarms + 0.5) / (8 new + 1) = <b>${fr.toFixed(3)}</b></td></tr>
+            <tr><td style="text-align:left">Convert each to z</td>
+              <td style="text-align:left" class="mono">z(${hr.toFixed(3)}) = ${zh.toFixed(2)} &nbsp;·&nbsp; z(${fr.toFixed(3)}) = ${zf.toFixed(2)}</td></tr>
+            <tr><td style="text-align:left"><b>d′ = z(hit) − z(FA)</b></td>
+              <td style="text-align:left" class="mono">${zh.toFixed(2)} − (${zf.toFixed(2)}) = <b>${d.toFixed(2)}</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small" style="color:var(--text-secondary)">
+        The <b>z</b> step converts a proportion into standard-deviation units, which is what
+        makes d′ a distance rather than a percentage. The <b>+0.5</b> and <b>+1</b> are a
+        standard correction: a perfect 8/8 would give a rate of 1.0, whose z is infinity, so
+        the counts are nudged off the extremes. d′ = 0 means the two rates are equal — you
+        said “old” just as often to new words as to old ones, which is guessing.
       </p>
       <p class="small" style="color:var(--text-secondary)">
         The 67 people in the real dataset averaged
