@@ -268,17 +268,18 @@
 
     <div class="prose">
       <p>
-        The famous components, used one at a time, predict almost nothing — 0.508 is a
-        rounding error away from chance, even though it is “statistically significant”
-        across 67 people. Measure it as distance above chance and the gap is stark: the
-        FN400 manages 0.008, the LPP 0.035, and all 280 features together 0.080 — ten
-        times the FN400 and more than double the better of the two components.
+        The famous components, one at a time, carry almost no usable single-trial
+        information: the FN400's Old/New AUC is 0.508, barely above chance. It counts as
+        “statistically significant” only because 67 participants make the bar that low — a
+        mirror-image 0.492, equally below chance, would clear it just as easily.
+        Significance here means “reliably not exactly 0.5”, not “meaningful”.
       </p>
       <p>
-        That is the entire argument of chapter 2 in one table. The FN400 is a real,
-        replicable, decades-old effect. It is also nearly useless for predicting what any
-        individual trial will do. Both are true, and only the classifier could tell you
-        the second one.
+        Pooling all 280 features does markedly better in relative terms — 0.080 above
+        chance — but notice the absolute number is still 0.580, the same modest figure
+        from the top of this chapter. The lesson is not that the classifier is good; it is
+        that combining many weak features beats reading any one of them, which is the
+        argument of chapter 2 in a single table.
       </p>
     </div>
   </section>
