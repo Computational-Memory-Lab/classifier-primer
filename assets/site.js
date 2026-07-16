@@ -128,6 +128,41 @@ export function svgRoot(host, w, h) {
   return svg;
 }
 
+/**
+ * A real <canvas> laid over an SVG chart's plot area, for marks too numerous to
+ * be SVG nodes (tens of thousands of points, a 450x280 heatmap).
+ *
+ * Do NOT do this by drawing to an offscreen canvas and handing toDataURL() to an
+ * SVG <image>: decoding a data URL is asynchronous, so during a slider drag each
+ * redraw replaces the image before the last one has decoded and the marks vanish
+ * until you let go. A canvas in the page paints synchronously.
+ *
+ * `rect` is the plot area in viewBox units; the returned context is pre-scaled so
+ * the caller draws in those same units, with the rect's top-left as the origin.
+ * The canvas sits under the SVG, so axes and labels stay on top.
+ */
+export function canvasOverlay(host, svg, vbW, vbH, rect, ss = 2) {
+  host.style.position = 'relative';
+  svg.style.position = 'relative';
+  svg.style.zIndex = '1';
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(rect.w * ss));
+  c.height = Math.max(1, Math.round(rect.h * ss));
+  Object.assign(c.style, {
+    position: 'absolute',
+    left: `${(rect.x / vbW) * 100}%`,
+    top: `${(rect.y / vbH) * 100}%`,
+    width: `${(rect.w / vbW) * 100}%`,
+    height: `${(rect.h / vbH) * 100}%`,
+    zIndex: '0',
+    pointerEvents: 'none',
+  });
+  host.insertBefore(c, svg);
+  const ctx = c.getContext('2d');
+  ctx.scale(ss, ss);
+  return ctx;
+}
+
 export function scale(d0, d1, r0, r1) {
   const m = (r1 - r0) / (d1 - d0 || 1);
   const f = (v) => r0 + (v - d0) * m;

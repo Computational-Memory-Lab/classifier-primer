@@ -261,7 +261,7 @@
 <script type="module">
 import {
   initChrome, loadJSON, loadBin, svgRoot, frame, scale, linePath, el,
-  responsive, token, tooltip, mean,
+  responsive, token, tooltip, mean, canvasOverlay,
 } from './assets/site.js';
 
 initChrome();
@@ -617,11 +617,11 @@ const NBINS = F.binStartMs.length;
       }
     }
     ctx.putImageData(img, 0, 0);
-    el('image', {
-      x: pad.l, y: pad.t, width: pw, height: ph,
-      href: cvs.toDataURL(), preserveAspectRatio: 'none',
-      style: 'image-rendering:pixelated',
-    }, svg);
+    // Blit onto a canvas laid over the plot area rather than round-tripping
+    // through toDataURL() and an SVG <image>, which decodes asynchronously.
+    const out = canvasOverlay(host, svg, w, h, { x: pad.l, y: pad.t, w: pw, h: ph }, 1);
+    out.imageSmoothingEnabled = false;
+    out.drawImage(cvs, 0, 0, pw, ph);
     el('rect', { x: pad.l, y: pad.t, width: pw, height: ph, fill: 'none', stroke: token('--border-strong') }, svg);
 
     // electrode boundaries

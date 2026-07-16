@@ -318,7 +318,7 @@
 <script type="module">
 import {
   initChrome, loadJSON, loadBin, svgRoot, frame, scale, linePath, el,
-  responsive, token, tooltip, rng, gauss, mean, sd, tTest,
+  responsive, token, tooltip, rng, gauss, mean, sd, tTest, canvasOverlay,
 } from './assets/site.js';
 
 initChrome();
@@ -688,18 +688,19 @@ function averageOf(idxs) {
     for (const sgn of [1, -1]) {
       el('rect', { x: pad.l, y: sgn > 0 ? pad.t : ys(-CRIT), width: w - pad.l - pad.r,
         height: sgn > 0 ? ys(CRIT) - pad.t : (h - pad.b) - ys(-CRIT),
-        fill: token('--critical'), opacity: 0.08 }, svg);
+        fill: token('--critical'), opacity: 0.06, 'pointer-events': 'none' }, svg);
     }
     for (const c of [CRIT, -CRIT]) {
       el('line', { x1: pad.l, x2: w - pad.r, y1: ys(c), y2: ys(c),
         stroke: token('--critical'), 'stroke-dasharray': '4 3' }, svg);
     }
 
-    // Up to 83,200 points: far too many for SVG nodes, so paint them.
-    const pw = Math.round(w - pad.l - pad.r), ph = Math.round(h - pad.t - pad.b);
-    const cvs = document.createElement('canvas');
-    cvs.width = pw; cvs.height = ph;
-    const ctx = cvs.getContext('2d');
+    // Up to 83,200 points: far too many for SVG nodes, so paint them onto a
+    // canvas laid over the plot area. It has to be a real canvas in the page --
+    // going via toDataURL() decodes asynchronously and the points disappear for
+    // the whole of a slider drag.
+    const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+    const ctx = canvasOverlay(host, svg, w, h, { x: pad.l, y: pad.t, w: pw, h: ph });
     const px = (i) => (i / TOTAL) * pw;
     const py = (t) => ((4.6 - t) / 9.2) * ph;
     ctx.fillStyle = token('--text-muted');
@@ -716,8 +717,6 @@ function averageOf(idxs) {
       if (Math.abs(ts[k]) <= CRIT) continue;
       ctx.fillRect(px(k), py(ts[k]), 2, 2);
     }
-    el('image', { x: pad.l, y: pad.t, width: pw, height: ph,
-      href: cvs.toDataURL(), preserveAspectRatio: 'none' }, svg);
     el('text', { x: pad.l + 4, y: ys(CRIT) - 6, class: 'tick', fill: token('--critical'),
       'font-weight': 620, stroke: token('--surface-1'), 'stroke-width': 3,
       'stroke-linejoin': 'round', style: 'paint-order:stroke fill' }, svg)
