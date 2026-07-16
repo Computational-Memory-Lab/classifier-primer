@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7. The question we are trying to answer | CML primer</title>
+<meta name="description" content="Why do spectrographic features outperform time-domain features in EEG memory classification? The open problem this lab is working on.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory &amp; EEG <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Chapter 7</p>
+      <h1>The question we are trying to answer</h1>
+      <p class="lede">
+        Everything so far has been background. This is the actual open problem — the
+        reason the project exists, and the thing a new lab member could plausibly help
+        solve.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>The observation</h2>
+      <p>
+        Almost every EEG classification study in the literature uses
+        <strong>spectral</strong> features — how much rhythmic activity there is at each
+        frequency — rather than the <strong>time-domain</strong> voltage we have been
+        using. And when someone compares them head to head on the same data, spectral
+        wins.
+      </p>
+      <p>
+        <a href="https://doi.org/10.1007/s42113-025-00234-y">Danyluik, Chakravarty &amp; Caplan (2025)</a>
+        did exactly that comparison, in this lab, on a learning task. Their result:
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The gap this project is about</div>
+      <div class="figure__sub">
+        Danyluik et al. (2025), Table 3, all trials, N = 45. Same participants, same
+        trials, same classifiers — the <em>only</em> thing that changes between each pair
+        is how the EEG was represented. Bars are 95% confidence intervals.
+      </div>
+      <div id="gap-chart"></div>
+      <div class="figure__note" id="gap-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        In their own words: <em>“Time-frequency spectral features produced better
+        classifications (AUC ∼0.7) than time-domain features.”</em> The difference was not
+        subtle — <span class="nowrap">t(44) = 6.38</span> for LDA and
+        <span class="nowrap">t(44) = 4.86</span> for SVM.
+      </p>
+      <p>
+        This is the cleanest possible version of the comparison: it is a
+        <em>within-participant</em> test on one dataset. Nothing differs but the
+        representation, so the usual escape routes — different people, different task,
+        different preprocessing — are all closed off.
+      </p>
+      <div class="callout">
+        <strong>So: why?</strong> That question is the whole project. It has two very
+        different possible answers, and they matter enormously for what the field should
+        do next.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Two possible answers</h2>
+    </div>
+
+    <div class="cards" style="margin-top:1.4rem">
+      <a href="#" onclick="return false" style="cursor:default">
+        <div class="n">POSSIBILITY 1</div>
+        <h3>Brain rhythms really are where memory lives</h3>
+        <p>
+          Oscillations — theta, alpha — are a genuine mechanism of memory encoding and
+          retrieval. Spectral features win because they measure the thing that actually
+          does the work, and voltage-over-time only sees it indirectly. If this is true,
+          the field should keep going with spectral features and think harder about
+          oscillatory mechanisms.
+        </p>
+      </a>
+      <a href="#" onclick="return false" style="cursor:default">
+        <div class="n">POSSIBILITY 2</div>
+        <h3>It is an artifact of the transformation</h3>
+        <p>
+          Computing a spectrogram is a specific mathematical operation: window the signal,
+          transform it, take the magnitude, and — crucially — throw away the phase. Maybe
+          that operation happens to package the same information in a form a linear
+          classifier can use more easily. If so, the “oscillation” story is a
+          misinterpretation of a data-processing side effect.
+        </p>
+      </a>
+    </div>
+
+    <div class="prose" style="margin-top:1.6rem">
+      <p>
+        These are not academic hair-splitting. One says the brain works a particular way.
+        The other says our maths does. Telling them apart requires exactly the kind of
+        careful, unglamorous methodological work this repository contains.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>What we have ruled out so far</h2>
+      <p>
+        Chapter 6 showed the first real attempt at possibility 2. A spectrogram passes
+        voltage through a nonlinearity — squaring, essentially — so: does simply squaring
+        the time-domain features reproduce the advantage?
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Testing the simplest version of possibility 2</div>
+      <div class="figure__sub">If nonlinearity alone explained it, the transformed bars would go up. They go down.</div>
+      <div id="ruleout-chart"></div>
+      <div class="figure__note" id="ruleout-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        <strong>No.</strong> Squaring makes it worse — dramatically so for FA vs CR, which
+        collapses to chance. The manuscript states it plainly: “The spectrographic
+        advantage was not attributable to voltage being passed through a nonlinear
+        transformation.”
+      </p>
+      <p>
+        And there is a clue in <em>which</em> transformations failed. Absolute value and
+        squaring both discard the sign of the voltage; cube keeps it, and cube survives.
+        So the sign carries a lot of what the classifier was using. Which raises the
+        obvious next question, since a spectrogram also throws away sign information when
+        it discards phase — so why doesn't it suffer the same way?
+      </p>
+      <div class="keypoint">
+        <strong>That is roughly where the project is now.</strong> The simplest explanation
+        is dead, the result is a genuine puzzle, and the next steps are open.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>What is missing, and what you could do</h2>
+      <p>
+        Here is the honest state of things, which is also the opportunity. The
+        spectral analysis that would let us test this directly on
+        <em>our</em> data <strong>is not in the repository</strong>. There is no FFT, no
+        wavelet, no band-power extraction anywhere in the codebase. The manuscript has a
+        table of spectral results whose generating code nobody has found.
+      </p>
+      <p>
+        Which means the single most valuable thing an incoming person could do is
+        straightforward to state:
+      </p>
+    </div>
+
+    <div class="figure" style="max-width:46rem">
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th style="text-align:left">Open thread</th><th style="text-align:left">What it involves</th></tr></thead>
+          <tbody>
+            <tr><td style="text-align:left"><b>Rebuild the spectral pipeline</b></td>
+              <td style="text-align:left">Extract time-frequency features from our 67 participants and run them through the same classifiers. The comparison has never been done on this dataset. This is the big one.</td></tr>
+            <tr><td style="text-align:left"><b>Test the phase question</b></td>
+              <td style="text-align:left">A spectrogram discards phase. Our sweep says sign matters. Build features that keep magnitude but scramble phase, and see which side of that the advantage falls on.</td></tr>
+            <tr><td style="text-align:left"><b>Try more electrodes</b></td>
+              <td style="text-align:left">Ten of 257 were chosen to match an earlier study, with no test of whether they are the right ten. Nobody has swept this.</td></tr>
+            <tr><td style="text-align:left"><b>Nail down the montage</b></td>
+              <td style="text-align:left">Which physical scalp locations those ten indices correspond to depends on a channel-location file whose provenance is uncertain. This affects how any of it gets interpreted.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="figure__note">
+        These are real, currently-unclaimed threads — not exercises with known answers.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Why the small numbers are the point</h2>
+      <p>
+        It would be easy to read chapter 6 and conclude the project failed. AUC 0.58 is
+        not going to read anyone's mind.
+      </p>
+      <p>
+        But the goal was never a better decoder. The goal is to work out
+        <strong>which choices matter</strong>, so the next study can fix them in advance
+        instead of rediscovering them. That is what the sweeps are for: not to find the
+        best number, but to find out which knobs are connected to anything.
+      </p>
+      <p>
+        And the answer so far — preprocessing barely matters, feature count barely
+        matters, the classifier barely matters, but the <em>representation</em> matters
+        enormously — is genuinely useful. It says stop fiddling with artifact thresholds
+        and go think about what the features represent.
+      </p>
+      <div class="callout">
+        <strong>The most important sentence on this site.</strong> A modest, reliable,
+        honestly-reported effect that tells you where to look next is worth more than an
+        impressive number that turns out to be leakage. Chapter 5's “test on the training
+        trials” button produces 0.73 in one click. Anyone can produce big numbers. The
+        job is producing true ones.
+      </div>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab, University of Alberta ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+  </div>
+</footer>
+
+<script type="module">
+import {
+  initChrome, svgRoot, frame, scale, el, responsive, token, tooltip,
+} from './assets/site.js';
+
+initChrome();
+const tip = tooltip();
+
+/* ================= the gap ================= */
+{
+  // Danyluik et al. (2025) Table 3, "All trials" column, N = 45.
+  const host = document.getElementById('gap-chart');
+  const PAIRS = [
+    {
+      clf: 'LDA',
+      t: { v: 0.609, lo: 0.582, hi: 0.636 },
+      tf: { v: 0.716, lo: 0.690, hi: 0.743 },
+      test: 't(44) = 6.38, p < 0.001',
+    },
+    {
+      clf: 'SVM',
+      t: { v: 0.573, lo: 0.552, hi: 0.594 },
+      tf: { v: 0.643, lo: 0.616, hi: 0.670 },
+      test: 't(44) = 4.86, p < 0.001',
+    },
+  ];
+  const OURS = 0.580;   // this project's best, chapter 6
+
+  document.getElementById('gap-note').innerHTML =
+    'Both classifiers gain about <b>0.1 AUC</b> from the switch to a spectral representation, on the same trials — '
+    + 'far more than any preprocessing choice in chapter 6 moved anything. The dashed line is our own best '
+    + `time-domain result (${OURS.toFixed(3)}), on a different task, for scale: it sits right beside their time-domain arm. `
+    + 'The puzzle is the vertical jump, not the horizontal comparison.';
+
+  responsive(host, () => {
+    const w = 940, h = 340;
+    const pad = { l: 62, r: 150, t: 28, b: 62 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(-0.5, 3.5, pad.l, w - pad.r);
+    const ys = scale(0.5, 0.78, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, { yLabel: 'AUC', xTicks: [], yFmt: (v) => v.toFixed(2) });
+
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(0.5), y2: ys(0.5),
+      stroke: token('--critical'), 'stroke-width': 1.5, 'stroke-dasharray': '5 3' }, svg);
+    el('text', { x: w - pad.r - 3, y: ys(0.5) - 6, 'text-anchor': 'end', class: 'tick',
+      fill: token('--critical'), 'font-weight': 620 }, svg).textContent = 'chance';
+
+    // our own result, for scale -- muted and finely dashed so it cannot be
+    // mistaken for the red chance line
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(OURS), y2: ys(OURS),
+      stroke: token('--text-muted'), 'stroke-width': 1.5, 'stroke-dasharray': '1 4',
+      'stroke-linecap': 'round' }, svg);
+    el('text', { x: w - pad.r + 8, y: ys(OURS) + 4, class: 'tick',
+      fill: token('--text-secondary'), 'font-weight': 620 }, svg).textContent = 'this project';
+    el('text', { x: w - pad.r + 8, y: ys(OURS) + 17, class: 'tick' }, svg)
+      .textContent = `${OURS.toFixed(3)} · time-domain`;
+
+    const bw = 74;
+    PAIRS.forEach((p, i) => {
+      [['t', 'time-domain', '--series-1', i * 2],
+        ['tf', 'time-frequency', '--series-7', i * 2 + 1]].forEach(([key, label, col, slot]) => {
+        const d = p[key];
+        const cx = xs(slot);
+        // bar anchored to the chance baseline, 4px rounded data-end
+        el('rect', { x: cx - bw / 2, y: ys(d.v), width: bw, height: (h - pad.b) - ys(d.v),
+          rx: 4, fill: token(col), opacity: 0.85 }, svg);
+        // 95% CI
+        el('line', { x1: cx, x2: cx, y1: ys(d.lo), y2: ys(d.hi),
+          stroke: token('--text-primary'), 'stroke-width': 1.5, opacity: 0.7 }, svg);
+        el('line', { x1: cx - 7, x2: cx + 7, y1: ys(d.hi), y2: ys(d.hi),
+          stroke: token('--text-primary'), 'stroke-width': 1.5, opacity: 0.7 }, svg);
+        el('line', { x1: cx - 7, x2: cx + 7, y1: ys(d.lo), y2: ys(d.lo),
+          stroke: token('--text-primary'), 'stroke-width': 1.5, opacity: 0.7 }, svg);
+        el('text', { x: cx, y: ys(d.hi) - 8, 'text-anchor': 'middle', 'font-size': 14,
+          'font-weight': 680, fill: token(col) }, svg).textContent = d.v.toFixed(3);
+        el('text', { x: cx, y: h - pad.b + 17, 'text-anchor': 'middle', class: 'tick',
+          fill: token(col), 'font-weight': 620 }, svg).textContent = label;
+
+        const hit = el('rect', { x: cx - bw / 2, y: pad.t, width: bw, height: h - pad.t - pad.b,
+          fill: 'transparent', style: 'cursor:pointer' }, svg);
+        const html = `<b>${p.clf}, ${label}</b><br>AUC <b>${d.v.toFixed(3)}</b><br>`
+          + `95% CI [${d.lo.toFixed(3)}, ${d.hi.toFixed(3)}]<br>`
+          + `<span style="opacity:.75">Danyluik et al. 2025, Table 3, N = 45</span>`;
+        hit.addEventListener('pointermove', (ev) => tip.show(html, ev.clientX, ev.clientY));
+        hit.addEventListener('pointerleave', () => tip.hide());
+      });
+
+      // the gap, per classifier
+      const a = xs(i * 2), b = xs(i * 2 + 1);
+      const gy = ys(p.tf.hi) - 26;
+      el('path', { d: `M${a} ${gy + 12} v-6 H${b} v6`, stroke: token('--series-7'),
+        fill: 'none', 'stroke-width': 1.5 }, svg);
+      el('text', { x: (a + b) / 2, y: gy - 4, 'text-anchor': 'middle', 'font-size': 12,
+        'font-weight': 660, fill: token('--series-7') }, svg)
+        .textContent = `+${(p.tf.v - p.t.v).toFixed(3)}`;
+      el('text', { x: (a + b) / 2, y: h - pad.b + 36, 'text-anchor': 'middle',
+        class: 'axis-label', 'font-weight': 640 }, svg).textContent = p.clf;
+      el('text', { x: (a + b) / 2, y: h - pad.b + 50, 'text-anchor': 'middle', class: 'tick' }, svg)
+        .textContent = p.test;
+    });
+  });
+}
+
+/* ================= rule-out chart ================= */
+{
+  const host = document.getElementById('ruleout-chart');
+  const DATA = [
+    { name: 'Raw voltage', sign: true, OldNew: 0.579, HitMiss: 0.581, FAvsCR: 0.549 },
+    { name: 'Squared', sign: false, OldNew: 0.530, HitMiss: 0.550, FAvsCR: 0.494 },
+    { name: 'Absolute', sign: false, OldNew: 0.528, HitMiss: 0.543, FAvsCR: 0.497 },
+    { name: 'Cubed', sign: true, OldNew: 0.557, HitMiss: 0.564, FAvsCR: 0.543 },
+  ];
+  const TASKS = [['OldNew', 'Old vs New'], ['HitMiss', 'Hit vs Miss'], ['FAvsCR', 'FA vs CR']];
+  document.getElementById('ruleout-note').innerHTML =
+    'Squaring is the closest a time-domain feature gets to what a spectrogram does. '
+    + 'If that were the whole story, “Squared” would beat “Raw voltage”. It loses to it on all three tasks, '
+    + 'and drops FA vs CR to chance. The shaded transforms are the ones that discard the sign of the voltage.';
+
+  responsive(host, () => {
+    const w = 940, h = 330;
+    const pad = { l: 60, r: 120, t: 26, b: 62 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(-0.5, DATA.length - 0.5, pad.l, w - pad.r);
+    const ys = scale(0.47, 0.60, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, { yLabel: 'AUC', xTicks: [], yFmt: (v) => v.toFixed(2) });
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(0.5), y2: ys(0.5),
+      stroke: token('--critical'), 'stroke-width': 1.5, 'stroke-dasharray': '5 3' }, svg);
+    el('text', { x: w - pad.r - 3, y: ys(0.5) - 6, 'text-anchor': 'end', class: 'tick',
+      fill: token('--critical'), 'font-weight': 620 }, svg).textContent = 'chance';
+
+    DATA.forEach((d, i) => {
+      if (!d.sign) {
+        el('rect', { x: xs(i) - 52, y: pad.t, width: 104, height: h - pad.t - pad.b,
+          fill: token('--critical'), opacity: 0.05 }, svg);
+      }
+      el('text', { x: xs(i), y: h - pad.b + 18, 'text-anchor': 'middle', class: 'axis-label',
+        'font-weight': 640 }, svg).textContent = d.name;
+      el('text', { x: xs(i), y: h - pad.b + 34, 'text-anchor': 'middle', class: 'tick',
+        fill: token(d.sign ? '--good' : '--critical') }, svg)
+        .textContent = d.sign ? 'keeps sign' : 'loses sign';
+    });
+    TASKS.forEach(([key, label], k) => {
+      const pts = DATA.map((d, i) => [xs(i), ys(d[key])]);
+      el('path', { class: 'series-line',
+        d: pts.map((p, i) => `${i ? 'L' : 'M'}${p[0]} ${p[1]}`).join(''),
+        stroke: token(`--series-${k + 1}`) }, svg);
+      el('text', { class: 'direct-label', x: w - pad.r + 8, y: pts[3][1] + 4,
+        fill: token(`--series-${k + 1}`) }, svg).textContent = label;
+      DATA.forEach((d, i) => {
+        el('circle', { cx: xs(i), cy: ys(d[key]), r: 5,
+          fill: token(`--series-${k + 1}`), stroke: token('--surface-1'), 'stroke-width': 1.5,
+          style: 'cursor:pointer' }, svg)
+          .addEventListener('pointermove', (ev) =>
+            tip.show(`<b>${d.name}</b> · ${label}<br>AUC <b>${d[key].toFixed(3)}</b>`, ev.clientX, ev.clientY));
+      });
+    });
+    svg.addEventListener('pointerleave', () => tip.hide());
+  });
+}
+</script>
+</body>
+</html>

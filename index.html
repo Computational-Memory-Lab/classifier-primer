@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classifying memory from EEG — a primer | Computational Memory Lab</title>
+<meta name="description" content="An interactive introduction to the recognition-memory task, pattern classifiers, and how the Computational Memory Lab applies them to single-trial EEG.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory &amp; EEG <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+
+  <section style="padding: 3.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Computational Memory Lab · University of Alberta</p>
+      <h1>Can we tell, from brain activity alone, whether someone remembers a word?</h1>
+      <p class="lede">
+        This is a hands-on introduction to what our lab does and why. It assumes no
+        background in machine learning and no programming. You will build the
+        intuition by playing with the real thing: real EEG, from real participants,
+        with the real results.
+      </p>
+    </div>
+  </section>
+
+  <!-- The hook: the classic effect, and the question. -->
+  <figure class="figure figure--wide" id="hook" style="margin-top: 2.5rem;">
+    <div class="figure__title" id="hook-title">The effect that started all of this</div>
+    <div class="figure__sub" id="hook-sub"></div>
+    <div id="hook-chart"></div>
+    <div class="legend" id="hook-legend" style="margin-top: 0.6rem;"></div>
+    <div class="figure__note" id="hook-note-2"></div>
+  </figure>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>The short version</h2>
+      <p>
+        A participant studies a list of words. A few minutes later they see a mix of
+        studied and unstudied words and call each one <em>old</em> or <em>new</em>.
+        We record their EEG the whole time.
+      </p>
+      <p>
+        The traditional way to analyse this is to average hundreds of trials together
+        and show that some bump in the waveform is reliably bigger for remembered
+        words. That is the chart above, and it is real. But it only establishes that
+        the activity is <strong>correlated</strong> with memory. It does not show the
+        activity is <em>doing</em> anything.
+      </p>
+      <p>
+        A <strong>classifier</strong> sets a harder bar. We give a computer program
+        one single trial's brain activity — not an average, one trial — and ask it to
+        predict what happened. If it can predict trials it has never seen, we have
+        narrowed in on activity that is actually memory-relevant.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 44rem;">
+      <div class="figure__title">What we actually find</div>
+      <div class="figure__sub">Averaged over 67 participants. AUC is a prediction score: 0.5 is pure chance, 1.0 is perfect.</div>
+      <div class="stats" id="headline-stats"></div>
+      <div class="figure__note" id="headline-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>Read that honestly.</strong> An AUC of 0.58 is a long way from 1.0.
+        Single-trial EEG carries real memory information — reliably, across dozens of
+        participants — but not very much of it. That modest number is the finding, not
+        a bug. Getting comfortable with that is most of what it means to work here.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>What this site covers</h2>
+      <p>
+        Eight short chapters. Chapters 1–4 assume nothing at all. Chapter 5 lets you
+        train a real classifier in your browser, and chapters 6–7 are where the actual
+        open research question lives.
+      </p>
+    </div>
+    <div class="cards" id="chapter-cards" style="margin-top: 1.6rem;"></div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Where the numbers on this site come from</h2>
+      <p>
+        Everything quoted here is computed from the lab's actual data rather than
+        typed in by hand. The group results are recomputed from the per-participant
+        classifier outputs committed in
+        <code>outputs/</code>; the brain waves and the trainable classifier in chapter 5
+        are built from one participant's EEG on the lab Drive.
+      </p>
+      <p class="small muted">
+        The EEG was recorded by <a href="https://doi.org/10.1007/s00221-014-4003-0">Chen et al. (2014)</a>:
+        67 participants, 257 electrodes, 250 samples per second. The full provenance is
+        traced in <code>data/DATA.md</code>. This site ships only small derived
+        summaries — no raw EEG, nothing identifiable.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab, University of Alberta ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a> ·
+    Built for incoming lab members. Corrections welcome.
+  </div>
+</footer>
+
+<script type="module">
+import {
+  initChrome, CHAPTERS, loadJSON, svgRoot, frame, scale, linePath, el,
+  responsive, token, tooltip, tTest, mean,
+} from './assets/site.js';
+
+initChrome();
+
+/* ---- chapter cards ---- */
+const blurbs = {
+  'task.html': 'What participants actually do, and the four things that can happen on a trial. Try a block yourself.',
+  'why-classifiers.html': 'Why averaging is not enough, what prediction buys you, and how AUC measures it.',
+  'features.html': 'How a wiggly voltage trace becomes the 280 numbers a classifier reads.',
+  'how-it-learns.html': 'Drag a decision boundary around and watch it get things wrong. Then meet cross-validation.',
+  'try-it.html': 'Train a real classifier on real EEG, in this page, and see the AUC come out.',
+  'results.html': 'Every participant, every classifier, every pipeline choice we have tested.',
+  'open-question.html': 'The actual unsolved problem this lab is working on right now.',
+  'reading.html': 'The four papers to read, and how to get the code running.',
+};
+document.getElementById('chapter-cards').innerHTML = CHAPTERS
+  .filter((c) => c.href !== 'index.html')
+  .map((c) => `<a href="${c.href}">
+      <div class="n">${c.short.split('.')[0].padStart(2, '0')}</div>
+      <h3>${c.title}</h3>
+      <p>${blurbs[c.href] || ''}</p>
+    </a>`).join('');
+
+/* ---- headline stats ---- */
+const P = await loadJSON('data/participants.json');
+const tasks = [
+  ['OldNew', 'Old vs New', 'Was the word actually studied?'],
+  ['HitMiss', 'Hit vs Miss', 'Will a studied word be remembered?'],
+  ['FAvsCR', 'FA vs CR', 'Will a new word be falsely called old?'],
+];
+document.getElementById('headline-stats').innerHTML = tasks.map(([k, label]) => {
+  const g = P.group.lda[k];
+  return `<div class="stat">
+      <div class="stat__value">${g.mean.toFixed(3)}</div>
+      <div class="stat__label">${label}<br><span class="muted">N = ${g.n} · AUC</span></div>
+    </div>`;
+}).join('');
+const g0 = P.group.lda.OldNew;
+document.getElementById('headline-note').textContent =
+  `Linear discriminant analysis on raw time-domain features. Old vs New: `
+  + `95% CI [${g0.ci[0].toFixed(3)}, ${g0.ci[1].toFixed(3)}], `
+  + `t(${g0.df}) = ${g0.t.toFixed(2)}, p < 0.001 against chance. `
+  + `Recomputed in your browser from outputs/LDA/LDA_results_raw.mat.`;
+
+/* ---- hook chart: the grand-average old/new effect at Fz ----
+   Deliberately the grand average, not one participant: a single person's ERP is
+   far too noisy to show this. For participant 45 the Hit/CR difference here is
+   about 0.02 µV, i.e. nothing. The effect is a group-level phenomenon. */
+const G = await loadJSON('data/grand_erp.json');
+const host = document.getElementById('hook-chart');
+const series = [
+  { key: 'Hit', label: 'Hit', color: '--c-hit' },
+  { key: 'CR', label: 'Correct Rejection', color: '--c-cr' },
+];
+const wave = G.channels[String(G.fz)];
+
+document.getElementById('hook-sub').innerHTML =
+  `Brain response at the front of the head, averaged over all <b>${G.nParticipants} participants</b>, `
+  + `for words correctly recognised as old (Hits) versus new words correctly called new `
+  + `(Correct Rejections). Shaded bands are ±1 standard error across participants.`;
+document.getElementById('hook-legend').innerHTML = series.map((s) =>
+  `<span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token(s.color)}"></span>${s.label}</span>`
+).join('') + `<span class="legend__item muted">Electrode ${G.fz} (Fz), front midline · N = ${wave.Hit.n}</span>`;
+
+/* The classic effect, measured live: each participant's mean voltage in the
+   FN400 window, Hit minus Correct Rejection, tested against zero. */
+{
+  const diffs = G.windowMeans
+    .filter((r) => r.Fz_FN400_Hit !== null && r.Fz_FN400_CR !== null)
+    .map((r) => r.Fz_FN400_Hit - r.Fz_FN400_CR);
+  const s = tTest(diffs, 0);
+  document.getElementById('hook-note-2').innerHTML =
+    `The big dip just after 100 ms is the brain reacting to <em>seeing</em> a word — it happens `
+    + `whether or not the word is remembered. The interesting part is the shaded window, where the `
+    + `two lines pull apart. Hover to read the difference at any moment.<br><br>`
+    + `Measured across all ${diffs.length} participants, Hits are <b>${mean(diffs).toFixed(2)} µV</b> `
+    + `more positive than Correct Rejections in that window `
+    + `(t(${s.df}) = ${s.t.toFixed(2)}, p = ${s.p < 0.001 ? '< 0.001' : s.p.toFixed(3)}). `
+    + `That is a real, replicable effect — and it is about a fifth of a microvolt. `
+    + `It is the foundation of forty years of memory research, and this site is about why `
+    + `a gap that size is not enough.`;
+}
+
+const tip = tooltip();
+
+responsive(host, () => {
+  const w = 900, h = 340;
+  const pad = { l: 52, r: 84, t: 14, b: 34 };
+  const svg = svgRoot(host, w, h);
+  const all = series.flatMap((s) => wave[s.key].mean.flatMap((m, i) =>
+    [m + wave[s.key].sem[i], m - wave[s.key].sem[i]]));
+  const lo = Math.min(...all), hi = Math.max(...all);
+  const padY = (hi - lo) * 0.12;
+  const xs = scale(G.times[0], G.times[G.times.length - 1], pad.l, w - pad.r);
+  const ys = scale(lo - padY, hi + padY, h - pad.b, pad.t);
+
+  frame(svg, w, h, pad, xs, ys, {
+    xLabel: 'Time from word onset (ms)',
+    yLabel: 'Voltage (µV)',
+    xTicks: [0, 200, 400, 600, 800, 1000, 1200],
+    yFmt: (v) => v.toFixed(1),
+  });
+
+  // the FN400 window -- where the classic old/new difference is measured
+  el('rect', {
+    x: xs(300), y: pad.t, width: xs(500) - xs(300), height: h - pad.t - pad.b,
+    fill: token('--text-muted'), opacity: 0.1,
+  }, svg);
+  el('text', { class: 'tick', x: (xs(300) + xs(500)) / 2, y: pad.t + 10, 'text-anchor': 'middle' }, svg)
+    .textContent = '300–500 ms';
+
+  // stimulus onset
+  el('line', { x1: xs(0), x2: xs(0), y1: pad.t, y2: h - pad.b, stroke: token('--baseline'), 'stroke-width': 1.5, 'stroke-dasharray': '3 3' }, svg);
+  el('text', { class: 'tick', x: xs(0) + 5, y: pad.t + 10 }, svg).textContent = 'word appears';
+  el('line', { x1: pad.l, x2: w - pad.r, y1: ys(0), y2: ys(0), stroke: token('--gridline') }, svg);
+
+  // SEM ribbons first, so the lines sit on top
+  for (const s of series) {
+    const d = wave[s.key];
+    const up = G.times.map((t, i) => [xs(t), ys(d.mean[i] + d.sem[i])]);
+    const dn = G.times.map((t, i) => [xs(t), ys(d.mean[i] - d.sem[i])]).reverse();
+    el('path', {
+      d: linePath(up) + linePath(dn).replace('M', 'L') + 'Z',
+      fill: token(s.color), opacity: 0.18, stroke: 'none',
+    }, svg);
+  }
+  for (const s of series) {
+    const pts = G.times.map((t, i) => [xs(t), ys(wave[s.key].mean[i])]);
+    el('path', { class: 'series-line', d: linePath(pts), stroke: token(s.color) }, svg);
+    const last = pts[pts.length - 1];
+    el('text', {
+      class: 'direct-label', x: w - pad.r + 7, y: last[1] + 4, fill: token(s.color),
+    }, svg).textContent = s.label === 'Correct Rejection' ? 'Corr. Rej.' : s.label;
+  }
+
+  // hover crosshair
+  const cross = el('line', { y1: pad.t, y2: h - pad.b, stroke: token('--text-muted'), 'stroke-width': 1, opacity: 0 }, svg);
+  const hit = el('rect', { x: pad.l, y: pad.t, width: w - pad.l - pad.r, height: h - pad.t - pad.b, fill: 'transparent' }, svg);
+  hit.addEventListener('pointermove', (ev) => {
+    const box = svg.getBoundingClientRect();
+    const px = ((ev.clientX - box.left) / box.width) * w;
+    const t = xs.invert(px);
+    let i = 0, best = Infinity;
+    G.times.forEach((v, k) => { const d = Math.abs(v - t); if (d < best) { best = d; i = k; } });
+    cross.setAttribute('x1', xs(G.times[i]));
+    cross.setAttribute('x2', xs(G.times[i]));
+    cross.setAttribute('opacity', 0.5);
+    tip.show(
+      `<b>${Math.round(G.times[i])} ms</b><br>`
+      + series.map((s) => `<span style="color:${token(s.color)}">■</span> ${s.label}: <b>${wave[s.key].mean[i].toFixed(2)} µV</b> ± ${wave[s.key].sem[i].toFixed(2)}`).join('<br>')
+      + `<br><span style="opacity:.6">difference: ${(wave.Hit.mean[i] - wave.CR.mean[i]).toFixed(2)} µV</span>`,
+      ev.clientX, ev.clientY,
+    );
+  });
+  hit.addEventListener('pointerleave', () => { cross.setAttribute('opacity', 0); tip.hide(); });
+});
+</script>
+</body>
+</html>

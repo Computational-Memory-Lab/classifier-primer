@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3. From brain waves to 280 numbers | CML primer</title>
+<meta name="description" content="How one trial of 257-channel EEG becomes the 280-number feature vector a classifier actually reads.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory &amp; EEG <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Chapter 3</p>
+      <h1>From brain waves to 280 numbers</h1>
+      <p class="lede">
+        A classifier cannot read a squiggle. It reads a list of numbers. This chapter is
+        about how we turn one into the other — and why that step is where most of the
+        interesting decisions get made.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>What one trial actually is</h2>
+      <p>
+        When a word appears on screen, we save a slice of EEG running from 100 ms
+        <em>before</em> the word to 1,200 ms after it. Every electrode is sampled 250
+        times a second, so that slice is 325 measurements per electrode.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 44rem;">
+      <div class="figure__title">The shape of one participant's data</div>
+      <div id="cube"></div>
+      <div class="figure__note">
+        That is 37.5 million numbers per participant, and about 140 MB on disk. Multiply
+        by 67 people and you have the 8.7 GB sitting on the lab Drive.
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
+        We cannot hand a classifier 83,525 numbers per trial. With only 450 trials to
+        learn from, a model with that many inputs would simply memorise the training
+        trials — the problem chapter 4 calls overfitting. So we have to reduce. Two
+        decisions do almost all the reducing: <strong>which electrodes</strong>, and
+        <strong>how finely in time</strong>.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Decision 1: ten electrodes out of 257</h2>
+      <p>
+        The pipeline keeps ten. They are written into the code as a bare list of
+        numbers, with no names attached:
+      </p>
+      <p><code>electrodes = [64 194 21 41 214 8 101 87 153 137]</code></p>
+      <p>
+        Two of them you will meet again and again: <strong>21</strong> is Fz, near the
+        front of the head on the midline, and <strong>87</strong> is P3, back and to the
+        left. Those are the two the classic ERP analysis uses.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Each of the ten electrodes, for participant 45</div>
+      <div class="figure__sub">
+        Click an electrode to see its Hit and Correct Rejection averages. Notice how
+        different they look from one another — that variety is exactly why using ten
+        beats using one.
+      </div>
+      <div class="controls" id="elec-controls"></div>
+      <div id="elec-chart"></div>
+      <div class="legend" id="elec-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="elec-note"></div>
+    </div>
+
+    <details class="aside" style="max-width:34rem;margin:1.4rem auto">
+      <summary>Why these ten, specifically?</summary>
+      <p class="small">
+        Honest answer: to match the earlier study this project follows. The only note in
+        the code says <em>“10 electrodes to match suchetas approach”</em>, referring to
+        <a href="https://doi.org/10.1152/jn.00293.2020">Chakravarty et al. (2020)</a>.
+        Whether a different ten — or all 257 — would do better is an open question, and
+        one nobody has swept. It is on the list of unclaimed threads at the end of
+        chapter 7, and it is a genuinely available project for a new student.
+      </p>
+    </details>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Decision 2: chop time into overlapping bins</h2>
+      <p>
+        325 time points per electrode is still too many, and neighbouring points are
+        nearly identical anyway. So we slide a <strong>100 ms window</strong> along the
+        trace in <strong>40 ms steps</strong>, and average the voltage inside each
+        window. Each window becomes one number.
+      </p>
+      <p>
+        Because the step is smaller than the window, consecutive bins overlap by 60 ms.
+        That is deliberate: it means a feature is never split awkwardly across a
+        boundary.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Watch the binning happen</div>
+      <div class="figure__sub">
+        Drag to move the window along the real waveform. The bar underneath is the
+        feature value that window produces.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Bin
+          <input type="range" id="bin-idx" min="0" max="27" value="8">
+          <output id="bin-out"></output>
+        </label>
+        <button class="btn" id="bin-play">▶ Sweep all 28</button>
+        <label class="field">
+          <input type="checkbox" id="bin-all"> Show all 28 at once
+        </label>
+      </div>
+      <div id="bin-chart"></div>
+      <div class="figure__note" id="bin-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        The window starts at 0 ms — the baseline before the word is skipped entirely,
+        since it is by definition the period before anything happened. Sliding to the end
+        gives <strong>28 bins</strong>, the last one finishing at about 1,176 ms.
+      </p>
+      <div class="callout">
+        <strong>10 electrodes × 28 bins = 280 features.</strong> That is the number you
+        will see everywhere in this project. One trial, which started as 83,525 numbers,
+        is now a list of 280.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>The finished product</h2>
+      <p>
+        Here is what the classifier actually gets: a table with one row per trial and 280
+        columns, plus a single answer column saying what happened on that trial. This is
+        real — it is participant 45's feature matrix, computed from their EEG with the
+        same recipe the MATLAB pipeline uses.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Participant 45's feature matrix, X</div>
+      <div class="figure__sub">
+        450 trials × 280 features. Colour is voltage: blue is negative, red positive.
+        Hover any cell. Rows are sorted by outcome so the four conditions are grouped.
+      </div>
+      <div class="controls" id="mat-controls"></div>
+      <div id="matrix-chart"></div>
+      <div class="figure__note" id="matrix-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        Look at it honestly: it looks like static. There is no visible band that
+        separates Hits from Misses, no obvious stripe where memory lives. If the effect
+        were plain to the eye we would not need a classifier at all.
+      </p>
+      <p>
+        That is the situation in a sentence. The information is in there — chapter 5 will
+        pull it out, above chance, on this exact matrix — but it is spread thinly across
+        many features, and no single one carries much of it. Finding structure in a table
+        that looks like this is precisely what classifiers are for.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Everything else on that list is a choice too</h2>
+      <p>
+        The 100 ms window, the 40 ms step, the ten electrodes, using raw voltage rather
+        than something derived from it — none of these were handed down. Somebody picked
+        each one, and a different choice would give a different answer.
+      </p>
+      <p>
+        That is not a flaw in this project. It <em>is</em> the project. The whole point of
+        the manuscript is to work out which of these choices actually matter, so future
+        studies can stop guessing. Chapter 6 shows what happens when you vary them.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab, University of Alberta ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+  </div>
+</footer>
+
+<script type="module">
+import {
+  initChrome, loadJSON, loadBin, svgRoot, frame, scale, linePath, el,
+  responsive, token, tooltip, mean,
+} from './assets/site.js';
+
+initChrome();
+const tip = tooltip();
+
+const E = await loadJSON('data/erp.json');
+const F = await loadJSON('data/features_45.json');
+const fbuf = await loadBin('data/features_45.bin');
+const fraw = new Int16Array(fbuf);
+const [nTrials, nFeat] = F.shape;
+const X = (r, c) => fraw[r * nFeat + c] * F.scale;
+const ELECS = F.electrodes;
+const NBINS = F.binStartMs.length;
+
+/* ================= data cube ================= */
+{
+  const host = document.getElementById('cube');
+  responsive(host, () => {
+    const w = 620, h = 230;
+    const svg = svgRoot(host, w, h);
+    const ox = 190, oy = 42, bw = 210, bh = 120, dx = 62, dy = -34;
+    const face = (pts, fill, op) => el('polygon', {
+      points: pts.map((p) => p.join(',')).join(' '),
+      fill, opacity: op, stroke: token('--border-strong'), 'stroke-width': 1,
+    }, svg);
+    // front, top, side
+    face([[ox, oy], [ox + bw, oy], [ox + bw, oy + bh], [ox, oy + bh]], token('--series-1'), 0.18);
+    face([[ox, oy], [ox + dx, oy + dy], [ox + bw + dx, oy + dy], [ox + bw, oy]], token('--series-1'), 0.32);
+    face([[ox + bw, oy], [ox + bw + dx, oy + dy], [ox + bw + dx, oy + bh + dy], [ox + bw, oy + bh]], token('--series-1'), 0.24);
+
+    const lab = (x, y, t, anchor = 'middle', weight = 600, size = 12, fill = '--text-primary') =>
+      el('text', { x, y, 'text-anchor': anchor, 'font-size': size, 'font-weight': weight,
+        fill: token(fill) }, svg).textContent = t;
+
+    lab(ox + bw / 2, oy + bh + 22, '325 time points', 'middle', 620);
+    lab(ox + bw / 2, oy + bh + 37, '−100 to +1200 ms, 250 per second', 'middle', 400, 10.5, '--text-muted');
+    lab(ox - 10, oy + bh / 2, '257', 'end', 620);
+    lab(ox - 10, oy + bh / 2 + 15, 'electrodes', 'end', 400, 10.5, '--text-muted');
+    lab(ox + bw + dx + 8, oy + dy + bh / 2, '450 trials', 'start', 620);
+    lab(ox + bw + dx + 8, oy + dy + bh / 2 + 15, 'one per test word', 'start', 400, 10.5, '--text-muted');
+
+    el('text', { x: w / 2, y: h - 8, 'text-anchor': 'middle', class: 'tick' }, svg)
+      .textContent = 'test_45.mat  ·  data: 257 × 325 × 450  ·  one trial = 257 × 325 = 83,525 numbers';
+  });
+}
+
+/* ================= per-electrode ERPs ================= */
+{
+  const host = document.getElementById('elec-chart');
+  const ctrls = document.getElementById('elec-controls');
+  const note = document.getElementById('elec-note');
+  const legend = document.getElementById('elec-legend');
+  let cur = 21;
+
+  const NAMES = { 21: 'Fz — front midline', 87: 'P3 — left parietal' };
+  ctrls.innerHTML = `<div class="segmented">${ELECS.map((e) =>
+    `<button data-e="${e}" aria-pressed="${e === cur}">${e}</button>`).join('')}</div>`;
+  ctrls.querySelectorAll('button').forEach((b) => {
+    b.onclick = () => {
+      cur = +b.dataset.e;
+      ctrls.querySelectorAll('button').forEach((o) => o.setAttribute('aria-pressed', +o.dataset.e === cur));
+      draw();
+    };
+  });
+  legend.innerHTML = `
+    <span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token('--c-hit')}"></span>Hit</span>
+    <span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token('--c-cr')}"></span>Correct Rejection</span>`;
+
+  let draw;
+  draw = () => {
+    const wave = E.channels[String(cur)];
+    const w = 940, h = 280;
+    const pad = { l: 52, r: 76, t: 14, b: 36 };
+    const svg = svgRoot(host, w, h);
+    const all = [...wave.Hit, ...wave.CR];
+    const lo = Math.min(...all), hi = Math.max(...all);
+    const m = (hi - lo) * 0.14;
+    const xs = scale(E.times[0], E.times[E.times.length - 1], pad.l, w - pad.r);
+    const ys = scale(lo - m, hi + m, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      xLabel: 'Time from word onset (ms)', yLabel: 'Voltage (µV)',
+      xTicks: [0, 200, 400, 600, 800, 1000, 1200], yFmt: (v) => v.toFixed(1),
+    });
+    el('line', { x1: xs(0), x2: xs(0), y1: pad.t, y2: h - pad.b, stroke: token('--baseline'), 'stroke-dasharray': '3 3' }, svg);
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(0), y2: ys(0), stroke: token('--gridline') }, svg);
+    for (const [key, col, label] of [['Hit', '--c-hit', 'Hit'], ['CR', '--c-cr', 'Corr. Rej.']]) {
+      const pts = E.times.map((t, i) => [xs(t), ys(wave[key][i])]);
+      el('path', { class: 'series-line', d: linePath(pts), stroke: token(col) }, svg);
+      el('text', { class: 'direct-label', x: w - pad.r + 6, y: pts[pts.length - 1][1] + 4,
+        fill: token(col) }, svg).textContent = label;
+    }
+    el('text', { x: pad.l + 6, y: pad.t + 12, class: 'axis-label', 'font-weight': 640 }, svg)
+      .textContent = NAMES[cur] ? `Electrode ${cur} · ${NAMES[cur]}` : `Electrode ${cur}`;
+    note.textContent = NAMES[cur]
+      ? `Electrode ${cur} is one of the two the classic ERP analysis relies on. Every one of the ten feeds 28 features into the classifier.`
+      : `Electrode ${cur}. The pipeline gives this the same weight as Fz and P3 — the classifier decides for itself which are worth listening to.`;
+  };
+  responsive(host, draw);
+}
+
+/* ================= binning ================= */
+{
+  const host = document.getElementById('bin-chart');
+  const note = document.getElementById('bin-note');
+  const slider = document.getElementById('bin-idx');
+  const out = document.getElementById('bin-out');
+  const showAll = document.getElementById('bin-all');
+  const CH = 21;
+  const wave = E.channels[String(CH)].Hit;
+
+  const binValue = (b) => {
+    const lo = F.binStartMs[b], hi = lo + F.binWidthMs;
+    const inWin = E.times.map((t, i) => (t >= lo && t < hi ? i : -1)).filter((i) => i >= 0);
+    return mean(inWin.map((i) => wave[i]));
+  };
+  const vals = Array.from({ length: NBINS }, (_, b) => binValue(b));
+
+  let draw;
+  draw = () => {
+    const b = +slider.value;
+    const lo = F.binStartMs[b], hi = lo + F.binWidthMs;
+    out.textContent = `${b + 1} of 28`;
+    const w = 940, h = 400;
+    const pad = { l: 52, r: 22, t: 14, b: 160 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(E.times[0], E.times[E.times.length - 1], pad.l, w - pad.r);
+    const lo0 = Math.min(...wave), hi0 = Math.max(...wave);
+    const ys = scale(lo0 - 0.5, hi0 + 0.5, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      yLabel: 'Voltage (µV)', xTicks: [0, 200, 400, 600, 800, 1000, 1200], yFmt: (v) => v.toFixed(1),
+    });
+    el('text', { x: (pad.l + w - pad.r) / 2, y: h - pad.b + 30, 'text-anchor': 'middle', class: 'axis-label' }, svg)
+      .textContent = 'Time from word onset (ms)';
+
+    if (showAll.checked) {
+      for (let k = 0; k < NBINS; k++) {
+        const a = F.binStartMs[k];
+        el('rect', { x: xs(a), y: pad.t, width: xs(a + F.binWidthMs) - xs(a), height: h - pad.b - pad.t,
+          fill: token('--series-1'), opacity: 0.05, stroke: token('--series-1'), 'stroke-opacity': 0.25 }, svg);
+      }
+    }
+    // the active window
+    el('rect', { x: xs(lo), y: pad.t, width: xs(hi) - xs(lo), height: h - pad.b - pad.t,
+      fill: token('--series-6'), opacity: 0.16, stroke: token('--series-6'), 'stroke-width': 1.5 }, svg);
+
+    el('path', { class: 'series-line', d: linePath(E.times.map((t, i) => [xs(t), ys(wave[i])])),
+      stroke: token('--c-hit') }, svg);
+    // the mean line inside the window
+    el('line', { x1: xs(lo), x2: xs(hi), y1: ys(vals[b]), y2: ys(vals[b]),
+      stroke: token('--series-6'), 'stroke-width': 3 }, svg);
+    el('text', { x: (xs(lo) + xs(hi)) / 2, y: ys(vals[b]) - 8, 'text-anchor': 'middle',
+      'font-size': 11, 'font-weight': 640, fill: token('--series-6'), stroke: token('--surface-1'), 'stroke-width': 4, 'stroke-linejoin': 'round', style: 'paint-order:stroke fill' }, svg)
+      .textContent = `${vals[b].toFixed(2)} µV`;
+    el('line', { x1: xs(0), x2: xs(0), y1: pad.t, y2: h - pad.b, stroke: token('--baseline'), 'stroke-dasharray': '3 3' }, svg);
+
+    // the resulting 28 features as a bar strip
+    const by = h - 92, bh = 34;
+    el('text', { x: pad.l, y: by - 10, class: 'axis-label', 'font-weight': 620 }, svg)
+      .textContent = 'the 28 features this electrode produces';
+    const cw = (w - pad.l - pad.r) / NBINS;
+    const lim = Math.max(...vals.map(Math.abs));
+    for (let k = 0; k < NBINS; k++) {
+      const x = pad.l + k * cw;
+      const v = vals[k];
+      const hgt = (Math.abs(v) / lim) * (bh / 2);
+      // 2px gap between adjacent fills, ends anchored to the zero baseline
+      el('rect', {
+        x: x + 1, width: Math.max(1, cw - 2),
+        y: v >= 0 ? by + bh / 2 - hgt : by + bh / 2,
+        height: Math.max(1, hgt), rx: 2,
+        fill: token(k === b ? '--series-6' : '--series-1'),
+        opacity: k === b ? 1 : (showAll.checked ? 0.75 : 0.35),
+      }, svg);
+    }
+    el('line', { x1: pad.l, x2: w - pad.r, y1: by + bh / 2, y2: by + bh / 2, stroke: token('--baseline') }, svg);
+    el('text', { x: pad.l, y: by + bh + 14, class: 'tick' }, svg).textContent = 'bin 1 (0 ms)';
+    el('text', { x: w - pad.r, y: by + bh + 14, 'text-anchor': 'end', class: 'tick' }, svg).textContent = 'bin 28 (1080 ms)';
+
+    note.innerHTML = `Bin <b>${b + 1}</b> covers <b>${lo}–${lo + F.binWidthMs} ms</b>. `
+      + `Its 25 voltage samples average to <b>${vals[b].toFixed(2)} µV</b>, and that single number is `
+      + `feature ${b + 1} of 280. The next bin starts just ${F.binStepMs} ms later, so it re-uses 60 ms of the same signal.`;
+  };
+  slider.addEventListener('input', draw);
+  showAll.addEventListener('change', draw);
+  let timer = null;
+  document.getElementById('bin-play').onclick = (ev) => {
+    if (timer) { clearInterval(timer); timer = null; ev.target.textContent = '▶ Sweep all 28'; return; }
+    ev.target.textContent = '❚❚ Pause';
+    slider.value = 0; draw();
+    timer = setInterval(() => {
+      const v = +slider.value;
+      if (v >= 27) { clearInterval(timer); timer = null; ev.target.textContent = '▶ Sweep all 28'; return; }
+      slider.value = v + 1; draw();
+    }, 220);
+  };
+  responsive(host, draw);
+}
+
+/* ================= feature matrix heatmap ================= */
+{
+  const host = document.getElementById('matrix-chart');
+  const ctrls = document.getElementById('mat-controls');
+  const note = document.getElementById('matrix-note');
+  const NAMES = { 1: 'Hit', 2: 'Miss', 3: 'Correct Rejection', 4: 'False Alarm' };
+  const COLS = { 1: '--c-hit', 2: '--c-miss', 3: '--c-cr', 4: '--c-fa' };
+
+  // sort rows by condition
+  const order = [];
+  for (const c of [1, 2, 4, 3]) F.labels.forEach((v, i) => { if (v === c) order.push(i); });
+
+  let sortBy = 'cond';
+  ctrls.innerHTML = `<div class="segmented" id="mat-sort">
+      <button data-v="cond" aria-pressed="true">Group by outcome</button>
+      <button data-v="orig" aria-pressed="false">Original trial order</button>
+    </div>`;
+  ctrls.querySelectorAll('#mat-sort button').forEach((b) => {
+    b.onclick = () => {
+      sortBy = b.dataset.v;
+      ctrls.querySelectorAll('#mat-sort button').forEach((o) => o.setAttribute('aria-pressed', o.dataset.v === sortBy));
+      draw();
+    };
+  });
+
+  // robust colour limit
+  const sample = [];
+  for (let i = 0; i < nTrials; i += 3) for (let j = 0; j < nFeat; j += 3) sample.push(Math.abs(X(i, j)));
+  sample.sort((a, b) => a - b);
+  const lim = sample[Math.floor(sample.length * 0.97)];
+
+  note.innerHTML = `Colour limit ±${lim.toFixed(1)} µV. Columns 1–28 are electrode ${ELECS[0]}'s bins, `
+    + `29–56 are electrode ${ELECS[1]}'s, and so on — the matrix is built electrode by electrode. `
+    + `Values come straight from <code>features_45.bin</code>, computed by the same recipe as the MATLAB pipeline.`;
+
+  let draw;
+  draw = () => {
+    const w = 940, h = 430;
+    const pad = { l: 92, r: 16, t: 22, b: 46 };
+    const svg = svgRoot(host, w, h);
+    const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+    const rows = sortBy === 'cond' ? order : Array.from({ length: nTrials }, (_, i) => i);
+
+    // render to a canvas for speed, then embed
+    const cvs = document.createElement('canvas');
+    cvs.width = nFeat; cvs.height = nTrials;
+    const ctx = cvs.getContext('2d');
+    const img = ctx.createImageData(nFeat, nTrials);
+    // diverging blue <-> red with a neutral midpoint
+    for (let r = 0; r < nTrials; r++) {
+      for (let c = 0; c < nFeat; c++) {
+        const v = Math.max(-1, Math.min(1, X(rows[r], c) / lim));
+        const t = (v + 1) / 2;
+        // blue (42,120,214) -> neutral (150,150,148) -> red (208,59,59)
+        let R, G, B;
+        if (t < 0.5) {
+          const u = t * 2;
+          R = 42 + (150 - 42) * u; G = 120 + (150 - 120) * u; B = 214 + (148 - 214) * u;
+        } else {
+          const u = (t - 0.5) * 2;
+          R = 150 + (208 - 150) * u; G = 150 + (59 - 150) * u; B = 148 + (59 - 148) * u;
+        }
+        const o = (r * nFeat + c) * 4;
+        img.data[o] = R; img.data[o + 1] = G; img.data[o + 2] = B; img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    el('image', {
+      x: pad.l, y: pad.t, width: pw, height: ph,
+      href: cvs.toDataURL(), preserveAspectRatio: 'none',
+      style: 'image-rendering:pixelated',
+    }, svg);
+    el('rect', { x: pad.l, y: pad.t, width: pw, height: ph, fill: 'none', stroke: token('--border-strong') }, svg);
+
+    // electrode boundaries
+    for (let e = 1; e < ELECS.length; e++) {
+      const x = pad.l + (e * NBINS / nFeat) * pw;
+      el('line', { x1: x, x2: x, y1: pad.t, y2: pad.t + ph, stroke: token('--surface-1'), 'stroke-width': 1, opacity: 0.55 }, svg);
+    }
+    ELECS.forEach((e, i) => {
+      const x = pad.l + ((i + 0.5) * NBINS / nFeat) * pw;
+      el('text', { x, y: pad.t - 7, 'text-anchor': 'middle', class: 'tick' }, svg).textContent = e;
+    });
+    el('text', { x: pad.l + pw / 2, y: h - 6, 'text-anchor': 'middle', class: 'axis-label' }, svg)
+      .textContent = '280 features — ten electrodes, 28 time bins each';
+    el('text', { x: pad.l + pw / 2, y: pad.t - 22, 'text-anchor': 'middle', class: 'tick' }, svg)
+      .textContent = 'electrode';
+
+    // condition ribbon
+    if (sortBy === 'cond') {
+      let y = pad.t;
+      for (const c of [1, 2, 4, 3]) {
+        const n = F.labels.filter((v) => v === c).length;
+        const hh = (n / nTrials) * ph;
+        el('rect', { x: pad.l - 12, y, width: 8, height: Math.max(1, hh - 1), rx: 2, fill: token(COLS[c]) }, svg);
+        if (hh > 13) {
+          el('text', { x: pad.l - 18, y: y + hh / 2 + 3.5, 'text-anchor': 'end', class: 'tick',
+            fill: token('--text-secondary'), 'font-weight': 600 }, svg).textContent = `${NAMES[c]} (${n})`;
+        } else {
+          el('text', { x: pad.l - 18, y: y + hh / 2 + 3.5, 'text-anchor': 'end', class: 'tick',
+            fill: token(COLS[c]), 'font-weight': 600 }, svg).textContent = `FA (${n})`;
+        }
+        y += hh;
+      }
+    } else {
+      el('text', { x: pad.l - 10, y: pad.t + ph / 2, 'text-anchor': 'middle', class: 'axis-label',
+        transform: `rotate(-90 ${pad.l - 10} ${pad.t + ph / 2})` }, svg).textContent = '450 trials, as recorded';
+    }
+
+    // colour key
+    const kx = w - pad.r - 130, ky = pad.t + 6;
+    const defs = el('defs', {}, svg);
+    const g = el('linearGradient', { id: 'divg', x1: '0', x2: '1' }, defs);
+    el('stop', { offset: '0', 'stop-color': 'rgb(42,120,214)' }, g);
+    el('stop', { offset: '0.5', 'stop-color': 'rgb(150,150,148)' }, g);
+    el('stop', { offset: '1', 'stop-color': 'rgb(208,59,59)' }, g);
+
+    // hover
+    const hit = el('rect', { x: pad.l, y: pad.t, width: pw, height: ph, fill: 'transparent', style: 'cursor:crosshair' }, svg);
+    hit.addEventListener('pointermove', (ev) => {
+      const box = svg.getBoundingClientRect();
+      const fx = ((ev.clientX - box.left) / box.width) * w;
+      const fy = ((ev.clientY - box.top) / box.height) * h;
+      const c = Math.floor(((fx - pad.l) / pw) * nFeat);
+      const r = Math.floor(((fy - pad.t) / ph) * nTrials);
+      if (c < 0 || c >= nFeat || r < 0 || r >= nTrials) return;
+      const trialIdx = rows[r];
+      const e = ELECS[Math.floor(c / NBINS)];
+      const b = c % NBINS;
+      const code = F.labels[trialIdx];
+      tip.show(
+        `<b>Trial ${trialIdx + 1}</b> — <span style="color:${token(COLS[code])}">${NAMES[code]}</span><br>`
+        + `electrode <b>${e}</b>, bin <b>${b + 1}</b> (${F.binStartMs[b]}–${F.binStartMs[b] + F.binWidthMs} ms)<br>`
+        + `value: <b>${X(trialIdx, c).toFixed(2)} µV</b><br>`
+        + `<span style="opacity:.6">feature ${c + 1} of 280</span>`,
+        ev.clientX, ev.clientY,
+      );
+    });
+    hit.addEventListener('pointerleave', () => tip.hide());
+  };
+  responsive(host, draw);
+}
+</script>
+</body>
+</html>

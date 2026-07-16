@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8. Where to go next | CML primer</title>
+<meta name="description" content="The four papers to read, how to get the code and data running, and where to start contributing.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory &amp; EEG <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Chapter 8</p>
+      <h1>Where to go next</h1>
+      <p class="lede">
+        You now have the whole picture. This chapter is the practical part: what to read,
+        how to run things, and what to be ready for.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Read these four</h2>
+      <p>
+        There are seventeen PDFs in <code>papers/</code>. You do not need them all. Read
+        these four and you will understand what the project is doing and why. The rest are
+        reference — open them when you hit the specific thing they explain.
+      </p>
+    </div>
+
+    <div class="cards" style="margin-top:1.4rem" id="papers"></div>
+
+    <div class="prose" style="margin-top:1.6rem">
+      <details class="aside">
+        <summary>The rest of the reading list, by what it explains</summary>
+        <div class="table-scroll" style="margin-top:0.8rem">
+          <table class="data data--prose">
+            <thead><tr><th style="text-align:left">Paper</th><th style="text-align:left">Read it when…</th></tr></thead>
+            <tbody>
+              <tr><td style="text-align:left">Rugg &amp; Curran (2007)</td><td style="text-align:left">…“FN400” and “LPP” are new to you. Six pages, and the standard reference for the familiarity/recollection account.</td></tr>
+              <tr><td style="text-align:left">Curran (2004)</td><td style="text-align:left">…you want to know why FA vs CR is interesting. The FN400 tracks <em>subjective</em> familiarity, so it fires on false alarms too.</td></tr>
+              <tr><td style="text-align:left">Noh et al. (2014)</td><td style="text-align:left">…you want to see the closest methodological neighbour outside this lab.</td></tr>
+              <tr><td style="text-align:left">Zhang et al. (2023)</td><td style="text-align:left">…you want univariate and multivariate approaches side by side.</td></tr>
+              <tr><td style="text-align:left">Tipping (2001)</td><td style="text-align:left">…you touch the RVM. This is the paper the vendored toolbox implements.</td></tr>
+              <tr><td style="text-align:left">Chawla et al. (2002)</td><td style="text-align:left">…you touch SMOTE. Matters most for FA vs CR, where one class can be 14 trials against 211.</td></tr>
+              <tr><td style="text-align:left">Kayser &amp; Tenke (2006); Perrin et al. (1989)</td><td style="text-align:left">…you touch the Laplacian/CSD branch. Perrin is four pages.</td></tr>
+              <tr><td style="text-align:left">Delorme &amp; Makeig (2004)</td><td style="text-align:left">…you need EEGLAB, which did the original preprocessing back in 2010.</td></tr>
+              <tr><td style="text-align:left">Rouder et al. (2009); Wetzels &amp; Wagenmakers (2012)</td><td style="text-align:left">…you meet a Bayes Factor in the manuscript.</td></tr>
+              <tr><td style="text-align:left">Friendly et al. (1982)</td><td style="text-align:left">…you need to look something up about the stimulus words. Do not read it.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small muted">The authoritative version of this list, with the lab's own annotations, is <code>papers/READING_LIST.md</code>.</p>
+      </details>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Getting it running</h2>
+      <p>
+        Three things to know before you open MATLAB, in order of how much time they will
+        cost you if you do not.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width:46rem">
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th style="text-align:left">Step</th><th style="text-align:left">Detail</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="text-align:left"><b>1. Run <code>setup_paths</code></b></td>
+              <td style="text-align:left">Once per MATLAB session, before anything else. The pipeline resolves its helpers by bare function name across sibling folders, so nothing works without it. <code>Undefined function 'run_lda_auc'</code> means you skipped it.</td>
+            </tr>
+            <tr>
+              <td style="text-align:left"><b>2. Point it at your data</b></td>
+              <td style="text-align:left">Each stage reads a folder and writes another; the coupling between stages is the <code>.mat</code> files on disk, not function calls. Check the settings at the top of whichever stage you are running before you run it — especially the <code>DATA_SOURCE</code> switch, which selects which comparison arm you are asking for. There is no single driver that runs the pipeline end to end; each stage is opened and run by hand.</td>
+            </tr>
+            <tr>
+              <td style="text-align:left"><b>3. Get the data</b></td>
+              <td style="text-align:left">It is not in the repository — about 8.7 GB on the lab Google Drive at <code>CML documents/Classifier Project/data</code>. Drive keeps the files as cloud stubs that report their full size while occupying no disk, so force a real download before reading them; a partially-downloaded <code>.mat</code> fails in confusing ways.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="figure__note">
+        <code>README.md</code> has the full pipeline diagram; <code>data/DATA.md</code> has
+        the data provenance, traced file by file.
+      </div>
+    </div>
+
+    <div class="prose">
+      <div class="callout">
+        <strong>Before you conclude something is broken, check whether someone already
+        knew.</strong> This code came together over several years and several people, so a
+        few things are missing and a few are broken. That is context, not the point of the
+        project. <code>MISSING_FILES.md</code> says what is absent,
+        <code>WORKLOG.md</code> says what has already been tried and ruled out, and
+        <code>README.md</code> says how the pipeline actually works. Checking those first
+        will save you from re-deriving an answer someone already wrote down.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Two local customs</h2>
+    </div>
+
+    <div class="figure" style="max-width:46rem">
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th style="text-align:left">Rule</th><th style="text-align:left">Why</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="text-align:left"><b>Never delete files</b></td>
+              <td style="text-align:left">Anything that looks redundant goes to <code>Potentially Delete/</code> with a written rationale. A human makes the final call. In a project reassembled from lost laptops, the cost of deleting something that mattered is much higher than the cost of keeping clutter.</td>
+            </tr>
+            <tr>
+              <td style="text-align:left"><b>Redundancy is often deliberate</b></td>
+              <td style="text-align:left">The raw/filtered/laplacian switches, the fixed-bin extractor sitting next to the moving-bin one, the “Alternative” pipeline — those are <em>comparison arms</em>, and chapter 6 is what they are for. Tidying them into a single path would delete the experiment.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
+        There is a third custom worth adopting rather than just tolerating: <strong>write
+        down what you ruled out.</strong> That is what <code>WORKLOG.md</code> is for. A
+        sweep that found nothing is a real result — it stops the next person spending a
+        week rediscovering the same nothing — but only if somebody records it.
+      </p>
+      <p>
+        And when you cannot verify something, say so rather than smoothing it over. Most
+        of the value in this project's documentation comes from someone taking the trouble
+        to write down what they were unsure about.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>The short version of everything</h2>
+      <div class="keypoint" style="margin-top:1rem">
+        <p style="margin:0 0 0.7rem">
+          People study words and then judge them old or new. Every trial gets one of four
+          labels, and we record 257 channels of EEG throughout.
+        </p>
+        <p style="margin:0 0 0.7rem">
+          Averaging those trials shows a real difference between remembered and
+          unremembered words, but an average cannot tell you about any single trial. So we
+          reduce each trial to 280 numbers and train a classifier to predict its label,
+          testing only on trials it has never seen.
+        </p>
+        <p style="margin:0 0 0.7rem">
+          It works — AUC around 0.58, reliably, across 67 people. Modestly. Preprocessing
+          choices barely change it, the classifier barely changes it, but how you
+          <em>represent</em> the signal changes it a lot.
+        </p>
+        <p style="margin:0">
+          And nobody yet knows why spectral representations do better. That is the
+          question.
+        </p>
+      </div>
+    </div>
+
+    <div class="prose" style="margin-top:2rem">
+      <p>
+        If something on this site is wrong, unclear, or has gone out of date, it is a
+        static page in the same repository as the code — fix it and open a pull request.
+      </p>
+      <p class="small muted">
+        Built from the lab's own data and results: the group numbers are recomputed from
+        <code>outputs/</code>, the brain waves and the trainable classifier from the EEG on
+        the Drive. Regenerate the derived files with <code>python3 site/build_data.py</code>.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab, University of Alberta ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+  </div>
+</footer>
+
+<script type="module">
+import { initChrome } from './assets/site.js';
+initChrome();
+
+const PAPERS = [
+  {
+    n: 'READ FIRST',
+    title: 'Chen, Lithgow, Hemmerich &amp; Caplan (2014)',
+    what: '<em>Is what goes in what comes out?</em> Exp Brain Res 232, 3175–3190.',
+    why: 'This is our data. Every file on the Drive is a re-analysis of these recordings. Read it for the task design and what the trial codes mean. Start here even if you read nothing else.',
+    href: 'https://doi.org/10.1007/s00221-014-4003-0',
+    file: 'papers/Chen_Etal_2014.pdf',
+  },
+  {
+    n: 'THEN',
+    title: 'Chakravarty, Chen &amp; Caplan (2020)',
+    what: '<em>Predicting memory from study-related brain activity.</em> J Neurophysiol 124(6), 2060–2075.',
+    why: 'The paper this project follows. Same dataset, same lab, but asking the question of the study phase. It also makes the case for why prediction beats description — the argument in chapter 2.',
+    href: 'https://doi.org/10.1152/jn.00293.2020',
+    file: 'papers/Chakravarty_Etal_2020.pdf',
+  },
+  {
+    n: 'THEN',
+    title: 'Danyluik, Chakravarty &amp; Caplan (2025)',
+    what: '<em>EEG activity predictive of learning through feedback.</em> Comput Brain Behav 9, 155–183.',
+    why: 'Why the project exists. This is where the spectral-beats-time-domain finding comes from, and answering “why?” is what the current manuscript is for. Chapter 7 is about this paper.',
+    href: 'https://doi.org/10.1007/s42113-025-00234-y',
+    file: 'papers/Danyluik_Etal_2025.pdf',
+  },
+  {
+    n: 'IF YOU WANT DEPTH',
+    title: 'Chakravarty (2021)',
+    what: 'PhD thesis, University of Alberta.',
+    why: 'The long version — the whole predictive-approach programme in one place. The best single document if you would rather read one argument than four. Skim the chapters relevant to you.',
+    file: 'papers/Chakravarty_2021_thesis.pdf',
+  },
+];
+
+document.getElementById('papers').innerHTML = PAPERS.map((p) => `
+  <a ${p.href ? `href="${p.href}"` : 'href="#" onclick="return false" style="cursor:default"'}>
+    <div class="n">${p.n}</div>
+    <h3>${p.title}</h3>
+    <p style="margin-bottom:0.5rem">${p.what}</p>
+    <p>${p.why}</p>
+    <p class="small muted" style="margin-top:0.6rem"><code>${p.file}</code></p>
+  </a>`).join('');
+</script>
+</body>
+</html>

@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4. How a classifier actually learns | CML primer</title>
+<meta name="description" content="Decision boundaries, ROC curves, AUC, overfitting and cross-validation, built up by hand.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory &amp; EEG <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Chapter 4</p>
+      <h1>How a classifier actually learns</h1>
+      <p class="lede">
+        No equations. We will use two features instead of 280 so you can see everything,
+        and build up to the real thing.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Drawing a line</h2>
+      <p>
+        Imagine each trial is a dot. Its position is set by two measurements from the
+        EEG. Blue dots were Hits, green dots were Misses. The classifier's job is to
+        find a rule that separates them.
+      </p>
+      <p>
+        For the classifiers this lab uses, that rule is a straight line — everything on
+        one side gets called “Hit”, everything on the other “Miss”.
+        <strong>Drag the line.</strong> Grab the middle to move it, or either end to
+        rotate it, and watch the mistakes update.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Find the best line you can</div>
+      <div class="figure__sub">Drag the black line. The tallies underneath are live.</div>
+      <div class="controls">
+        <label class="field">
+          How separable
+          <input type="range" id="sep" min="0" max="100" value="45">
+          <output id="sep-out"></output>
+        </label>
+        <button class="btn" id="best">Let the classifier solve it</button>
+        <button class="btn" id="reset-line">Reset the line</button>
+      </div>
+      <div class="split split--wide-left" id="scatter-grid">
+        <div id="scatter"></div>
+        <div>
+          <div class="stats" id="conf" style="grid-template-columns:1fr 1fr"></div>
+          <div id="scatter-note" class="figure__note"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
+        Two things worth noticing. First, when the clouds overlap you <em>cannot</em>
+        get everything right — no line exists that does. Every position you choose
+        trades one kind of mistake against the other. Second, “Let the classifier solve
+        it” does not produce a magic line. It produces the line that a specific rule —
+        linear discriminant analysis, the workhorse of this project — says is best given
+        where the clouds sit.
+      </p>
+      <div class="callout">
+        <strong>Real EEG lives at the left-hand end of that slider.</strong> Drag
+        separability down towards 15 or 20 and look at the overlap. That is what a real
+        Hit/Miss problem looks like, and it is why the AUCs in chapter 6 are 0.58 rather
+        than 0.95.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>From a line to a score</h2>
+      <p>
+        Forcing a yes/no answer throws information away. A trial right next to the line
+        is a coin flip; one far from it is a confident call. So instead of a decision,
+        the classifier gives each trial a <strong>score</strong> — how far it is from the
+        line, and which side.
+      </p>
+      <p>
+        Collapse the dots onto a single axis running perpendicular to the line and you
+        get two distributions. Now the threshold is a slider you can move.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One threshold, three views</div>
+      <div class="figure__sub">
+        Move the threshold. Watch the mistakes trade off, and watch the point ride along
+        the ROC curve.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Threshold
+          <input type="range" id="thr" min="0" max="1000" value="500">
+        </label>
+        <label class="field">
+          Overlap
+          <input type="range" id="ovl" min="0" max="100" value="55">
+          <output id="ovl-out"></output>
+        </label>
+      </div>
+      <div class="split split--roc">
+        <div id="dist-chart"></div>
+        <div id="roc-chart"></div>
+      </div>
+      <div class="figure__note" id="roc-note"></div>
+    </div>
+
+    <div class="prose">
+      <h3>So what is the ROC curve?</h3>
+      <p>
+        Every possible threshold gives one pair of numbers: the fraction of Hits you
+        caught, and the fraction of Misses you wrongly called Hits. Plot that pair for
+        every threshold and you trace out the ROC curve. A useless classifier gives the
+        diagonal. A good one bulges towards the top-left.
+      </p>
+      <div class="keypoint">
+        <strong>AUC is the area under that curve</strong> — and it equals the probability
+        that a randomly chosen Hit scores higher than a randomly chosen Miss. Because it
+        sweeps every threshold, you never have to pick one, and because it only cares
+        about ordering, it is immune to lopsided classes.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>The trap: learning the noise</h2>
+      <p>
+        Here is the thing that makes machine learning hard, and the reason for all the
+        care that follows.
+      </p>
+      <p>
+        A model with enough freedom can fit <em>anything</em>, including the random
+        wobble in your particular sample. It will look brilliant on the trials it
+        learned from, and fall apart on new ones. That is <strong>overfitting</strong>,
+        and it is not a hypothetical — with 280 features and sometimes fewer than 100
+        trials per class, this project is squarely in the danger zone.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The same model, scored two ways</div>
+      <div class="figure__sub">
+        Turn up the model's flexibility. Watch the two lines go opposite directions —
+        that gap is overfitting.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Model flexibility
+          <input type="range" id="flex" min="1" max="14" value="1">
+          <output id="flex-out"></output>
+        </label>
+      </div>
+      <div class="split split--even">
+        <div id="fit-chart"></div>
+        <div id="curve-chart"></div>
+      </div>
+      <div class="figure__note" id="fit-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        The dashed line is what the model scores on the trials it trained on. It only
+        ever goes up — of course it does; you are marking your own homework. The solid
+        line is what it scores on trials held back. That one turns around and heads
+        down, because past a point the model is memorising noise that will not repeat.
+      </p>
+      <div class="callout callout--warn">
+        <strong>This is why a suspiciously high AUC is bad news, not good news.</strong>
+        If someone reports 0.9 on single-trial memory EEG, the first hypothesis is that
+        test data leaked into training somehow. In this field, big numbers are a symptom.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>The fix: cross-validation</h2>
+      <p>
+        We only have 450 trials per person, and we cannot afford to throw a chunk away
+        just to have something to test on. Cross-validation is the trick that lets every
+        trial be tested exactly once, while never being tested by a model that saw it.
+      </p>
+      <p>
+        Split the trials into <em>k</em> equal folds. Train on <em>k</em>−1 of them, test
+        on the one left out. Then rotate, so each fold takes a turn being the test set.
+        Average the results.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">10-fold cross-validation, one round at a time</div>
+      <div class="figure__sub">Click a round, or play through it. This is exactly what the pipeline does.</div>
+      <div class="controls" id="cv-controls"></div>
+      <div id="cv-chart"></div>
+      <div class="figure__note" id="cv-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        The pipeline uses <strong>10 folds</strong> for Old/New and Hit/Miss, and
+        <strong>5 folds</strong> for FA vs CR — fewer folds there because false alarms
+        are so rare that ten folds could leave a fold with no false alarms in it at all.
+      </p>
+      <p>
+        Crucially, all of this happens <strong>within one participant</strong>. We never
+        train on Alice and test on Bob. Brains differ enough that a rule learned on one
+        person does not transfer well, so each person gets their own classifier and their
+        own AUC, and only then do we ask whether those AUCs beat chance across the group.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>One more wrinkle: lopsided classes</h2>
+      <p>
+        Participant 45 gave 14 false alarms and 211 correct rejections. A classifier
+        trained on that will notice the cheapest possible strategy — always say “correct
+        rejection” — and take it.
+      </p>
+      <p>
+        The pipeline's answer is <strong>SMOTE</strong>, which builds extra synthetic
+        minority-class examples by interpolating between real ones, until the classes are
+        even. A synthetic false alarm is a blend of two real false alarms.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">SMOTE, balancing 14 false alarms against 211 rejections</div>
+      <div class="controls">
+        <div class="segmented" id="smote-toggle">
+          <button data-v="off" aria-pressed="true">As recorded</button>
+          <button data-v="on" aria-pressed="false">After SMOTE</button>
+        </div>
+      </div>
+      <div id="smote-chart"></div>
+      <div class="legend" id="smote-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="smote-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>SMOTE is applied to the training fold only — never the test fold.</strong>
+        Inventing test data would be cheating, and inventing it out of trials you are
+        about to be tested on would be a spectacular way to fool yourself. Getting this
+        boundary right is one of the fiddliest parts of the real code.
+      </div>
+      <p>
+        You now know every idea the pipeline uses. In the next chapter you get to run it.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab, University of Alberta ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+  </div>
+</footer>
+
+<script type="module">
+import {
+  initChrome, svgRoot, frame, scale, linePath, el, responsive, token, tooltip,
+  rng, gauss, mean, auc, roc, fmtAuc,
+} from './assets/site.js';
+
+initChrome();
+const tip = tooltip();
+
+/* ============ 1. draggable decision boundary ============ */
+{
+  const host = document.getElementById('scatter');
+  const conf = document.getElementById('conf');
+  const note = document.getElementById('scatter-note');
+  const sep = document.getElementById('sep');
+  const sepOut = document.getElementById('sep-out');
+
+  let pts = [];
+  function makePoints() {
+    const d = (+sep.value / 100) * 3.4;
+    const r = rng(42);
+    pts = [];
+    for (let i = 0; i < 70; i++) pts.push({ x: gauss(r) * 1 + d / 2, y: gauss(r) * 1 + d / 2, c: 1 });
+    for (let i = 0; i < 70; i++) pts.push({ x: gauss(r) * 1 - d / 2, y: gauss(r) * 1 - d / 2, c: 0 });
+  }
+  makePoints();
+
+  // line as point + angle
+  let line = { cx: 0, cy: 0, ang: -Math.PI / 4 };
+  const reset = () => { line = { cx: 0, cy: 0, ang: -Math.PI / 4 }; };
+
+  // signed distance from the line; positive side = predicted Hit
+  const nx = () => -Math.sin(line.ang);
+  const ny = () => Math.cos(line.ang);
+  const dist = (p) => (p.x - line.cx) * nx() + (p.y - line.cy) * ny();
+
+  function solve() {
+    // LDA on two features: w = inv(S) (m1 - m0)
+    const g1 = pts.filter((p) => p.c === 1), g0 = pts.filter((p) => p.c === 0);
+    const m1 = [mean(g1.map((p) => p.x)), mean(g1.map((p) => p.y))];
+    const m0 = [mean(g0.map((p) => p.x)), mean(g0.map((p) => p.y))];
+    let s00 = 0, s01 = 0, s11 = 0;
+    for (const [g, m] of [[g1, m1], [g0, m0]]) {
+      for (const p of g) {
+        const a = p.x - m[0], b = p.y - m[1];
+        s00 += a * a; s01 += a * b; s11 += b * b;
+      }
+    }
+    const n = pts.length - 2;
+    s00 /= n; s01 /= n; s11 /= n;
+    const det = s00 * s11 - s01 * s01;
+    const dx = m1[0] - m0[0], dy = m1[1] - m0[1];
+    const wx = (s11 * dx - s01 * dy) / det;
+    const wy = (-s01 * dx + s00 * dy) / det;
+    line.ang = Math.atan2(wy, wx) - Math.PI / 2;   // line is perpendicular to w
+    line.cx = (m1[0] + m0[0]) / 2;
+    line.cy = (m1[1] + m0[1]) / 2;
+    // ensure the positive normal points at the Hit cloud
+    if (dist({ x: m1[0], y: m1[1] }) < 0) line.ang += Math.PI;
+  }
+
+  let draw;
+  let drag = null;
+  draw = () => {
+    sepOut.textContent = sep.value;
+    const w = 470, h = 400;
+    const pad = { l: 44, r: 16, t: 14, b: 40 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(-4.6, 4.6, pad.l, w - pad.r);
+    const ys = scale(-4.6, 4.6, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      xLabel: 'a feature (say, electrode 21 at 400 ms)',
+      yLabel: 'another feature', xTicks: [], yTicks: [],
+    });
+
+    // everything the line touches has to stay inside the plot rectangle
+    const defs = el('defs', {}, svg);
+    const clip = el('clipPath', { id: 'plotclip' }, defs);
+    el('rect', { x: pad.l, y: pad.t, width: w - pad.l - pad.r, height: h - pad.t - pad.b }, clip);
+    const plot = el('g', { 'clip-path': 'url(#plotclip)' }, svg);
+
+    // shade the two predicted regions
+    const big = 40;
+    const dx = Math.cos(line.ang), dy = Math.sin(line.ang);
+    const px = -dy, py = dx;   // normal
+    const a = [line.cx - dx * big, line.cy - dy * big];
+    const b = [line.cx + dx * big, line.cy + dy * big];
+    for (const s of [1, -1]) {
+      const poly = [
+        [xs(a[0]), ys(a[1])], [xs(b[0]), ys(b[1])],
+        [xs(b[0] + px * big * s), ys(b[1] + py * big * s)],
+        [xs(a[0] + px * big * s), ys(a[1] + py * big * s)],
+      ];
+      el('polygon', { points: poly.map((p) => p.join(',')).join(' '),
+        fill: token(s > 0 ? '--c-hit' : '--c-miss'), opacity: 0.07 }, plot);
+    }
+
+    let tp = 0, fp = 0, tn = 0, fn = 0;
+    for (const p of pts) {
+      const pred = dist(p) > 0 ? 1 : 0;
+      const right = pred === p.c;
+      if (p.c === 1 && pred === 1) tp++;
+      else if (p.c === 1 && pred === 0) fn++;
+      else if (p.c === 0 && pred === 0) tn++;
+      else fp++;
+      el('circle', {
+        cx: xs(p.x), cy: ys(p.y), r: 4.6,
+        fill: token(p.c === 1 ? '--c-hit' : '--c-miss'),
+        opacity: right ? 0.95 : 0.35,
+        stroke: right ? token('--surface-1') : token('--critical'),
+        'stroke-width': right ? 1.5 : 2,
+      }, plot);
+    }
+
+    // the line itself
+    el('line', {
+      x1: xs(a[0]), y1: ys(a[1]), x2: xs(b[0]), y2: ys(b[1]),
+      stroke: token('--text-primary'), 'stroke-width': 2.5, 'stroke-linecap': 'round',
+      style: 'cursor:move',
+    }, plot);
+    for (const [hx, hy, kind] of [[line.cx, line.cy, 'move'],
+      [line.cx + dx * 3, line.cy + dy * 3, 'rot'], [line.cx - dx * 3, line.cy - dy * 3, 'rot']]) {
+      el('circle', { cx: xs(hx), cy: ys(hy), r: kind === 'move' ? 7 : 5.5,
+        fill: token('--surface-1'), stroke: token('--text-primary'), 'stroke-width': 2,
+        style: `cursor:${kind === 'move' ? 'move' : 'grab'}`,
+        'data-kind': kind }, plot);
+    }
+    el('text', { x: w - pad.r - 4, y: pad.t + 12, 'text-anchor': 'end', class: 'tick' }, svg)
+      .textContent = 'red rings = mistakes';
+
+    const acc = (tp + tn) / pts.length;
+    conf.innerHTML = `
+      <div class="stat"><div class="stat__value" style="color:${token('--c-hit')}">${tp}</div>
+        <div class="stat__label">Hits called Hit<br><span class="muted">correct</span></div></div>
+      <div class="stat"><div class="stat__value" style="color:${token('--critical')}">${fn}</div>
+        <div class="stat__label">Hits called Miss<br><span class="muted">mistake</span></div></div>
+      <div class="stat"><div class="stat__value" style="color:${token('--critical')}">${fp}</div>
+        <div class="stat__label">Misses called Hit<br><span class="muted">mistake</span></div></div>
+      <div class="stat"><div class="stat__value" style="color:${token('--c-miss')}">${tn}</div>
+        <div class="stat__label">Misses called Miss<br><span class="muted">correct</span></div></div>`;
+    const a2 = auc(pts.map((p) => p.c), pts.map((p) => dist(p)));
+    note.innerHTML = `Accuracy <b>${(acc * 100).toFixed(0)}%</b> · AUC <b>${fmtAuc(a2)}</b>. `
+      + `AUC uses the distance from the line rather than the side, so it does not change when you slide the line `
+      + `without rotating it — only rotation changes the ordering of the trials.`;
+
+    // dragging
+    const toData = (ev) => {
+      const box = svg.getBoundingClientRect();
+      return {
+        x: xs.invert(((ev.clientX - box.left) / box.width) * w),
+        y: ys.invert(((ev.clientY - box.top) / box.height) * h),
+      };
+    };
+    svg.style.touchAction = 'none';
+    svg.addEventListener('pointerdown', (ev) => {
+      const p = toData(ev);
+      const dCentre = Math.hypot(p.x - line.cx, p.y - line.cy);
+      drag = dCentre < 1.2 ? 'move' : 'rot';
+      svg.setPointerCapture(ev.pointerId);
+    });
+    svg.addEventListener('pointermove', (ev) => {
+      if (!drag) return;
+      const p = toData(ev);
+      if (drag === 'move') { line.cx = p.x; line.cy = p.y; }
+      else line.ang = Math.atan2(p.y - line.cy, p.x - line.cx);
+      draw();
+    });
+    svg.addEventListener('pointerup', () => { drag = null; });
+  };
+  sep.addEventListener('input', () => { makePoints(); draw(); });
+  document.getElementById('best').onclick = () => { solve(); draw(); };
+  document.getElementById('reset-line').onclick = () => { reset(); draw(); };
+  responsive(host, draw);
+}
+
+/* ============ 2. distributions + ROC ============ */
+{
+  const dHost = document.getElementById('dist-chart');
+  const rHost = document.getElementById('roc-chart');
+  const note = document.getElementById('roc-note');
+  const thr = document.getElementById('thr');
+  const ovl = document.getElementById('ovl');
+  const ovlOut = document.getElementById('ovl-out');
+
+  let data = [];
+  function make() {
+    const d = 3.2 - (+ovl.value / 100) * 3.0;
+    const r = rng(9);
+    data = [];
+    for (let i = 0; i < 160; i++) data.push({ s: gauss(r) + d / 2, c: 1 });
+    for (let i = 0; i < 160; i++) data.push({ s: gauss(r) - d / 2, c: 0 });
+  }
+  make();
+
+  const LO = -5, HI = 5;
+  const tval = () => LO + (+thr.value / 1000) * (HI - LO);
+
+  function hist(vals, bins, lo, hi) {
+    const out = new Array(bins).fill(0);
+    for (const v of vals) {
+      const k = Math.floor(((v - lo) / (hi - lo)) * bins);
+      if (k >= 0 && k < bins) out[k]++;
+    }
+    return out;
+  }
+
+  let draw;
+  draw = () => {
+    ovlOut.textContent = `${ovl.value}%`;
+    const t = tval();
+    const labels = data.map((d) => d.c);
+    const scores = data.map((d) => d.s);
+    const A = auc(labels, scores);
+
+    /* -- distributions -- */
+    {
+      const w = 520, h = 300;
+      const pad = { l: 44, r: 14, t: 16, b: 44 };
+      const svg = svgRoot(dHost, w, h);
+      const BINS = 34;
+      const h1 = hist(data.filter((d) => d.c === 1).map((d) => d.s), BINS, LO, HI);
+      const h0 = hist(data.filter((d) => d.c === 0).map((d) => d.s), BINS, LO, HI);
+      const ymax = Math.max(...h1, ...h0) * 1.15;
+      const xs = scale(LO, HI, pad.l, w - pad.r);
+      const ys = scale(0, ymax, h - pad.b, pad.t);
+      frame(svg, w, h, pad, xs, ys, {
+        xLabel: 'classifier score (distance from the line)', yLabel: 'trials',
+      });
+      const bw = (w - pad.l - pad.r) / BINS;
+      for (const [hh, col] of [[h0, '--c-miss'], [h1, '--c-hit']]) {
+        hh.forEach((n, i) => {
+          if (!n) return;
+          const x = pad.l + i * bw;
+          el('rect', { x: x + 1, width: Math.max(1, bw - 2), y: ys(n), height: (h - pad.b) - ys(n),
+            rx: 2, fill: token(col), opacity: 0.62 }, svg);
+        });
+      }
+      // threshold
+      el('line', { x1: xs(t), x2: xs(t), y1: pad.t, y2: h - pad.b,
+        stroke: token('--text-primary'), 'stroke-width': 2.5 }, svg);
+      el('text', { x: xs(t), y: pad.t - 3, 'text-anchor': 'middle', class: 'tick',
+        fill: token('--text-primary'), 'font-weight': 620 }, svg).textContent = 'threshold';
+      el('text', { x: pad.l + 4, y: pad.t + 12, class: 'tick', fill: token('--c-miss'), 'font-weight': 620 }, svg)
+        .textContent = '← called Miss';
+      el('text', { x: w - pad.r - 4, y: pad.t + 12, 'text-anchor': 'end', class: 'tick',
+        fill: token('--c-hit'), 'font-weight': 620 }, svg).textContent = 'called Hit →';
+    }
+
+    /* -- ROC -- */
+    const pts = roc(labels, scores);
+    const tp = data.filter((d) => d.c === 1 && d.s >= t).length;
+    const fn = data.filter((d) => d.c === 1 && d.s < t).length;
+    const fp = data.filter((d) => d.c === 0 && d.s >= t).length;
+    const tn = data.filter((d) => d.c === 0 && d.s < t).length;
+    const tpr = tp / (tp + fn), fpr = fp / (fp + tn);
+    {
+      const w = 330, h = 300;
+      const pad = { l: 46, r: 14, t: 16, b: 44 };
+      const svg = svgRoot(rHost, w, h);
+      const xs = scale(0, 1, pad.l, w - pad.r);
+      const ys = scale(0, 1, h - pad.b, pad.t);
+      frame(svg, w, h, pad, xs, ys, {
+        xLabel: 'false alarm rate', yLabel: 'hit rate',
+        xTicks: [0, 0.5, 1], yTicks: [0, 0.5, 1],
+        xFmt: (v) => v.toFixed(1), yFmt: (v) => v.toFixed(1),
+      });
+      // area fill
+      el('path', {
+        d: linePath(pts.map((p) => [xs(p[0]), ys(p[1])])) + `L${xs(1)} ${ys(0)} Z`,
+        fill: token('--series-1'), opacity: 0.14,
+      }, svg);
+      el('line', { x1: xs(0), y1: ys(0), x2: xs(1), y2: ys(1),
+        stroke: token('--text-muted'), 'stroke-dasharray': '4 3' }, svg);
+      el('text', { x: xs(0.62), y: ys(0.52), class: 'tick', transform: `rotate(-45 ${xs(0.62)} ${ys(0.52)})` }, svg)
+        .textContent = 'chance';
+      el('path', { class: 'series-line', d: linePath(pts.map((p) => [xs(p[0]), ys(p[1])])),
+        stroke: token('--series-1') }, svg);
+      el('circle', { cx: xs(fpr), cy: ys(tpr), r: 6, fill: token('--text-primary'),
+        stroke: token('--surface-1'), 'stroke-width': 2 }, svg);
+      el('text', { x: xs(0.97), y: ys(0.08), 'text-anchor': 'end', 'font-size': 15, 'font-weight': 680,
+        fill: token('--series-1') }, svg).textContent = `AUC ${fmtAuc(A)}`;
+      el('text', { x: xs(0.97), y: ys(0.02), 'text-anchor': 'end', class: 'tick' }, svg)
+        .textContent = 'shaded area';
+    }
+    note.innerHTML = `At this threshold you catch <b>${(tpr * 100).toFixed(0)}%</b> of Hits `
+      + `but wrongly flag <b>${(fpr * 100).toFixed(0)}%</b> of Misses. The black dot on the ROC curve is `
+      + `<em>this</em> threshold; the curve is every other one. Slide the threshold and the dot moves — but `
+      + `<b>the curve and the AUC (${fmtAuc(A)}) never change</b>, because they describe the classifier, not your choice of cut-off.`;
+  };
+  thr.addEventListener('input', draw);
+  ovl.addEventListener('input', () => { make(); draw(); });
+  responsive(dHost, draw);
+}
+
+/* ============ 3. overfitting ============ */
+{
+  const fHost = document.getElementById('fit-chart');
+  const cHost = document.getElementById('curve-chart');
+  const note = document.getElementById('fit-note');
+  const flex = document.getElementById('flex');
+  const flexOut = document.getElementById('flex-out');
+
+  // a smooth truth + noise; fit polynomials of increasing degree
+  const r = rng(5);
+  const truth = (x) => Math.sin(x * 2.1) * 0.8 + x * 0.25;
+  const train = Array.from({ length: 14 }, (_, i) => {
+    const x = -2 + (i / 13) * 4;
+    return { x, y: truth(x) + gauss(r) * 0.42 };
+  });
+  const test = Array.from({ length: 60 }, () => {
+    const x = -2 + r() * 4;
+    return { x, y: truth(x) + gauss(r) * 0.42 };
+  });
+
+  function polyfit(pts, deg) {
+    const n = deg + 1;
+    const A = Array.from({ length: n }, () => new Array(n).fill(0));
+    const b = new Array(n).fill(0);
+    for (const p of pts) {
+      const pow = Array.from({ length: 2 * deg + 1 }, (_, k) => p.x ** k);
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) A[i][j] += pow[i + j];
+        b[i] += pow[i] * p.y;
+      }
+    }
+    // ridge-stabilised gaussian elimination
+    for (let i = 0; i < n; i++) A[i][i] += 1e-7;
+    for (let i = 0; i < n; i++) {
+      let piv = i;
+      for (let k = i + 1; k < n; k++) if (Math.abs(A[k][i]) > Math.abs(A[piv][i])) piv = k;
+      [A[i], A[piv]] = [A[piv], A[i]]; [b[i], b[piv]] = [b[piv], b[i]];
+      if (Math.abs(A[i][i]) < 1e-12) continue;
+      for (let k = i + 1; k < n; k++) {
+        const f = A[k][i] / A[i][i];
+        for (let j = i; j < n; j++) A[k][j] -= f * A[i][j];
+        b[k] -= f * b[i];
+      }
+    }
+    const c = new Array(n).fill(0);
+    for (let i = n - 1; i >= 0; i--) {
+      let s = b[i];
+      for (let j = i + 1; j < n; j++) s -= A[i][j] * c[j];
+      c[i] = Math.abs(A[i][i]) < 1e-12 ? 0 : s / A[i][i];
+    }
+    return (x) => c.reduce((s, ci, k) => s + ci * x ** k, 0);
+  }
+
+  const rmse = (f, pts) => Math.sqrt(mean(pts.map((p) => (f(p.x) - p.y) ** 2)));
+  const curves = Array.from({ length: 14 }, (_, i) => {
+    const f = polyfit(train, i + 1);
+    return { deg: i + 1, tr: rmse(f, train), te: rmse(f, test) };
+  });
+
+  let draw;
+  draw = () => {
+    const deg = +flex.value;
+    flexOut.textContent = deg;
+    const f = polyfit(train, deg);
+
+    {
+      const w = 430, h = 290;
+      const pad = { l: 42, r: 14, t: 16, b: 40 };
+      const svg = svgRoot(fHost, w, h);
+      const xs = scale(-2.2, 2.2, pad.l, w - pad.r);
+      const ys = scale(-2.4, 2.4, h - pad.b, pad.t);
+      frame(svg, w, h, pad, xs, ys, { xLabel: 'a feature', yLabel: 'outcome', xTicks: [], yTicks: [] });
+      // fitted curve
+      const line = [];
+      for (let i = 0; i <= 240; i++) {
+        const x = -2.2 + (i / 240) * 4.4;
+        line.push([xs(x), ys(Math.max(-2.4, Math.min(2.4, f(x))))]);
+      }
+      el('path', { class: 'series-line', d: linePath(line), stroke: token('--series-6') }, svg);
+      for (const p of test) {
+        el('circle', { cx: xs(p.x), cy: ys(p.y), r: 2.6, fill: token('--text-muted'), opacity: 0.4 }, svg);
+      }
+      for (const p of train) {
+        el('circle', { cx: xs(p.x), cy: ys(p.y), r: 5, fill: token('--series-1'),
+          stroke: token('--surface-1'), 'stroke-width': 1.5 }, svg);
+      }
+      el('text', { x: pad.l + 4, y: pad.t + 11, class: 'tick', fill: token('--series-1'), 'font-weight': 620 }, svg)
+        .textContent = '● 14 training trials';
+      el('text', { x: pad.l + 4, y: pad.t + 24, class: 'tick' }, svg).textContent = '● held-back trials';
+    }
+    {
+      const w = 430, h = 290;
+      const pad = { l: 48, r: 60, t: 16, b: 40 };
+      const svg = svgRoot(cHost, w, h);
+      const xs = scale(1, 14, pad.l, w - pad.r);
+      const ys = scale(0, 1.15, h - pad.b, pad.t);
+      frame(svg, w, h, pad, xs, ys, {
+        xLabel: 'model flexibility', yLabel: 'error (lower is better)',
+        xTicks: [1, 4, 7, 10, 14], yFmt: (v) => v.toFixed(1),
+      });
+      const clamp = (v) => Math.min(1.15, v);
+      el('path', { class: 'series-line', 'stroke-dasharray': '5 3',
+        d: linePath(curves.map((c) => [xs(c.deg), ys(clamp(c.tr))])), stroke: token('--series-2') }, svg);
+      el('path', { class: 'series-line',
+        d: linePath(curves.map((c) => [xs(c.deg), ys(clamp(c.te))])), stroke: token('--series-8') }, svg);
+      el('text', { class: 'direct-label', x: w - pad.r + 5, y: ys(clamp(curves[13].tr)) + 4,
+        fill: token('--series-2') }, svg).textContent = 'training';
+      el('text', { class: 'direct-label', x: w - pad.r + 5, y: ys(clamp(curves[13].te)) + 4,
+        fill: token('--series-8') }, svg).textContent = 'held back';
+      const cur = curves[deg - 1];
+      el('line', { x1: xs(deg), x2: xs(deg), y1: pad.t, y2: h - pad.b,
+        stroke: token('--text-muted'), 'stroke-dasharray': '2 3' }, svg);
+      el('circle', { cx: xs(deg), cy: ys(clamp(cur.tr)), r: 5, fill: token('--series-2'),
+        stroke: token('--surface-1'), 'stroke-width': 2 }, svg);
+      el('circle', { cx: xs(deg), cy: ys(clamp(cur.te)), r: 5, fill: token('--series-8'),
+        stroke: token('--surface-1'), 'stroke-width': 2 }, svg);
+    }
+    const cur = curves[deg - 1];
+    const best = curves.reduce((a, b) => (b.te < a.te ? b : a));
+    note.innerHTML = `Flexibility <b>${deg}</b>: error on training trials <b>${cur.tr.toFixed(2)}</b>, `
+      + `on held-back trials <b>${cur.te.toFixed(2)}</b>. `
+      + (deg <= 3
+        ? 'Right now the model is too rigid to capture the real pattern — both errors are high. Turn it up.'
+        : deg <= best.deg + 1
+          ? `This is about the sweet spot (flexibility ${best.deg}). The model has caught the real pattern and stopped.`
+          : `The training error keeps falling while the held-back error climbs. The model is now bending itself around noise — `
+            + `it is <b>${((cur.te / best.te - 1) * 100).toFixed(0)}% worse</b> on new data than the sweet spot, while looking better on paper.`);
+  };
+  flex.addEventListener('input', draw);
+  responsive(fHost, draw);
+}
+
+/* ============ 4. cross-validation ============ */
+{
+  const host = document.getElementById('cv-chart');
+  const ctrls = document.getElementById('cv-controls');
+  const note = document.getElementById('cv-note');
+  const K = 10;
+  let round = 0;
+  let timer = null;
+
+  ctrls.innerHTML = `<div class="segmented" id="cv-rounds">${Array.from({ length: K }, (_, i) =>
+    `<button data-i="${i}" aria-pressed="${i === 0}">${i + 1}</button>`).join('')}</div>
+    <button class="btn" id="cv-play">▶ Play all 10</button>`;
+  const setRound = (i) => {
+    round = i;
+    ctrls.querySelectorAll('#cv-rounds button').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.i === i));
+    draw();
+  };
+  ctrls.querySelectorAll('#cv-rounds button').forEach((b) => { b.onclick = () => setRound(+b.dataset.i); });
+  document.getElementById('cv-play').onclick = (ev) => {
+    if (timer) { clearInterval(timer); timer = null; ev.target.textContent = '▶ Play all 10'; return; }
+    ev.target.textContent = '❚❚ Pause';
+    timer = setInterval(() => setRound((round + 1) % K), 750);
+  };
+
+  // fake but plausible per-fold AUCs
+  const r = rng(21);
+  const foldAuc = Array.from({ length: K }, () => 0.57 + gauss(r) * 0.06);
+
+  let draw;
+  draw = () => {
+    const w = 940, h = 210;
+    const svg = svgRoot(host, w, h);
+    const pad = { l: 100, r: 130, t: 30 };
+    const bw = (w - pad.l - pad.r) / K;
+    el('text', { x: pad.l, y: 16, class: 'axis-label', 'font-weight': 620 }, svg)
+      .textContent = '450 trials, split into 10 folds';
+    el('text', { x: 8, y: pad.t + 26, class: 'axis-label', 'font-weight': 620 }, svg)
+      .textContent = `Round ${round + 1}`;
+    el('text', { x: 8, y: pad.t + 42, class: 'tick' }, svg).textContent = '45 trials per fold';
+
+    for (let i = 0; i < K; i++) {
+      const isTest = i === round;
+      const x = pad.l + i * bw;
+      el('rect', { x: x + 1, y: pad.t, width: bw - 2, height: 46, rx: 4,
+        fill: token(isTest ? '--series-6' : '--series-1'),
+        opacity: isTest ? 0.9 : 0.28,
+        stroke: token(isTest ? '--series-6' : '--series-1'), 'stroke-width': isTest ? 2 : 1 }, svg);
+      el('text', { x: x + bw / 2, y: pad.t + 28, 'text-anchor': 'middle', 'font-size': 11,
+        'font-weight': 620, fill: isTest ? '#fff' : token('--text-secondary') }, svg)
+        .textContent = isTest ? 'TEST' : 'train';
+      el('text', { x: x + bw / 2, y: pad.t + 60, 'text-anchor': 'middle', class: 'tick' }, svg)
+        .textContent = i + 1;
+    }
+    el('text', { x: w - pad.r + 10, y: pad.t + 20, class: 'tick', fill: token('--series-6'), 'font-weight': 620 }, svg)
+      .textContent = `AUC this round`;
+    el('text', { x: w - pad.r + 10, y: pad.t + 40, 'font-size': 17, 'font-weight': 680,
+      fill: token('--series-6') }, svg).textContent = foldAuc[round].toFixed(3);
+
+    // running results
+    const by = 118;
+    el('text', { x: pad.l, y: by - 6, class: 'axis-label', 'font-weight': 620 }, svg)
+      .textContent = 'each fold contributes one AUC; the participant\'s score is their average';
+    const xs = scale(0.4, 0.75, pad.l, w - pad.r);
+    el('line', { x1: pad.l, x2: w - pad.r, y1: by + 26, y2: by + 26, stroke: token('--baseline') }, svg);
+    for (const v of [0.4, 0.5, 0.6, 0.7]) {
+      el('text', { x: xs(v), y: by + 44, 'text-anchor': 'middle', class: 'tick' }, svg).textContent = v.toFixed(1);
+      el('line', { x1: xs(v), x2: xs(v), y1: by + 22, y2: by + 30, stroke: token('--baseline') }, svg);
+    }
+    el('line', { x1: xs(0.5), x2: xs(0.5), y1: by + 10, y2: by + 42, stroke: token('--critical'), 'stroke-dasharray': '3 2' }, svg);
+    el('text', { x: xs(0.5), y: by + 6, 'text-anchor': 'middle', class: 'tick', fill: token('--critical') }, svg)
+      .textContent = 'chance';
+    foldAuc.forEach((v, i) => {
+      const done = i <= round;
+      el('circle', { cx: xs(v), cy: by + 26, r: i === round ? 6 : 4,
+        fill: token(i === round ? '--series-6' : '--series-1'),
+        opacity: done ? 0.9 : 0.15,
+        stroke: token('--surface-1'), 'stroke-width': 1.5 }, svg);
+    });
+    const done = foldAuc.slice(0, round + 1);
+    const m = mean(done);
+    el('line', { x1: xs(m), x2: xs(m), y1: by + 8, y2: by + 44, stroke: token('--text-primary'), 'stroke-width': 2 }, svg);
+    el('text', { x: w - pad.r + 10, y: by + 30, class: 'tick', 'font-weight': 620 }, svg)
+      .textContent = `mean so far ${m.toFixed(3)}`;
+
+    note.innerHTML = `Round ${round + 1}: fold ${round + 1} is held out, the model trains on the other nine, `
+      + `and is scored only on the fold it never saw. After all ten rounds every trial has been tested exactly once, `
+      + `and the ten AUCs average to this participant's score. `
+      + `Notice the spread across folds — <b>${Math.min(...foldAuc).toFixed(3)} to ${Math.max(...foldAuc).toFixed(3)}</b> — `
+      + `from identical data. That is why one participant's AUC is a noisy thing, and why the group matters more than any individual.`;
+  };
+  responsive(host, draw);
+}
+
+/* ============ 5. SMOTE ============ */
+{
+  const host = document.getElementById('smote-chart');
+  const note = document.getElementById('smote-note');
+  const legend = document.getElementById('smote-legend');
+  let mode = 'off';
+  document.querySelectorAll('#smote-toggle button').forEach((b) => {
+    b.onclick = () => {
+      mode = b.dataset.v;
+      document.querySelectorAll('#smote-toggle button').forEach((o) =>
+        o.setAttribute('aria-pressed', o.dataset.v === mode));
+      draw();
+    };
+  });
+  legend.innerHTML = `
+    <span class="legend__item"><span class="legend__swatch" style="background:${token('--c-cr')}"></span>Correct Rejection (211 real)</span>
+    <span class="legend__item"><span class="legend__swatch" style="background:${token('--c-fa')}"></span>False Alarm (14 real)</span>
+    <span class="legend__item"><span class="legend__swatch" style="background:${token('--c-fa')};opacity:.45"></span>Synthetic false alarm (invented)</span>`;
+
+  const r = rng(17);
+  const crs = Array.from({ length: 211 }, () => ({ x: gauss(r) * 1.05 - 0.35, y: gauss(r) * 1.05 - 0.3 }));
+  const fas = Array.from({ length: 14 }, () => ({ x: gauss(r) * 0.85 + 1.15, y: gauss(r) * 0.85 + 1.0 }));
+  // SMOTE: interpolate between a minority point and one of its k nearest neighbours
+  const synth = [];
+  {
+    const k = 4;
+    const need = crs.length - fas.length;
+    for (let i = 0; i < need; i++) {
+      const a = fas[Math.floor(r() * fas.length)];
+      const nbrs = fas.filter((p) => p !== a)
+        .map((p) => ({ p, d: (p.x - a.x) ** 2 + (p.y - a.y) ** 2 }))
+        .sort((u, v) => u.d - v.d).slice(0, k);
+      const b = nbrs[Math.floor(r() * nbrs.length)].p;
+      const gx = r(), gy = r();
+      synth.push({ x: a.x + gx * (b.x - a.x), y: a.y + gy * (b.y - a.y), a, b });
+    }
+  }
+
+  let draw;
+  draw = () => {
+    const w = 940, h = 330;
+    const pad = { l: 46, r: 16, t: 16, b: 40 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(-4, 4.4, pad.l, w - pad.r);
+    const ys = scale(-3.6, 3.9, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, { xLabel: 'a feature', yLabel: 'another feature', xTicks: [], yTicks: [] });
+
+    for (const p of crs) {
+      el('circle', { cx: xs(p.x), cy: ys(p.y), r: 3.6, fill: token('--c-cr'), opacity: 0.5 }, svg);
+    }
+    if (mode === 'on') {
+      for (const p of synth) {
+        el('circle', { cx: xs(p.x), cy: ys(p.y), r: 3.2, fill: token('--c-fa'), opacity: 0.4 }, svg);
+      }
+    }
+    for (const p of fas) {
+      el('circle', { cx: xs(p.x), cy: ys(p.y), r: 5.5, fill: token('--c-fa'),
+        stroke: token('--surface-1'), 'stroke-width': 1.8 }, svg);
+    }
+    const nFa = mode === 'on' ? 211 : 14;
+    el('text', { x: w - pad.r - 6, y: pad.t + 14, 'text-anchor': 'end', 'font-size': 12,
+      'font-weight': 620, fill: token('--text-secondary') }, svg)
+      .textContent = `211 correct rejections vs ${nFa} false alarms`;
+
+    note.innerHTML = mode === 'off'
+      ? `As recorded, the classes are <b>15 to 1</b>. A classifier that ignores the EEG and always says `
+        + `“correct rejection” is right <b>94%</b> of the time. It has learned nothing, and accuracy will not tell you that. `
+        + `(AUC will: it scores exactly 0.5.)`
+      : `SMOTE invented <b>${synth.length}</b> false alarms by interpolating between the 14 real ones and their nearest neighbours, `
+        + `bringing the classes to <b>211 vs 211</b>. The classifier can no longer win by ignoring the rare class. `
+        + `But look closely: the synthetic points only ever fall <em>between</em> existing ones, so they add no genuinely new `
+        + `information — they just stop the model taking the lazy option. With only 14 originals, that is a lot of weight on very few trials.`;
+  };
+  responsive(host, draw);
+}
+</script>
+</body>
+</html>

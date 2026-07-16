@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5. Train one yourself, on real data | CML primer</title>
+<meta name="description" content="Train a real linear discriminant classifier on real single-trial EEG, in your browser, with proper cross-validation.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory &amp; EEG <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Chapter 5</p>
+      <h1>Train one yourself, on real data</h1>
+      <p class="lede">
+        This is not a simulation. The classifier below runs in your browser on
+        participant 45's actual EEG — the same 450 × 280 feature matrix from chapter 3,
+        the same maths the MATLAB pipeline uses.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="figure figure--wide" style="margin-top:1.5rem">
+      <div class="figure__title">Linear discriminant analysis, cross-validated</div>
+      <div class="figure__sub" id="setup-sub"></div>
+
+      <div class="controls" style="margin-top:0.9rem">
+        <label class="field">
+          Task
+          <select id="task">
+            <option value="OldNew">Old vs New — was it studied?</option>
+            <option value="HitMiss">Hit vs Miss — will it be remembered?</option>
+            <option value="FAvsCR">FA vs CR — will it fool them?</option>
+          </select>
+        </label>
+        <label class="field">
+          Electrodes
+          <select id="elecs">
+            <option value="all">All 10</option>
+            <option value="21">Only 21 (Fz)</option>
+            <option value="87">Only 87 (P3)</option>
+            <option value="2">Just 21 and 87</option>
+          </select>
+        </label>
+        <label class="field">
+          Time window
+          <select id="window">
+            <option value="all">All 28 bins (0–1176 ms)</option>
+            <option value="early">Early only (0–400 ms)</option>
+            <option value="fn400">FN400 window (300–500 ms)</option>
+            <option value="lpp">LPP window (500–800 ms)</option>
+            <option value="late">Late only (600–1176 ms)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="controls">
+        <label class="field">
+          Regularisation γ
+          <input type="range" id="gamma" min="0" max="100" value="50">
+          <output id="gamma-out">0.50</output>
+        </label>
+        <label class="field"><input type="checkbox" id="smote" checked> Balance classes with SMOTE</label>
+        <label class="field"><input type="checkbox" id="cheat"> Test on the training trials</label>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn--primary" id="run">Train and cross-validate</button>
+        <span id="status" class="small muted"></span>
+      </div>
+
+      <div class="split split--panel" style="margin-top:0.5rem">
+        <div id="folds-chart"></div>
+        <div id="roc2-chart"></div>
+      </div>
+      <div class="figure__note" id="result-note">Press the button to run it.</div>
+    </div>
+
+    <div class="prose">
+      <div class="callout" id="compare-callout" hidden></div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Things worth trying</h2>
+      <p>
+        The controls are not decoration. Each one demonstrates something the lab has
+        actually had to think about.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width:46rem">
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th style="text-align:left">Try this</th><th style="text-align:left">What you should see, and why</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="text-align:left"><b>Test on the training trials</b></td>
+              <td style="text-align:left">AUC jumps from about 0.54 to about 0.73. Nothing improved — you are marking your own homework. That gap is chapter 4's overfitting, measured on real data, and it is why cross-validation is not optional.</td>
+            </tr>
+            <tr>
+              <td style="text-align:left"><b>Drag γ to 0</b></td>
+              <td style="text-align:left">With 280 features and a few hundred trials, the model can no longer estimate how the features co-vary and the result degrades. γ pulls it back towards something stable. The pipeline fixes γ = 0.5.</td>
+            </tr>
+            <tr>
+              <td style="text-align:left"><b>One electrode instead of ten</b></td>
+              <td style="text-align:left">AUC drops but usually stays above chance. No single electrode carries the signal — it is spread out, which is exactly the argument for a multivariate approach over a single ERP measurement.</td>
+            </tr>
+            <tr>
+              <td style="text-align:left"><b>FN400 or LPP window only</b></td>
+              <td style="text-align:left">You have just reduced the classifier to roughly the classic ERP analysis. Compare it to all 28 bins to see what the extra time points buy you.</td>
+            </tr>
+            <tr>
+              <td style="text-align:left"><b>FA vs CR, SMOTE off</b></td>
+              <td style="text-align:left">With 14 false alarms against 211 rejections, the model learns to always say “rejection”. Watch the fold-to-fold spread explode — some folds contain barely any false alarms at all.</td>
+            </tr>
+            <tr>
+              <td style="text-align:left"><b>Run it twice unchanged</b></td>
+              <td style="text-align:left">The number moves. Folds are drawn randomly each run, and on one participant that is worth a few hundredths of AUC. Any single result here is noise around a true value you cannot see.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>One participant is not a result</h2>
+      <p>
+        That last row is the important one, so it gets its own demo. Below, the exact
+        same classifier on the exact same data is run over and over — the only thing that
+        changes is which trials land in which fold.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The same analysis, repeated</div>
+      <div class="figure__sub">Nothing changes between runs except the random fold split.</div>
+      <div class="controls">
+        <button class="btn" id="repeat">Run it 25 times</button>
+        <span id="repeat-status" class="small muted"></span>
+      </div>
+      <div id="repeat-chart"></div>
+      <div class="figure__note" id="repeat-note">
+        Each run is a legitimate, correctly cross-validated analysis of real data.
+      </div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>This is why the lab reports 67 participants, not one.</strong> A single
+        participant's AUC wobbles by several hundredths for no reason other than the
+        shuffle. Only when you average one score per person across dozens of people does
+        the number get stable enough to defend — which is exactly what chapter 6 does.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>How honest is this?</h2>
+      <p>
+        Honest enough to be checkable, which is the only useful kind. The feature
+        extraction is a port of <code>feature_label_moving_bin.m</code>; the classifier
+        mirrors <code>run_lda_auc.m</code> — regularised linear discriminant with
+        γ = 0.5, stratified folds, SMOTE on the training fold only, AUC averaged across
+        folds.
+      </p>
+      <p>
+        Rather than take that on trust, we handed <em>this page's own feature matrix</em>
+        back to MATLAB and ran the lab's real <code>run_lda_auc.m</code> on it:
+      </p>
+      <div class="table-scroll" style="max-width:32rem;margin:1rem 0">
+        <table class="data">
+          <thead><tr><th style="text-align:left">Task</th><th>Real MATLAB</th><th>Committed result</th></tr></thead>
+          <tbody>
+            <tr><td style="text-align:left">Old vs New</td><td class="num">0.5419</td><td>0.5419</td></tr>
+            <tr><td style="text-align:left">Hit vs Miss</td><td class="num">0.5723</td><td>0.5723</td></tr>
+            <tr><td style="text-align:left">FA vs CR</td><td class="num">0.5659</td><td>0.5659</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Identical. So the 280 numbers this page is training on are <em>exactly</em> the
+        numbers the MATLAB pipeline would compute — not an approximation of them. The
+        only thing that differs between the button above and the real pipeline is which
+        trials land in which fold, which is the wobble the previous section is about.
+      </p>
+      <p class="small muted">
+        That check is a script, not a claim: run <code>setup_paths</code> then
+        <code>verify_against_matlab</code> from <code>site/</code>. Its browser
+        counterpart is <code>site/_selftest.html</code>. If someone changes the MATLAB
+        feature extractor and forgets this page, those two are what catch it.
+      </p>
+      <p class="small muted">
+        Deliberately different from the repo: this page uses participant 45, while the
+        <code>test_project/</code> onboarding exercise uses participant 06. If you are
+        about to do that exercise, nothing here spoils the answer.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab, University of Alberta ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+  </div>
+</footer>
+
+<script type="module">
+import {
+  initChrome, loadJSON, loadBin, svgRoot, frame, scale, linePath, el,
+  responsive, token, tooltip, mean, sd, auc, roc, fmtAuc,
+} from './assets/site.js';
+import { crossValidate } from './assets/lda.js';
+
+initChrome();
+const tip = tooltip();
+
+const F = await loadJSON('data/features_45.json');
+const buf = await loadBin('data/features_45.bin');
+const raw = new Int16Array(buf);
+const [N, P] = F.shape;
+const codes = F.labels;
+const NBINS = F.binStartMs.length;
+const ELECS = F.electrodes;
+
+document.getElementById('setup-sub').innerHTML =
+  `Participant ${F.participant} · ${N} trials × ${P} features · loaded from `
+  + `<code>features_45.bin</code> (${(buf.byteLength / 1024).toFixed(0)} KB). Everything below runs on your machine.`;
+
+/* ---------- feature selection ---------- */
+
+function columns() {
+  const eSel = document.getElementById('elecs').value;
+  const wSel = document.getElementById('window').value;
+  let elecIdx;
+  if (eSel === 'all') elecIdx = ELECS.map((_, i) => i);
+  else if (eSel === '2') elecIdx = [ELECS.indexOf(21), ELECS.indexOf(87)];
+  else elecIdx = [ELECS.indexOf(+eSel)];
+
+  const binOk = (b) => {
+    const t0 = F.binStartMs[b], t1 = t0 + F.binWidthMs;
+    if (wSel === 'all') return true;
+    if (wSel === 'early') return t1 <= 420;
+    if (wSel === 'fn400') return t0 >= 280 && t1 <= 520;
+    if (wSel === 'lpp') return t0 >= 480 && t1 <= 820;
+    if (wSel === 'late') return t0 >= 600;
+    return true;
+  };
+  const cols = [];
+  for (const e of elecIdx) for (let b = 0; b < NBINS; b++) if (binOk(b)) cols.push(e * NBINS + b);
+  return cols;
+}
+
+function buildSet(task) {
+  const cols = columns();
+  const rows = [];
+  const y = [];
+  for (let i = 0; i < N; i++) {
+    const c = codes[i];
+    let lab = null;
+    if (task === 'OldNew') lab = (c === 1 || c === 2) ? 1 : 0;
+    else if (task === 'HitMiss') lab = c === 1 ? 1 : c === 2 ? 0 : null;
+    else lab = c === 4 ? 1 : c === 3 ? 0 : null;
+    if (lab === null) continue;
+    const row = new Float64Array(cols.length);
+    for (let k = 0; k < cols.length; k++) row[k] = raw[i * P + cols[k]] * F.scale;
+    rows.push(row);
+    y.push(lab);
+  }
+  return { X: rows, y, nFeat: cols.length };
+}
+
+/* ---------- cross-validation ----------
+   The algorithm itself lives in assets/lda.js so it can be tested on its own;
+   all this does is pick the fold count the pipeline would use for the task. */
+
+function runCV(task, opts, seed) {
+  const { X, y } = buildSet(task);
+  return crossValidate(X, y, { ...opts, folds: task === 'FAvsCR' ? 5 : 10 }, seed);
+}
+
+/* ---------- the main panel ---------- */
+
+const MATLAB = { OldNew: 0.542, HitMiss: 0.572, FAvsCR: 0.566 };
+const gammaEl = document.getElementById('gamma');
+const gammaOut = document.getElementById('gamma-out');
+gammaEl.addEventListener('input', () => { gammaOut.textContent = (+gammaEl.value / 100).toFixed(2); });
+
+let last = null;
+let seedCounter = 1;
+
+function opts() {
+  return {
+    gamma: +gammaEl.value / 100,
+    smote: document.getElementById('smote').checked,
+    cheat: document.getElementById('cheat').checked,
+  };
+}
+
+document.getElementById('run').onclick = run;
+
+function run() {
+  const task = document.getElementById('task').value;
+  const st = document.getElementById('status');
+  st.textContent = 'training…';
+  document.getElementById('run').disabled = true;
+  setTimeout(() => {
+    const t0 = performance.now();
+    const o = opts();
+    last = { ...runCV(task, o, seedCounter++), task, o };
+    const ms = performance.now() - t0;
+    st.textContent = `done in ${ms.toFixed(0)} ms`;
+    document.getElementById('run').disabled = false;
+    drawFolds();
+    drawRoc();
+    report(ms);
+  }, 15);
+}
+
+// #autorun trains on load -- used to smoke-test the page. Deliberately not
+// "#run", which would collide with the button's id and scroll the page to it.
+if (location.hash === '#autorun') run();
+
+function report(ms) {
+  const { foldAucs, task, o, counts, nFeat, k } = last;
+  const m = mean(foldAucs);
+  const note = document.getElementById('result-note');
+  const cc = document.getElementById('compare-callout');
+  note.innerHTML = `<b>${nFeat} features</b>, ${counts[1]} positive vs ${counts[0]} negative trials, `
+    + `${k}-fold cross-validation${o.smote ? ', SMOTE on the training folds' : ', no class balancing'}, `
+    + `γ = ${o.gamma.toFixed(2)}. Fold AUCs ranged ${Math.min(...foldAucs).toFixed(3)}–${Math.max(...foldAucs).toFixed(3)} `
+    + `(SD ${sd(foldAucs).toFixed(3)}). Computed in ${ms.toFixed(0)} ms.`;
+
+  cc.hidden = false;
+  if (o.cheat) {
+    cc.className = 'callout callout--warn';
+    cc.innerHTML = `<strong>Mean AUC ${fmtAuc(m)} — and it is meaningless.</strong> `
+      + `You just scored the model on the trials it learned from. It has partly memorised them, so this number `
+      + `measures memorisation, not prediction. Untick the box and watch it fall back to reality. `
+      + `Every result the lab publishes is the unticked number.`;
+  } else {
+    const ref = MATLAB[task];
+    cc.className = 'callout';
+    cc.innerHTML = `<strong>Mean AUC ${fmtAuc(m)}.</strong> `
+      + `MATLAB recorded <b>${ref}</b> for participant 45 on this task with the full feature set. `
+      + (Math.abs(m - ref) < 0.05
+        ? `Yours is within a few hundredths — that is the fold shuffle, not a disagreement.`
+        : `Yours differs by ${Math.abs(m - ref).toFixed(3)}, which is what changing the settings above does to the answer.`)
+      + ` Chance is 0.5.`;
+  }
+}
+
+function drawFolds() {
+  const host = document.getElementById('folds-chart');
+  const { foldAucs, o } = last;
+  const w = 560, h = 300;
+  const pad = { l: 46, r: 20, t: 26, b: 44 };
+  const svg = svgRoot(host, w, h);
+  const lo = Math.min(0.35, ...foldAucs) - 0.03;
+  const hi = Math.max(0.75, ...foldAucs) + 0.03;
+  const xs = scale(-0.6, foldAucs.length - 0.4, pad.l, w - pad.r);
+  const ys = scale(lo, hi, h - pad.b, pad.t);
+  frame(svg, w, h, pad, xs, ys, {
+    xLabel: 'fold', yLabel: 'AUC on that fold', xTicks: [], yFmt: (v) => v.toFixed(2),
+  });
+  el('line', { x1: pad.l, x2: w - pad.r, y1: ys(0.5), y2: ys(0.5),
+    stroke: token('--critical'), 'stroke-dasharray': '4 3' }, svg);
+  el('text', { x: w - pad.r - 3, y: ys(0.5) - 5, 'text-anchor': 'end', class: 'tick',
+    fill: token('--critical') }, svg).textContent = 'chance';
+  const m = mean(foldAucs);
+  el('line', { x1: pad.l, x2: w - pad.r, y1: ys(m), y2: ys(m),
+    stroke: token('--text-primary'), 'stroke-width': 2 }, svg);
+  el('text', { x: pad.l + 3, y: ys(m) - 6, class: 'tick', 'font-weight': 640,
+    fill: token('--text-primary'), stroke: token('--surface-1'), 'stroke-width': 4, 'stroke-linejoin': 'round', style: 'paint-order:stroke fill' }, svg).textContent = `mean ${m.toFixed(3)}`;
+  foldAucs.forEach((v, i) => {
+    el('line', { x1: xs(i), x2: xs(i), y1: ys(m), y2: ys(v), stroke: token('--baseline') }, svg);
+    const c = el('circle', { cx: xs(i), cy: ys(v), r: 6,
+      fill: token(o.cheat ? '--warning' : '--series-1'),
+      stroke: token('--surface-1'), 'stroke-width': 2, style: 'cursor:pointer' }, svg);
+    const html = `<b>Fold ${i + 1}</b><br>AUC ${v.toFixed(3)}`;
+    c.addEventListener('pointerenter', (ev) => tip.show(html, ev.clientX, ev.clientY));
+    c.addEventListener('pointermove', (ev) => tip.show(html, ev.clientX, ev.clientY));
+    c.addEventListener('pointerleave', () => tip.hide());
+    el('text', { x: xs(i), y: h - pad.b + 14, 'text-anchor': 'middle', class: 'tick' }, svg)
+      .textContent = i + 1;
+  });
+  el('text', { x: pad.l, y: 14, class: 'axis-label', 'font-weight': 620 }, svg)
+    .textContent = o.cheat ? 'scored on TRAINING trials (not a real result)' : 'each fold scored on trials it never saw';
+}
+
+function drawRoc() {
+  const host = document.getElementById('roc2-chart');
+  const { allLab, allScore, o } = last;
+  const pts = roc(allLab, allScore);
+  const A = auc(allLab, allScore);
+  const w = 340, h = 300;
+  const pad = { l: 46, r: 14, t: 26, b: 44 };
+  const svg = svgRoot(host, w, h);
+  const xs = scale(0, 1, pad.l, w - pad.r);
+  const ys = scale(0, 1, h - pad.b, pad.t);
+  frame(svg, w, h, pad, xs, ys, {
+    xLabel: 'false alarm rate', yLabel: 'hit rate',
+    xTicks: [0, 0.5, 1], yTicks: [0, 0.5, 1],
+    xFmt: (v) => v.toFixed(1), yFmt: (v) => v.toFixed(1),
+  });
+  const col = o.cheat ? '--warning' : '--series-1';
+  el('path', { d: linePath(pts.map((p) => [xs(p[0]), ys(p[1])])) + `L${xs(1)} ${ys(0)} Z`,
+    fill: token(col), opacity: 0.14 }, svg);
+  el('line', { x1: xs(0), y1: ys(0), x2: xs(1), y2: ys(1), stroke: token('--text-muted'), 'stroke-dasharray': '4 3' }, svg);
+  el('path', { class: 'series-line', d: linePath(pts.map((p) => [xs(p[0]), ys(p[1])])), stroke: token(col) }, svg);
+  el('text', { x: xs(0.96), y: ys(0.08), 'text-anchor': 'end', 'font-size': 15, 'font-weight': 680,
+    fill: token(col) }, svg).textContent = `AUC ${fmtAuc(A)}`;
+  el('text', { x: pad.l, y: 14, class: 'axis-label', 'font-weight': 620 }, svg)
+    .textContent = 'ROC, all folds pooled';
+}
+
+/* ---------- repeatability ---------- */
+{
+  const host = document.getElementById('repeat-chart');
+  const note = document.getElementById('repeat-note');
+  const status = document.getElementById('repeat-status');
+  let runs = [];
+
+  document.getElementById('repeat').onclick = async () => {
+    const btn = document.getElementById('repeat');
+    btn.disabled = true;
+    runs = [];
+    const task = document.getElementById('task').value;
+    const o = { gamma: 0.5, smote: true, cheat: false };
+    for (let i = 0; i < 25; i++) {
+      status.textContent = `run ${i + 1} of 25…`;
+      // yield so the browser can paint between runs
+      await new Promise((r) => setTimeout(r, 0));
+      const res = runCV(task, o, 1000 + i);
+      runs.push(mean(res.foldAucs));
+      draw(task);
+    }
+    status.textContent = '';
+    btn.disabled = false;
+  };
+
+  function draw(task) {
+    const w = 940, h = 250;
+    const pad = { l: 46, r: 20, t: 30, b: 46 };
+    const svg = svgRoot(host, w, h);
+    const ref = MATLAB[task];
+    const lo = Math.min(0.45, ...runs, ref) - 0.02;
+    const hi = Math.max(0.65, ...runs, ref) + 0.02;
+    const xs = scale(lo, hi, pad.l, w - pad.r);
+    const ys = scale(0, 1, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      xLabel: 'mean AUC for participant 45 on this task', yTicks: [], xFmt: (v) => v.toFixed(2),
+    });
+    el('line', { x1: xs(0.5), x2: xs(0.5), y1: pad.t, y2: h - pad.b,
+      stroke: token('--critical'), 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, svg);
+    el('text', { x: xs(0.5), y: pad.t - 6, 'text-anchor': 'middle', class: 'tick',
+      fill: token('--critical') }, svg).textContent = 'chance';
+    el('line', { x1: xs(ref), x2: xs(ref), y1: pad.t, y2: h - pad.b,
+      stroke: token('--series-6'), 'stroke-width': 2 }, svg);
+    el('text', { x: xs(ref), y: pad.t - 6, 'text-anchor': 'middle', class: 'tick',
+      fill: token('--series-6'), 'font-weight': 640 }, svg).textContent = `MATLAB ${ref}`;
+
+    // one dot per run, stacked where they collide
+    const bins = new Map();
+    runs.forEach((v) => {
+      const key = Math.round(xs(v) / 9);
+      const n = bins.get(key) || 0;
+      bins.set(key, n + 1);
+      el('circle', { cx: xs(v), cy: (h - pad.b) - 10 - n * 11, r: 4.6,
+        fill: token('--series-1'), stroke: token('--surface-1'), 'stroke-width': 1.5, opacity: 0.9 }, svg);
+    });
+    if (runs.length > 2) {
+      const m = mean(runs), s = sd(runs);
+      el('line', { x1: xs(m), x2: xs(m), y1: pad.t + 4, y2: h - pad.b,
+        stroke: token('--text-primary'), 'stroke-width': 2 }, svg);
+      el('text', { x: xs(m), y: pad.t + 14, 'text-anchor': 'middle', class: 'tick', 'font-weight': 640,
+        fill: token('--text-primary'), stroke: token('--surface-1'), 'stroke-width': 4, 'stroke-linejoin': 'round', style: 'paint-order:stroke fill' }, svg)
+        .textContent = `mean ${m.toFixed(3)}`;
+      note.innerHTML = `<b>${runs.length} runs.</b> Mean <b>${m.toFixed(3)}</b>, SD <b>${s.toFixed(3)}</b>, `
+        + `range <b>${Math.min(...runs).toFixed(3)}–${Math.max(...runs).toFixed(3)}</b>. `
+        + `MATLAB's recorded value (${ref}) sits ${ref >= Math.min(...runs) && ref <= Math.max(...runs) ? 'inside' : 'outside'} that range. `
+        + `Every dot is a legitimate analysis; the spread is pure fold shuffle. `
+        + `A difference of ${(Math.max(...runs) - Math.min(...runs)).toFixed(3)} AUC between two “results” here means nothing at all.`;
+    }
+  }
+  responsive(host, () => { if (runs.length) draw(document.getElementById('task').value); });
+}
+</script>
+</body>
+</html>

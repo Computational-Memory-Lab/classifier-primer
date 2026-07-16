@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1. The memory task | CML primer</title>
+<meta name="description" content="What participants actually do in the recognition-memory experiment, and the four outcomes every test trial falls into.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory &amp; EEG <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Chapter 1</p>
+      <h1>The memory task</h1>
+      <p class="lede">
+        Everything else on this site depends on understanding this one experiment.
+        It is simple, and it is worth five minutes.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Study, distract, test — nine times over</h2>
+      <p>
+        Participants sit in front of a screen wearing a net of 257 electrodes. The
+        experiment runs in three-part blocks, and the whole thing repeats nine times.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One block of the experiment</div>
+      <div class="figure__sub">Repeated nine times, giving 225 studied words and 450 test words per participant.</div>
+      <div id="block-diagram"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        The words are ordinary 4–8 letter nouns drawn from the
+        <a href="https://doi.org/10.3758/BF03203275">Toronto Word Pool</a> — <em>chapter</em>,
+        <em>artist</em>, <em>motor</em>. The arithmetic in the middle is not measuring
+        anything. It is there to clear out short-term memory, so that when a word comes
+        back at test the participant has to actually <em>remember</em> it rather than
+        just still be holding it in mind.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Four things can happen on a test trial</h2>
+      <p>
+        At test, each word is either <strong>old</strong> (it was in the study list) or
+        <strong>new</strong> (it was not). The participant presses one of two keys to say
+        which they think it is. Cross those two facts and you get four outcomes — and
+        these four labels are what the entire project is built on.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 40rem;">
+      <div class="figure__title">The 2 × 2 that defines everything</div>
+      <div class="figure__sub">Hover or tap a cell. The number in each cell is a real count from participant 45.</div>
+      <div id="matrix"></div>
+      <div class="figure__note" id="matrix-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        In the code and the data files these are stored as the numbers
+        <code>1</code>, <code>2</code>, <code>3</code>, <code>4</code>. You will see those
+        constants everywhere in the repository, so they are worth memorising:
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 40rem;">
+      <div class="table-scroll">
+        <table class="data">
+          <thead>
+            <tr><th>Code</th><th>Name</th><th>The word was…</th><th>They said…</th><th>Correct?</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="num">1</td><td>Hit</td><td>old</td><td>“old”</td><td>yes</td></tr>
+            <tr><td class="num">2</td><td>Miss</td><td>old</td><td>“new”</td><td>no</td></tr>
+            <tr><td class="num">3</td><td>Correct Rejection</td><td>new</td><td>“new”</td><td>yes</td></tr>
+            <tr><td class="num">4</td><td>False Alarm</td><td>new</td><td>“old”</td><td>no</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="figure__note">
+        These live in column 2 of each participant's <code>events_NN.mat</code>; the
+        canonical table is in <code>data/DATA.md</code>. A trial's code is the only thing
+        that tells the classifier what “happened” on that trial — it is the answer key.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Try it yourself</h2>
+      <p>
+        Run a shortened block: study eight words, do a little arithmetic, then judge
+        sixteen. Your own trials get coded exactly the way a participant's would.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 44rem;">
+      <div class="figure__title">A miniature version of the experiment</div>
+      <div class="figure__sub">Eight study words instead of 25, sixteen test words instead of 50. Same structure.</div>
+      <div id="demo"></div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Three questions hide inside those four outcomes</h2>
+      <p>
+        Here is the step that takes people a while to see. Because every trial carries
+        both <em>what the word was</em> and <em>what the participant said</em>, you can
+        slice the same trials three different ways — and each slice asks a genuinely
+        different psychological question.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The same 450 trials, sliced three ways</div>
+      <div class="figure__sub">Click a task to see which trials it uses and which are set aside. Counts are participant 45's.</div>
+      <div class="controls" id="task-controls"></div>
+      <div id="task-split"></div>
+      <div class="figure__note" id="task-note"></div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <strong>Why this matters.</strong> Old vs New asks whether the brain registers
+        that a word was studied <em>at all</em>. Hit vs Miss asks whether the brain
+        predicts <em>success</em> — same physical words, sorted by whether memory worked.
+        FA vs CR asks about <em>error</em> — same physical words (all new), sorted by
+        whether the person was fooled. Only the last two hold the stimulus constant and
+        vary the memory, which is what makes them the interesting ones.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>How good are people at this, really?</h2>
+      <p>
+        Before asking a computer to read the EEG, it is worth knowing how well the
+        participants themselves did. Each dot is one of the 67 people in the dataset.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Behaviour of all 67 participants</div>
+      <div class="figure__sub">
+        d′ (“d-prime”) measures how well someone separates old from new words.
+        0 means no ability to tell them apart; higher is better. Hover any dot.
+      </div>
+      <div id="dprime-chart"></div>
+      <div class="figure__note" id="dprime-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        People are clearly not at chance — they can do this task. But they are also far
+        from perfect, and they vary a lot. Hold on to that spread: when we get to
+        classifier results in chapter 6, this same participant-to-participant variability
+        shows up again, and it is one of the reasons the lab needs dozens of people
+        rather than one very well-measured person.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab, University of Alberta ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+  </div>
+</footer>
+
+<script type="module">
+import {
+  initChrome, loadJSON, svgRoot, frame, scale, el, responsive, token, tooltip,
+  rng, mean, ticks,
+} from './assets/site.js';
+
+initChrome();
+const tip = tooltip();
+const P = await loadJSON('data/participants.json');
+const E = await loadJSON('data/erp.json');
+const counts = E.counts;
+
+/* ================= block diagram ================= */
+{
+  const host = document.getElementById('block-diagram');
+  responsive(host, () => {
+    const w = 940, h = 210;
+    const svg = svgRoot(host, w, h);
+    const panels = [
+      { t: 'STUDY', sub: '25 words', words: ['CHAPTER', 'ARTIST', 'MOTOR'],
+        note: 'each word 1,500 ms\nblank gap 300–500 ms', c: '--series-1' },
+      { t: 'DISTRACTOR', sub: '5 problems', words: ['5 + 6 − 3 = ?', '9 − 5 + 2 = ?', '4 + 7 − 1 = ?'],
+        note: 'clears short-term memory', c: '--series-4' },
+      { t: 'TEST', sub: '50 words', words: ['CHAPTER', 'MERCY', 'ARTIST'],
+        note: 'key 1 = “old”\nkey 2 = “new”', c: '--series-2' },
+    ];
+    const pw = 250, gap = 60, y0 = 26;
+    panels.forEach((p, i) => {
+      const x = 30 + i * (pw + gap);
+      el('text', { x: x + pw / 2, y: 12, 'text-anchor': 'middle', class: 'axis-label',
+        fill: token(p.c), 'font-weight': 700 }, svg).textContent = p.t;
+      // Stacked cards, drawn back to front. Each card is offset far enough that
+      // its own word stays readable in the strip the next card does not cover.
+      const cardW = pw - 46, cardH = 42, dx = 17, dy = 24;
+      p.words.forEach((word, k) => {
+        const cx = x + k * dx, cy = y0 + k * dy;
+        el('rect', { x: cx, y: cy, width: cardW, height: cardH, rx: 5,
+          fill: token('--surface-1'), stroke: token('--border-strong') }, svg);
+        el('text', { x: cx + 10, y: cy + 15, 'text-anchor': 'start',
+          fill: token('--text-primary'), 'font-size': 12, 'letter-spacing': '0.04em',
+          'font-family': p.t === 'DISTRACTOR' ? 'var(--mono)' : 'inherit' }, svg).textContent = word;
+      });
+      const cx = x + pw / 2 - 20;
+      el('text', { x: cx, y: y0 + 112, 'text-anchor': 'middle',
+        class: 'axis-label', 'font-weight': 600 }, svg).textContent = p.sub;
+      p.note.split('\n').forEach((line, k) => {
+        el('text', { x: cx, y: y0 + 128 + k * 13, 'text-anchor': 'middle',
+          class: 'tick' }, svg).textContent = line;
+      });
+      if (i < 2) {
+        const ax = x + pw - 26;
+        el('path', { d: `M${ax} ${y0 + 50} L${ax + 30} ${y0 + 50}`, stroke: token('--baseline'), 'stroke-width': 2 }, svg);
+        el('path', { d: `M${ax + 30} ${y0 + 50} l-7 -4 v8 z`, fill: token('--baseline') }, svg);
+      }
+    });
+    // repeat bar
+    const by = h - 24;
+    el('line', { x1: 30, x2: w - 30, y1: by, y2: by, stroke: token('--baseline'), 'stroke-width': 1.5 }, svg);
+    el('path', { d: `M${w - 30} ${by} l-8 -4 v8 z`, fill: token('--baseline') }, svg);
+    el('text', { x: (w) / 2, y: by + 16, 'text-anchor': 'middle', class: 'axis-label' }, svg)
+      .textContent = 'repeated for 9 blocks → 225 study words, 450 test words';
+  });
+}
+
+/* ================= 2x2 matrix ================= */
+{
+  const host = document.getElementById('matrix');
+  const note = document.getElementById('matrix-note');
+  const cells = [
+    { r: 0, c: 0, name: 'Hit', code: 1, key: 'Hit', col: '--c-hit', ok: true,
+      say: 'Correctly remembered a studied word.' },
+    { r: 0, c: 1, name: 'Miss', code: 2, key: 'Miss', col: '--c-miss', ok: false,
+      say: 'Forgot a word they had studied.' },
+    { r: 1, c: 0, name: 'False Alarm', code: 4, key: 'FA', col: '--c-fa', ok: false,
+      say: 'Fooled: the word felt familiar, but they never studied it.' },
+    { r: 1, c: 1, name: 'Correct Rejection', code: 3, key: 'CR', col: '--c-cr', ok: true,
+      say: 'Correctly identified a word as new.' },
+  ];
+  note.textContent = 'Participant 45 saw 225 old and 225 new words, like everyone else.';
+  responsive(host, () => {
+    const w = 560, h = 270;
+    const svg = svgRoot(host, w, h);
+    const x0 = 120, y0 = 46, cw = 200, ch = 90;
+    el('text', { x: x0 + cw, y: 16, 'text-anchor': 'middle', class: 'axis-label', 'font-weight': 700 }, svg)
+      .textContent = 'Participant said…';
+    ['“old”', '“new”'].forEach((t, i) => {
+      el('text', { x: x0 + i * cw + cw / 2, y: 36, 'text-anchor': 'middle', class: 'axis-label' }, svg).textContent = t;
+    });
+    el('text', { x: 14, y: y0 + ch, 'text-anchor': 'middle', class: 'axis-label', 'font-weight': 700,
+      transform: `rotate(-90 14 ${y0 + ch})` }, svg).textContent = 'The word was…';
+    ['old', 'new'].forEach((t, i) => {
+      el('text', { x: x0 - 12, y: y0 + i * ch + ch / 2 + 4, 'text-anchor': 'end', class: 'axis-label' }, svg).textContent = t;
+    });
+    for (const c of cells) {
+      const x = x0 + c.c * cw, y = y0 + c.r * ch;
+      const g = el('g', { style: 'cursor:pointer' }, svg);
+      // 2px surface gap between fills
+      el('rect', { x: x + 1, y: y + 1, width: cw - 2, height: ch - 2, rx: 7,
+        fill: token(c.col), opacity: 0.16, stroke: token(c.col), 'stroke-width': 1.5 }, g);
+      el('text', { x: x + cw / 2, y: y + 34, 'text-anchor': 'middle',
+        fill: token('--text-primary'), 'font-size': 14, 'font-weight': 660 }, g).textContent = c.name;
+      el('text', { x: x + cw / 2, y: y + 58, 'text-anchor': 'middle',
+        fill: token('--text-primary'), 'font-size': 20, 'font-weight': 680 }, g).textContent = counts[c.key];
+      el('text', { x: x + cw / 2, y: y + 76, 'text-anchor': 'middle', class: 'tick' }, g)
+        .textContent = `trials · code ${c.code}`;
+      // correctness carried by a glyph, not by colour -- the four colours are
+      // identities that follow these conditions across every chart on the site
+      el('text', { x: x + cw - 12, y: y + 20, 'text-anchor': 'end', 'font-size': 13,
+        fill: c.ok ? token('--good') : token('--critical') }, g)
+        .textContent = c.ok ? '✓ correct' : '✗ error';
+      const html = `<b>${c.name}</b> · code ${c.code}<br>${c.say}<br>`
+        + `<span style="opacity:.7">${counts[c.key]} of participant 45's 450 trials</span>`;
+      g.addEventListener('pointerenter', (ev) => tip.show(html, ev.clientX, ev.clientY));
+      g.addEventListener('pointermove', (ev) => tip.show(html, ev.clientX, ev.clientY));
+      g.addEventListener('pointerleave', () => tip.hide());
+    }
+    el('text', { x: x0 + cw, y: h - 6, 'text-anchor': 'middle', class: 'tick' }, svg)
+      .textContent = 'each condition keeps its colour everywhere on this site';
+  });
+}
+
+/* ================= mini experiment ================= */
+{
+  const STUDY = ['CHAPTER', 'ARTIST', 'MOTOR', 'MERCY', 'HARBOUR', 'PENCIL', 'THUNDER', 'GARDEN'];
+  const LURES = ['CANDLE', 'MARKET', 'RIVER', 'PUZZLE', 'SILVER', 'TUNNEL', 'ORCHARD', 'BUTTON'];
+  const host = document.getElementById('demo');
+  const rand = rng(7);
+
+  let state = 'intro';
+  let i = 0;
+  let testList = [];
+  let responses = [];
+  let mathA = 0, mathB = 0, mathC = 0;
+
+  const shuffle = (a) => {
+    const b = a.slice();
+    for (let k = b.length - 1; k > 0; k--) {
+      const j = Math.floor(rand() * (k + 1));
+      [b[k], b[j]] = [b[j], b[k]];
+    }
+    return b;
+  };
+
+  function begin() {
+    state = 'study'; i = 0;
+    testList = shuffle(STUDY.map((w) => ({ w, old: true })).concat(LURES.map((w) => ({ w, old: false }))));
+    responses = [];
+    render();
+    step();
+  }
+
+  function step() {
+    if (state !== 'study') return;
+    if (i >= STUDY.length) {
+      state = 'math';
+      mathA = 3 + Math.floor(rand() * 7);
+      mathB = 1 + Math.floor(rand() * 5);
+      mathC = 2 + Math.floor(rand() * 6);
+      render();
+      return;
+    }
+    render();
+    setTimeout(() => { i++; step(); }, 900);
+  }
+
+  function answer(saidOld) {
+    const item = testList[i];
+    const code = item.old ? (saidOld ? 1 : 2) : (saidOld ? 4 : 3);
+    responses.push({ ...item, saidOld, code });
+    i++;
+    if (i >= testList.length) state = 'done';
+    render();
+  }
+
+  const NAMES = { 1: 'Hit', 2: 'Miss', 3: 'Correct Rejection', 4: 'False Alarm' };
+  const COLS = { 1: '--c-hit', 2: '--c-miss', 3: '--c-cr', 4: '--c-fa' };
+
+  function render() {
+    if (state === 'intro') {
+      host.innerHTML = `<div style="text-align:center;padding:2.2rem 1rem">
+        <p style="color:var(--text-secondary);margin-bottom:1rem">
+          You will see eight words to memorise, one at a time. Then some arithmetic.
+          Then sixteen words to judge as old or new.</p>
+        <button class="btn btn--primary" id="go">Start the block</button></div>`;
+      host.querySelector('#go').onclick = begin;
+      return;
+    }
+    if (state === 'study') {
+      host.innerHTML = `<div style="text-align:center;padding:1rem">
+        <div class="eyebrow">Study phase · word ${Math.min(i + 1, 8)} of 8</div>
+        <div style="font-size:2.4rem;font-weight:600;letter-spacing:0.06em;margin:2rem 0;min-height:3rem">${STUDY[i] ?? ''}</div>
+        <div class="small muted">Just read each word and try to remember it.</div></div>`;
+      return;
+    }
+    if (state === 'math') {
+      host.innerHTML = `<div style="text-align:center;padding:1.4rem 1rem">
+        <div class="eyebrow">Distractor</div>
+        <div class="mono" style="font-size:2rem;margin:1.4rem 0">${mathA} + ${mathB} − ${mathC} = ?</div>
+        <div class="small muted" style="margin-bottom:1rem">
+          Real participants type the answer. The point is only to occupy your mind for a moment.</div>
+        <button class="btn btn--primary" id="go">Answer: ${mathA + mathB - mathC} — continue</button></div>`;
+      host.querySelector('#go').onclick = () => { state = 'test'; i = 0; render(); };
+      return;
+    }
+    if (state === 'test') {
+      const last = responses[responses.length - 1];
+      host.innerHTML = `<div style="text-align:center;padding:1rem">
+        <div class="eyebrow">Test phase · word ${i + 1} of 16</div>
+        <div style="font-size:2.4rem;font-weight:600;letter-spacing:0.06em;margin:1.6rem 0">${testList[i].w}</div>
+        <div class="controls" style="justify-content:center">
+          <button class="btn" id="old">Old — I studied it</button>
+          <button class="btn" id="new">New — I did not</button>
+        </div>
+        <div class="small" style="min-height:1.4rem;margin-top:0.7rem">${
+          last ? `<span style="color:${token(COLS[last.code])}">●</span> <b>${last.w}</b> → ${NAMES[last.code]} <span class="muted">(code ${last.code})</span>` : ''
+        }</div></div>`;
+      host.querySelector('#old').onclick = () => answer(true);
+      host.querySelector('#new').onclick = () => answer(false);
+      return;
+    }
+    // done
+    const tally = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    responses.forEach((r) => tally[r.code]++);
+    const hr = (tally[1] + 0.5) / (8 + 1);
+    const fr = (tally[4] + 0.5) / (8 + 1);
+    const z = (p) => { // Acklam inverse normal, plenty accurate here
+      const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687,
+        138.3577518672690, -30.66479806614716, 2.506628277459239];
+      const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866,
+        66.80131188771972, -13.28068155288572];
+      const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838,
+        -2.549732539343734, 4.374664141464968, 2.938163982698783];
+      const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+      const pl = 0.02425;
+      let q, r;
+      if (p < pl) { q = Math.sqrt(-2 * Math.log(p));
+        return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+             / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+      if (p > 1 - pl) return -z(1 - p);
+      q = p - 0.5; r = q * q;
+      return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
+           / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+    };
+    const d = z(hr) - z(fr);
+    host.innerHTML = `<div style="padding:0.6rem 0.2rem">
+      <div class="eyebrow" style="text-align:center">Your block, coded</div>
+      <div class="stats" style="margin:1rem 0">
+        ${[1, 2, 4, 3].map((c) => `<div class="stat">
+          <div class="stat__value" style="color:${token(COLS[c])}">${tally[c]}</div>
+          <div class="stat__label">${NAMES[c]}<br><span class="muted">code ${c}</span></div></div>`).join('')}
+      </div>
+      <p class="small" style="color:var(--text-secondary)">
+        Your d′ was <b>${d.toFixed(2)}</b>. For comparison, the 67 people in the real dataset
+        averaged <b>${mean(P.participants.map((p) => p.dprime)).toFixed(2)}</b> — over 450 trials
+        rather than 16, and after a much longer study list.
+      </p>
+      <p class="small muted">
+        Every one of those trials also has a second of 257-channel EEG attached to it.
+        That pairing — a brain response and a code from 1 to 4 — is the raw material for
+        everything that follows.
+      </p>
+      <div class="controls" style="margin-top:0.8rem"><button class="btn" id="again">Run another block</button></div>
+    </div>`;
+    host.querySelector('#again').onclick = begin;
+  }
+  render();
+  window.addEventListener('themechange', render);
+}
+
+/* ================= task splits ================= */
+{
+  const host = document.getElementById('task-split');
+  const ctrls = document.getElementById('task-controls');
+  const note = document.getElementById('task-note');
+  const TASKS = {
+    OldNew: {
+      label: 'Old vs New', q: 'Does the brain register that the word was studied?',
+      groups: [
+        { name: 'Old (Hit + Miss)', keys: ['Hit', 'Miss'], col: '--c-hit' },
+        { name: 'New (CR + FA)', keys: ['CR', 'FA'], col: '--c-cr' },
+      ],
+      note: 'Uses all 450 trials. Note this is what the word actually was — not what the participant said. A Miss is still an old word.',
+    },
+    HitMiss: {
+      label: 'Hit vs Miss', q: 'Among studied words, does the brain predict remembering?',
+      groups: [
+        { name: 'Hit', keys: ['Hit'], col: '--c-hit' },
+        { name: 'Miss', keys: ['Miss'], col: '--c-miss' },
+      ],
+      note: 'Uses only the 225 old words. All the new words are set aside. Every word here was studied — the only difference is whether memory worked.',
+    },
+    FAvsCR: {
+      label: 'FA vs CR', q: 'Among new words, does the brain predict a false memory?',
+      groups: [
+        { name: 'False Alarm', keys: ['FA'], col: '--c-fa' },
+        { name: 'Correct Rejection', keys: ['CR'], col: '--c-cr' },
+      ],
+      note: 'Uses only the 225 new words. Note how lopsided it is: participant 45 produced just 14 false alarms against 211 correct rejections. That imbalance causes real trouble later.',
+    },
+  };
+  let cur = 'OldNew';
+  ctrls.innerHTML = `<div class="segmented">${Object.entries(TASKS).map(([k, t]) =>
+    `<button data-k="${k}" aria-pressed="${k === cur}">${t.label}</button>`).join('')}</div>`;
+  ctrls.querySelectorAll('button').forEach((b) => {
+    b.onclick = () => {
+      cur = b.dataset.k;
+      ctrls.querySelectorAll('button').forEach((o) => o.setAttribute('aria-pressed', o.dataset.k === cur));
+      draw();
+    };
+  });
+
+  const ALL = ['Hit', 'Miss', 'CR', 'FA'];
+  function draw() {
+    const t = TASKS[cur];
+    const used = new Set(t.groups.flatMap((g) => g.keys));
+    note.textContent = t.note;
+    const w = 900, h = 150;
+    const svg = svgRoot(host, w, h);
+    el('text', { x: w / 2, y: 14, 'text-anchor': 'middle', class: 'axis-label', 'font-weight': 620 }, svg)
+      .textContent = t.q;
+
+    const total = 450;
+    const x0 = 30, barW = w - 60, y = 42, bh = 44;
+    let x = x0;
+    for (const key of ALL) {
+      const n = counts[key];
+      const cw = (n / total) * barW;
+      const inUse = used.has(key);
+      const g = t.groups.find((gr) => gr.keys.includes(key));
+      // 2px gap between fills
+      el('rect', {
+        x: x + 1, y, width: Math.max(0, cw - 2), height: bh, rx: 4,
+        fill: inUse ? token(g.col) : token('--text-muted'),
+        opacity: inUse ? 0.85 : 0.15,
+        stroke: inUse ? token(g.col) : 'none', 'stroke-width': 1,
+      }, svg);
+      if (cw > 34) {
+        el('text', { x: x + cw / 2, y: y + bh / 2 + 4, 'text-anchor': 'middle',
+          'font-size': 12, 'font-weight': 620,
+          fill: inUse ? '#fff' : token('--text-muted') }, svg).textContent = n;
+      }
+      el('text', { x: x + cw / 2, y: y + bh + 15, 'text-anchor': 'middle',
+        class: 'tick', 'font-weight': inUse ? 620 : 400,
+        fill: inUse ? token('--text-primary') : token('--text-muted') }, svg)
+        .textContent = cw > 22 ? key : '';
+      x += cw;
+    }
+    // group brackets
+    let bx = x0;
+    const spans = ALL.map((k) => (counts[k] / total) * barW);
+    const idx = Object.fromEntries(ALL.map((k, i) => [k, i]));
+    for (const g of t.groups) {
+      const starts = g.keys.map((k) => x0 + spans.slice(0, idx[k]).reduce((s, v) => s + v, 0));
+      const ends = g.keys.map((k) => x0 + spans.slice(0, idx[k] + 1).reduce((s, v) => s + v, 0));
+      const a = Math.min(...starts), b = Math.max(...ends);
+      const by = y + bh + 26;
+      el('path', { d: `M${a + 2} ${by} v6 H${b - 2} v-6`, stroke: token(g.col), fill: 'none', 'stroke-width': 1.5 }, svg);
+      el('text', { x: (a + b) / 2, y: by + 22, 'text-anchor': 'middle',
+        'font-size': 11, 'font-weight': 620, fill: token(g.col) }, svg)
+        .textContent = `${g.name} · ${g.keys.reduce((s, k) => s + counts[k], 0)}`;
+    }
+    const setAside = ALL.filter((k) => !used.has(k));
+    if (setAside.length) {
+      el('text', { x: w - 30, y: h - 4, 'text-anchor': 'end', class: 'tick' }, svg)
+        .textContent = `set aside: ${setAside.map((k) => `${k} (${counts[k]})`).join(', ')}`;
+    }
+  }
+  responsive(host, draw);
+}
+
+/* ================= d-prime dot plot ================= */
+{
+  const host = document.getElementById('dprime-chart');
+  const rows = P.participants.map((p) => ({
+    id: p.id, d: p.dprime,
+    acc: (p.counts.Hit + p.counts.CR) / 450,
+    ...p.counts,
+  })).sort((a, b) => a.d - b.d);
+  document.getElementById('dprime-note').textContent =
+    `Mean d′ = ${mean(rows.map((r) => r.d)).toFixed(2)}. `
+    + `Every participant is above 0, so everyone could tell old from new to some degree — `
+    + `but the best (P${rows[rows.length - 1].id}, d′ = ${rows[rows.length - 1].d.toFixed(2)}) is far from the weakest `
+    + `(P${rows[0].id}, d′ = ${rows[0].d.toFixed(2)}). Computed from events_NN.mat with the same log-linear correction the pipeline uses.`;
+
+  responsive(host, () => {
+    const w = 940, h = 260;
+    const pad = { l: 46, r: 20, t: 16, b: 42 };
+    const svg = svgRoot(host, w, h);
+    const dmax = Math.max(...rows.map((r) => r.d));
+    const xs = scale(-0.5, rows.length - 0.5, pad.l, w - pad.r);
+    const ys = scale(0, Math.ceil(dmax * 2) / 2, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      xLabel: 'each dot is one participant, ordered by d′',
+      yLabel: "d′ (old/new sensitivity)",
+      xTicks: [], yFmt: (v) => v.toFixed(1),
+    });
+    // chance line
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(0), y2: ys(0), stroke: token('--critical'), 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, svg);
+    el('text', { x: w - pad.r - 4, y: ys(0) - 5, 'text-anchor': 'end', class: 'tick', fill: token('--critical') }, svg)
+      .textContent = 'd′ = 0 · cannot tell old from new';
+    const m = mean(rows.map((r) => r.d));
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(m), y2: ys(m), stroke: token('--text-muted'), 'stroke-dasharray': '2 3' }, svg);
+    el('text', { x: pad.l + 4, y: ys(m) - 5, class: 'tick' }, svg).textContent = `mean ${m.toFixed(2)}`;
+
+    rows.forEach((r, i) => {
+      const c = el('circle', {
+        cx: xs(i), cy: ys(r.d), r: 4.5,
+        fill: r.id === 45 ? token('--series-6') : token('--series-1'),
+        stroke: token('--surface-1'), 'stroke-width': 1.5, // 2px surface ring
+        style: 'cursor:pointer',
+      }, svg);
+      const html = `<b>Participant ${r.id}</b><br>d′ = <b>${r.d.toFixed(2)}</b> · accuracy ${(r.acc * 100).toFixed(0)}%<br>`
+        + `${r.Hit} hits, ${r.Miss} misses<br>${r.CR} correct rejections, ${r.FA} false alarms`
+        + (r.id === 45 ? '<br><span style="opacity:.7">the participant used for the demos on this site</span>' : '');
+      c.addEventListener('pointerenter', (ev) => tip.show(html, ev.clientX, ev.clientY));
+      c.addEventListener('pointermove', (ev) => tip.show(html, ev.clientX, ev.clientY));
+      c.addEventListener('pointerleave', () => tip.hide());
+    });
+    // label P45
+    const i45 = rows.findIndex((r) => r.id === 45);
+    el('text', { x: xs(i45), y: ys(rows[i45].d) - 10, 'text-anchor': 'middle',
+      class: 'direct-label', fill: token('--series-6') }, svg).textContent = 'P45';
+  });
+}
+</script>
+</body>
+</html>

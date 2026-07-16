@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2. Why classifiers, not just averages | CML primer</title>
+<meta name="description" content="Why averaging EEG establishes correlation but not much else, and what asking a classifier to predict unseen trials buys you.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory &amp; EEG <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Chapter 2</p>
+      <h1>Why classifiers, not just averages</h1>
+      <p class="lede">
+        This chapter is the argument for the whole project. If you take one idea away
+        from this site, take this one.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>A single trial looks like nothing at all</h2>
+      <p>
+        Here is the honest starting point. This is one real second of brain activity
+        from one real trial — participant 45, one electrode, one word they went on to
+        remember. Look at it and try to see the memory.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Watch an average appear out of noise</div>
+      <div class="figure__sub">
+        Drag the slider to average more Hit trials together. These are the real
+        recorded trials, added in one at a time.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Trials averaged
+          <input type="range" id="n-trials" min="1" max="147" value="1">
+          <output id="n-out">1</output>
+        </label>
+        <button class="btn" id="reshuffle">Different random trials</button>
+        <button class="btn" id="play">▶ Animate</button>
+      </div>
+      <div id="avg-chart"></div>
+      <div class="figure__note" id="avg-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        At one trial it is a mess. By ten you can see something. By a hundred a clean,
+        smooth, textbook waveform has appeared — the sharp negative dip around 100 ms,
+        the slow drift afterwards. Nothing was added. The signal was in there the whole
+        time; averaging just cancelled the noise around it.
+      </p>
+      <div class="callout">
+        <strong>This is what ERP research is.</strong> Averaging is not a trick — it is a
+        genuinely powerful tool, and essentially everything psychology knows about the
+        electrical signature of memory came from it. The problem is not that it is wrong.
+        The problem is what it throws away.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>What the average costs you</h2>
+      <p>
+        Now put the two conditions side by side. Averaging within each participant, and
+        then across all 67 of them, gives the classic result: words that were remembered
+        produce a slightly different waveform from new words correctly called new.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The classic old/new effect, across 67 participants</div>
+      <div class="figure__sub" id="grand-sub"></div>
+      <div class="controls" id="grand-controls"></div>
+      <div id="grand-chart"></div>
+      <div class="legend" id="grand-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="grand-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        There it is — decades of memory research in one picture. Note the size of it: a
+        fraction of a microvolt. And note what it took to see: 67 people × 450 trials each,
+        roughly 30,000 trials averaged down into two lines.
+      </p>
+      <p>
+        Now here is the same comparison for <strong>one</strong> participant, with the
+        actual trials that went into it drawn underneath.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One participant, and the trials underneath their average</div>
+      <div class="figure__sub">
+        Participant 45. Toggle the faint single trials on — the bold lines are the
+        averages of exactly those trials.
+      </div>
+      <div class="controls">
+        <div class="segmented" id="show-toggle">
+          <button data-v="avg" aria-pressed="true">Averages only</button>
+          <button data-v="both" aria-pressed="false">Show the single trials</button>
+        </div>
+      </div>
+      <div id="spaghetti-chart"></div>
+      <div class="legend" id="spaghetti-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="spaghetti-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        That picture is the whole difficulty in one image. The difference between the
+        averages is <em>real</em> — it replicates across labs and decades. But an average
+        is a statement about a <strong>group of trials</strong>. It cannot tell you
+        anything about any particular trial, because the moment you averaged, the
+        individual trials stopped existing.
+      </p>
+      <p>
+        So the classic finding says: <em>studied words produce, on average, a slightly
+        different waveform.</em> It does not say: <em>this brain activity is what
+        remembering is made of.</em> Those are very different claims, and only the first
+        one has been demonstrated.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Description is easy. Prediction is hard.</h2>
+      <p>
+        There is a deeper problem, and it is the reason machine learning people are
+        fussy in ways that can seem pedantic at first.
+      </p>
+      <p>
+        If you go looking for a difference in a rich enough dataset, you will find one.
+        257 electrodes × 325 time points is 83,525 places to look. Some of them will
+        differ between your conditions <em>by chance</em>. If you then report the ones
+        that differed, you are describing the noise in the sample you happened to
+        collect — and it will not be there next time.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Finding a “result” in pure noise</div>
+      <div class="figure__sub">
+        Both groups below are random numbers with no real difference whatsoever. Search
+        enough electrodes and time points, and a “significant” effect appears anyway.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Places you look
+          <input type="range" id="n-look" min="1" max="400" value="1">
+          <output id="look-out">1</output>
+        </label>
+        <button class="btn" id="look-again">New random data</button>
+      </div>
+      <div id="noise-chart"></div>
+      <div class="figure__note" id="noise-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        Nothing in that demo is real. There is no signal to find. Yet with enough places
+        to look, something always crosses the line — and it is easy to write it up as a
+        finding, complete with a p-value.
+      </p>
+      <div class="keypoint">
+        <strong>The fix is not more statistics. It is a different question.</strong>
+        Instead of asking “is there a difference in the data I already have?”, ask
+        “can I <em>predict</em> data I have never seen?” You cannot fool yourself the
+        same way, because the answer is checked against trials that had no say in
+        building the model.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>So: what is a classifier?</h2>
+      <p>
+        A classifier is a program that learns a rule from labelled examples. You show it
+        many trials, each one paired with its answer — this trial was a Hit, that one was
+        a Miss — and it works out a rule for telling them apart. Then you show it trials
+        it has never seen and make it guess.
+      </p>
+      <p>
+        The crucial discipline is that the trials it is tested on are <strong>held back
+        from training entirely</strong>. If the model has seen a trial, that trial cannot
+        be used to judge it. The test has to be fair, or it tells you nothing.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 46rem;">
+      <div class="figure__title">The two questions, side by side</div>
+      <div class="table-scroll">
+        <table class="data">
+          <thead>
+            <tr><th></th><th style="text-align:left">Classic ERP analysis</th><th style="text-align:left">Classifier analysis</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Asks</td><td style="text-align:left">Do these conditions differ on average?</td><td style="text-align:left">Can I predict the condition of an unseen trial?</td></tr>
+            <tr><td>Unit</td><td style="text-align:left">The averaged waveform</td><td style="text-align:left">The single trial</td></tr>
+            <tr><td>Uses</td><td style="text-align:left">A couple of hand-picked measurements</td><td style="text-align:left">All 280 measurements at once</td></tr>
+            <tr><td>Checked against</td><td style="text-align:left">The same data you looked at</td><td style="text-align:left">Data held back from training</td></tr>
+            <tr><td>Establishes</td><td style="text-align:left">Correlation</td><td style="text-align:left">That the signal carries usable information</td></tr>
+            <tr><td>Fails when</td><td style="text-align:left">You looked in many places</td><td style="text-align:left">It genuinely cannot predict</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="figure__note">
+        Neither column is “better”. They answer different questions. This lab runs both —
+        the ERP analysis is the manuscript's Table 1 — but the classifier is the one that
+        can rule things out.
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
+        This is exactly the argument
+        <a href="https://doi.org/10.1152/jn.00293.2020">Chakravarty, Chen &amp; Caplan (2020)</a>
+        made for the study phase of this very dataset, and it is the paper this project
+        follows. In their words, the field distinguishes
+        “descriptive analysis, subject to overfitting, and true prediction, that can
+        classify untrained data.”
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>How we score it: AUC</h2>
+      <p>
+        We need one number for “how well did it predict”. Accuracy — the percentage it
+        got right — turns out to be a bad choice here. Remember participant 45's 14 false
+        alarms against 211 correct rejections? A classifier that ignores the brain
+        entirely and always says “correct rejection” scores 94% accuracy. It is useless
+        and it looks excellent.
+      </p>
+      <p>
+        So we use <strong>AUC</strong> instead. Rather than forcing a yes/no decision, the
+        classifier rates each trial by how confident it is. AUC then asks a question that
+        does not care about class imbalance:
+      </p>
+      <div class="callout">
+        <strong>Pick one random Hit and one random Miss. What is the probability the
+        classifier rated the Hit higher?</strong> That probability is the AUC.
+        0.5 means it is guessing. 1.0 means it never gets the ordering wrong.
+      </div>
+      <p>
+        Because it only depends on the <em>ordering</em> of trials, an always-say-CR
+        classifier scores exactly 0.5 — correctly identified as worthless. Chapter 4
+        builds this up visually. For now, the scale is all you need:
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 50rem;">
+      <div class="figure__title">The AUC scale, and where this field actually lives</div>
+      <div id="auc-scale"></div>
+      <div class="figure__note">
+        Our results sit at the left-hand end, and that is not a failure — it is what
+        single-trial EEG can support. A memory classifier reporting 0.95 would be
+        evidence of a bug, not a breakthrough.
+      </div>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab, University of Alberta ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+  </div>
+</footer>
+
+<script type="module">
+import {
+  initChrome, loadJSON, loadBin, svgRoot, frame, scale, linePath, el,
+  responsive, token, tooltip, rng, gauss, mean, sd, tTest,
+} from './assets/site.js';
+
+initChrome();
+const tip = tooltip();
+
+/* load the single trials at Fz */
+const meta = await loadJSON('data/fz_trials.json');
+const buf = await loadBin('data/fz_trials.bin');
+const raw = new Int16Array(buf);
+const [nTrials, nSamp] = meta.shape;
+const times = meta.times;
+const trial = (i) => {
+  const out = new Float64Array(nSamp);
+  for (let k = 0; k < nSamp; k++) out[k] = raw[i * nSamp + k] * meta.scale;
+  return out;
+};
+const byCode = (c) => meta.labels.map((v, i) => (v === c ? i : -1)).filter((i) => i >= 0);
+const hits = byCode(1);
+const crs = byCode(3);
+
+function averageOf(idxs) {
+  const out = new Float64Array(nSamp);
+  for (const i of idxs) {
+    for (let k = 0; k < nSamp; k++) out[k] += raw[i * nSamp + k] * meta.scale;
+  }
+  for (let k = 0; k < nSamp; k++) out[k] /= idxs.length;
+  return out;
+}
+
+/* ============ averaging demo ============ */
+{
+  const host = document.getElementById('avg-chart');
+  const note = document.getElementById('avg-note');
+  const slider = document.getElementById('n-trials');
+  const out = document.getElementById('n-out');
+  let order = null;
+  let seed = 3;
+
+  const reorder = () => {
+    const r = rng(seed);
+    order = hits.slice();
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+  };
+  reorder();
+
+  const full = averageOf(hits);
+  const fullRange = Math.max(...full.map(Math.abs));
+
+  let draw;
+  draw = () => {
+    const n = +slider.value;
+    out.textContent = n;
+    const idxs = order.slice(0, n);
+    const avg = averageOf(idxs);
+
+    const w = 940, h = 320;
+    const pad = { l: 52, r: 22, t: 14, b: 36 };
+    const svg = svgRoot(host, w, h);
+    // fixed y range so the collapse of noise is visible rather than rescaled away
+    const lim = 26;
+    const xs = scale(times[0], times[times.length - 1], pad.l, w - pad.r);
+    const ys = scale(-lim, lim, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      xLabel: 'Time from word onset (ms)', yLabel: 'Voltage (µV)',
+      xTicks: [0, 200, 400, 600, 800, 1000, 1200],
+      yTicks: [-20, -10, 0, 10, 20],
+    });
+    el('line', { x1: xs(0), x2: xs(0), y1: pad.t, y2: h - pad.b,
+      stroke: token('--baseline'), 'stroke-dasharray': '3 3' }, svg);
+
+    // the trials going into this average, faint
+    if (n <= 40) {
+      for (const i of idxs) {
+        const t = trial(i);
+        el('path', {
+          d: linePath(times.map((tm, k) => [xs(tm), ys(t[k])])),
+          fill: 'none', stroke: token('--c-hit'), 'stroke-width': 0.7, opacity: 0.16,
+        }, svg);
+      }
+    }
+    // the true full average, for reference
+    el('path', {
+      d: linePath(times.map((tm, k) => [xs(tm), ys(full[k])])),
+      fill: 'none', stroke: token('--text-muted'), 'stroke-width': 1.5,
+      'stroke-dasharray': '4 3', opacity: 0.8,
+    }, svg);
+    el('path', {
+      class: 'series-line',
+      d: linePath(times.map((tm, k) => [xs(tm), ys(avg[k])])),
+      stroke: token('--c-hit'),
+    }, svg);
+
+    el('text', { x: w - pad.r - 4, y: pad.t + 12, 'text-anchor': 'end',
+      class: 'tick', fill: token('--text-muted') }, svg)
+      .textContent = `dashed = average of all ${hits.length} Hit trials`;
+
+    // how far is this average from the final one?
+    let err = 0;
+    for (let k = 0; k < nSamp; k++) err += (avg[k] - full[k]) ** 2;
+    err = Math.sqrt(err / nSamp);
+    note.innerHTML = n === 1
+      ? `<b>One trial.</b> Root-mean-square distance from the final average: <b>${err.toFixed(2)} µV</b>. `
+        + `The waveform you are looking for is roughly 1 µV tall. It is buried about ${(err).toFixed(0)}× deeper than that.`
+      : `<b>${n} trials.</b> Distance from the final average: <b>${err.toFixed(2)} µV</b>. `
+        + `Noise falls off as the square root of the number of trials — to halve it you need four times as many.`;
+  };
+
+  slider.addEventListener('input', draw);
+  document.getElementById('reshuffle').onclick = () => { seed = (seed * 7 + 11) % 9973; reorder(); draw(); };
+  let timer = null;
+  document.getElementById('play').onclick = (ev) => {
+    if (timer) { clearInterval(timer); timer = null; ev.target.textContent = '▶ Animate'; return; }
+    ev.target.textContent = '❚❚ Pause';
+    slider.value = 1; draw();
+    timer = setInterval(() => {
+      const v = +slider.value;
+      const next = v < 10 ? v + 1 : v < 40 ? v + 3 : v + 7;
+      if (next >= 147) { slider.value = 147; draw(); clearInterval(timer); timer = null; ev.target.textContent = '▶ Animate'; return; }
+      slider.value = next; draw();
+    }, 90);
+  };
+  responsive(host, draw);
+}
+
+/* ============ the grand average: the classic effect ============ */
+{
+  const G = await loadJSON('data/grand_erp.json');
+  const host = document.getElementById('grand-chart');
+  const ctrls = document.getElementById('grand-controls');
+  const note = document.getElementById('grand-note');
+  const SITES = [
+    { ch: G.fz, name: 'Fz', blurb: 'front midline', win: 'FN400', range: [300, 500],
+      what: 'the <b>FN400</b>, classically linked to a feeling of familiarity' },
+    { ch: G.p3, name: 'P3', blurb: 'left parietal', win: 'LPP', range: [500, 800],
+      what: 'the <b>LPP</b>, classically linked to actually recollecting the word' },
+  ];
+  let cur = 0;
+
+  document.getElementById('grand-sub').innerHTML =
+    `Every participant's trials averaged within condition, then averaged across all `
+    + `<b>${G.nParticipants}</b> of them. Shaded bands are ±1 standard error across participants.`;
+  ctrls.innerHTML = `<div class="segmented" id="site-seg">${SITES.map((s, i) =>
+    `<button data-i="${i}" aria-pressed="${i === cur}">${s.name} — ${s.blurb}</button>`).join('')}</div>`;
+  ctrls.querySelectorAll('#site-seg button').forEach((b) => {
+    b.onclick = () => {
+      cur = +b.dataset.i;
+      ctrls.querySelectorAll('#site-seg button').forEach((o) =>
+        o.setAttribute('aria-pressed', +o.dataset.i === cur));
+      draw();
+    };
+  });
+  document.getElementById('grand-legend').innerHTML = `
+    <span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token('--c-hit')}"></span>Hit</span>
+    <span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token('--c-cr')}"></span>Correct Rejection</span>
+    <span class="legend__item muted">shaded band = ±1 SEM across participants</span>`;
+
+  let draw;
+  draw = () => {
+    const S = SITES[cur];
+    const wave = G.channels[String(S.ch)];
+    const w = 940, h = 340;
+    const pad = { l: 52, r: 84, t: 14, b: 36 };
+    const svg = svgRoot(host, w, h);
+    const all = ['Hit', 'CR'].flatMap((k) => wave[k].mean.flatMap((m, i) =>
+      [m + wave[k].sem[i], m - wave[k].sem[i]]));
+    const lo = Math.min(...all), hi = Math.max(...all);
+    const m = (hi - lo) * 0.12;
+    const xs = scale(G.times[0], G.times[G.times.length - 1], pad.l, w - pad.r);
+    const ys = scale(lo - m, hi + m, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      xLabel: 'Time from word onset (ms)', yLabel: 'Voltage (µV)',
+      xTicks: [0, 200, 400, 600, 800, 1000, 1200], yFmt: (v) => v.toFixed(1),
+    });
+    el('rect', { x: xs(S.range[0]), y: pad.t, width: xs(S.range[1]) - xs(S.range[0]),
+      height: h - pad.t - pad.b, fill: token('--text-muted'), opacity: 0.1 }, svg);
+    el('text', { x: (xs(S.range[0]) + xs(S.range[1])) / 2, y: pad.t + 11,
+      'text-anchor': 'middle', class: 'tick' }, svg)
+      .textContent = `${S.win} · ${S.range[0]}–${S.range[1]} ms`;
+    el('line', { x1: xs(0), x2: xs(0), y1: pad.t, y2: h - pad.b,
+      stroke: token('--baseline'), 'stroke-dasharray': '3 3' }, svg);
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(0), y2: ys(0), stroke: token('--gridline') }, svg);
+
+    for (const [k, col] of [['Hit', '--c-hit'], ['CR', '--c-cr']]) {
+      const d = wave[k];
+      const up = G.times.map((t, i) => [xs(t), ys(d.mean[i] + d.sem[i])]);
+      const dn = G.times.map((t, i) => [xs(t), ys(d.mean[i] - d.sem[i])]).reverse();
+      el('path', { d: linePath(up) + linePath(dn).replace('M', 'L') + 'Z',
+        fill: token(col), opacity: 0.18 }, svg);
+    }
+    for (const [k, col, label] of [['Hit', '--c-hit', 'Hit'], ['CR', '--c-cr', 'Corr. Rej.']]) {
+      const pts = G.times.map((t, i) => [xs(t), ys(wave[k].mean[i])]);
+      el('path', { class: 'series-line', d: linePath(pts), stroke: token(col) }, svg);
+      el('text', { class: 'direct-label', x: w - pad.r + 6, y: pts[pts.length - 1][1] + 4,
+        fill: token(col) }, svg).textContent = label;
+    }
+
+    // measure the effect live, from each participant's window mean
+    const diffs = G.windowMeans
+      .filter((r) => r[`${S.name}_${S.win}_Hit`] !== null && r[`${S.name}_${S.win}_CR`] !== null)
+      .map((r) => r[`${S.name}_${S.win}_Hit`] - r[`${S.name}_${S.win}_CR`]);
+    const st = tTest(diffs, 0);
+    const above = diffs.filter((d) => d > 0).length;
+    note.innerHTML = `In the shaded window, Hits are <b>${mean(diffs).toFixed(2)} µV</b> more positive `
+      + `than Correct Rejections — ${S.what}. Paired across ${diffs.length} participants: `
+      + `t(${st.df}) = ${st.t.toFixed(2)}, p = ${st.p < 0.001 ? '< 0.001' : st.p.toFixed(3)}. `
+      + `The effect held in the same direction for ${above} of ${diffs.length} people. `
+      + `Computed here in your browser from each participant's window mean.`;
+  };
+  responsive(host, draw);
+}
+
+/* ============ spaghetti: Hit vs CR, one participant ============ */
+{
+  const host = document.getElementById('spaghetti-chart');
+  const legend = document.getElementById('spaghetti-legend');
+  let mode = 'avg';
+  document.querySelectorAll('#show-toggle button').forEach((b) => {
+    b.onclick = () => {
+      mode = b.dataset.v;
+      document.querySelectorAll('#show-toggle button').forEach((o) =>
+        o.setAttribute('aria-pressed', o.dataset.v === mode));
+      draw();
+    };
+  });
+
+  const avgHit = averageOf(hits);
+  const avgCr = averageOf(crs);
+
+  legend.innerHTML = `
+    <span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token('--c-hit')}"></span>Hit <span class="muted">(${hits.length} trials)</span></span>
+    <span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token('--c-cr')}"></span>Correct Rejection <span class="muted">(${crs.length} trials)</span></span>`;
+
+  let draw;
+  draw = () => {
+    const w = 940, h = 340;
+    const pad = { l: 52, r: 70, t: 14, b: 36 };
+    const svg = svgRoot(host, w, h);
+    const lim = mode === 'both' ? 30 : 2.2;
+    const xs = scale(times[0], times[times.length - 1], pad.l, w - pad.r);
+    const ys = scale(-lim - (mode === 'both' ? 0 : 4), lim + (mode === 'both' ? 0 : 1), h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      xLabel: 'Time from word onset (ms)', yLabel: 'Voltage (µV)',
+      xTicks: [0, 200, 400, 600, 800, 1000, 1200],
+      yFmt: (v) => v.toFixed(mode === 'both' ? 0 : 1),
+    });
+    el('rect', { x: xs(300), y: pad.t, width: xs(500) - xs(300), height: h - pad.t - pad.b,
+      fill: token('--text-muted'), opacity: 0.09 }, svg);
+    el('text', { x: (xs(300) + xs(500)) / 2, y: pad.t + 11, 'text-anchor': 'middle', class: 'tick' }, svg)
+      .textContent = '300–500 ms';
+    el('line', { x1: xs(0), x2: xs(0), y1: pad.t, y2: h - pad.b, stroke: token('--baseline'), 'stroke-dasharray': '3 3' }, svg);
+
+    if (mode === 'both') {
+      for (const [idxs, col] of [[hits, '--c-hit'], [crs, '--c-cr']]) {
+        for (const i of idxs) {
+          const t = trial(i);
+          el('path', {
+            d: linePath(times.map((tm, k) => [xs(tm), ys(t[k])])),
+            fill: 'none', stroke: token(col), 'stroke-width': 0.5, opacity: 0.07,
+          }, svg);
+        }
+      }
+    }
+    for (const [avg, col, label] of [[avgHit, '--c-hit', 'Hit'], [avgCr, '--c-cr', 'Corr. Rej.']]) {
+      el('path', { class: 'series-line', d: linePath(times.map((tm, k) => [xs(tm), ys(avg[k])])),
+        stroke: token(col), 'stroke-width': mode === 'both' ? 2.5 : 2 }, svg);
+      el('text', { class: 'direct-label', x: w - pad.r + 6,
+        y: ys(avg[avg.length - 1]) + 4, fill: token(col) }, svg).textContent = label;
+    }
+    // quantify the gap in the FN400 window
+    const inWin = times.map((t, k) => (t >= 300 && t <= 500 ? k : -1)).filter((k) => k >= 0);
+    const gap = mean(inWin.map((k) => avgHit[k])) - mean(inWin.map((k) => avgCr[k]));
+    const spread = sd(hits.map((i) => { const t = trial(i); return mean(inWin.map((k) => t[k])); }));
+    document.getElementById('spaghetti-note').innerHTML =
+      `For this one participant, the two averages differ by <b>${gap.toFixed(2)} µV</b> in the shaded window, `
+      + `while their individual trials scatter by <b>±${spread.toFixed(1)} µV</b> around it — about `
+      + `${Math.round(spread / Math.abs(gap))} times larger than the effect being measured. `
+      + `That is why the group average above needed 67 people to show anything at all, and why no `
+      + `single trial here looks like a Hit or a Miss. Both facts are true at once.`;
+  };
+  responsive(host, draw);
+}
+
+/* ============ noise mining demo ============ */
+{
+  const host = document.getElementById('noise-chart');
+  const note = document.getElementById('noise-note');
+  const slider = document.getElementById('n-look');
+  const out = document.getElementById('look-out');
+  let seed = 11;
+
+  // t-value for two groups of 40 random normals, at each "place we look"
+  function makeTs(seed, n) {
+    const r = rng(seed);
+    const ts = [];
+    for (let i = 0; i < n; i++) {
+      const a = Array.from({ length: 40 }, () => gauss(r));
+      const b = Array.from({ length: 40 }, () => gauss(r));
+      const t = (mean(a) - mean(b)) / Math.sqrt(sd(a) ** 2 / 40 + sd(b) ** 2 / 40);
+      ts.push(t);
+    }
+    return ts;
+  }
+  let all = makeTs(seed, 400);
+
+  let draw;
+  draw = () => {
+    const n = +slider.value;
+    out.textContent = n;
+    const ts = all.slice(0, n);
+    const w = 940, h = 240;
+    const pad = { l: 52, r: 22, t: 16, b: 40 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(0, 400, pad.l, w - pad.r);
+    const ys = scale(-4.5, 4.5, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      xLabel: 'electrode × time point you tested (each one is a fresh place to look)',
+      yLabel: 't value', yTicks: [-4, -2, 0, 2, 4],
+    });
+    // significance bands
+    for (const s of [1, -1]) {
+      el('rect', { x: pad.l, y: s > 0 ? pad.t : ys(-1.99), width: w - pad.l - pad.r,
+        height: s > 0 ? ys(1.99) - pad.t : (h - pad.b) - ys(-1.99),
+        fill: token('--critical'), opacity: 0.08 }, svg);
+    }
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(1.99), y2: ys(1.99), stroke: token('--critical'), 'stroke-dasharray': '4 3' }, svg);
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(-1.99), y2: ys(-1.99), stroke: token('--critical'), 'stroke-dasharray': '4 3' }, svg);
+    el('text', { x: w - pad.r - 4, y: ys(1.99) - 5, 'text-anchor': 'end', class: 'tick', fill: token('--critical') }, svg)
+      .textContent = 'p < 0.05';
+
+    let sig = 0;
+    ts.forEach((t, i) => {
+      const hot = Math.abs(t) > 1.99;
+      if (hot) sig++;
+      el('circle', { cx: xs(i), cy: ys(t), r: hot ? 3.4 : 2.2,
+        fill: hot ? token('--critical') : token('--text-muted'),
+        opacity: hot ? 1 : 0.45,
+        stroke: hot ? token('--surface-1') : 'none', 'stroke-width': 1.5 }, svg);
+    });
+    note.innerHTML = sig === 0
+      ? `You have looked in <b>${n}</b> place${n > 1 ? 's' : ''} and found nothing yet. Keep going.`
+      : `Looking in <b>${n}</b> places produced <b>${sig}</b> “significant” result${sig > 1 ? 's' : ''} `
+        + `(${(100 * sig / n).toFixed(0)}% of tests) — from data with <b>no real effect at all</b>. `
+        + `That is exactly the 5% you signed up for at p &lt; 0.05. The real EEG has 83,525 places to look.`;
+  };
+  slider.addEventListener('input', draw);
+  document.getElementById('look-again').onclick = () => {
+    seed = (seed * 13 + 7) % 9973; all = makeTs(seed, 400); draw();
+  };
+  responsive(host, draw);
+}
+
+/* ============ AUC scale ============ */
+{
+  const host = document.getElementById('auc-scale');
+  const marks = [
+    { v: 0.5, label: 'Chance', sub: 'coin flip', col: '--text-muted' },
+    { v: 0.58, label: 'This project', sub: 'single-trial EEG, memory', col: '--series-6' },
+    { v: 0.716, label: 'Danyluik 2025', sub: 'spectral features, learning', col: '--series-7' },
+    { v: 1.0, label: 'Perfect', sub: 'never wrong', col: '--good' },
+  ];
+  responsive(host, () => {
+    const w = 900, h = 128;
+    const svg = svgRoot(host, w, h);
+    const pad = { l: 40, r: 40 };
+    const xs = scale(0.5, 1.0, pad.l, w - pad.r);
+    const y = 54;
+    // gradient track
+    const defs = el('defs', {}, svg);
+    const grad = el('linearGradient', { id: 'aucgrad', x1: '0', x2: '1' }, defs);
+    el('stop', { offset: '0', 'stop-color': token('--text-muted'), 'stop-opacity': '0.35' }, grad);
+    el('stop', { offset: '1', 'stop-color': token('--good'), 'stop-opacity': '0.8' }, grad);
+    el('rect', { x: pad.l, y: y - 7, width: w - pad.l - pad.r, height: 14, rx: 7, fill: 'url(#aucgrad)' }, svg);
+    for (const m of marks) {
+      const x = xs(m.v);
+      el('line', { x1: x, x2: x, y1: y - 16, y2: y + 16, stroke: token(m.col), 'stroke-width': 2.5 }, svg);
+      el('circle', { cx: x, cy: y, r: 5, fill: token(m.col), stroke: token('--surface-1'), 'stroke-width': 2 }, svg);
+      const anchor = m.v === 1 ? 'end' : m.v === 0.5 ? 'start' : 'middle';
+      el('text', { x, y: y - 24, 'text-anchor': anchor, 'font-size': 12, 'font-weight': 640,
+        fill: token(m.col) }, svg).textContent = m.label;
+      el('text', { x, y: y + 32, 'text-anchor': anchor, class: 'tick' }, svg).textContent = m.sub;
+      el('text', { x, y: y + 46, 'text-anchor': anchor, class: 'tick',
+        'font-weight': 600, fill: token('--text-secondary') }, svg).textContent = m.v.toFixed(2);
+    }
+  });
+}
+</script>
+</body>
+</html>

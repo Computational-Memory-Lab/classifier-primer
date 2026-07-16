@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6. What we have found so far | CML primer</title>
+<meta name="description" content="Every participant, every classifier, and every pipeline choice the lab has tested so far.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory &amp; EEG <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Chapter 6</p>
+      <h1>What we have found so far</h1>
+      <p class="lede">
+        The results. They are real, they are reliable, and they are small — and the
+        smallness is the interesting part.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Every participant, one dot each</h2>
+      <p>
+        Chapter 5 showed one person's AUC bouncing around by hundredths. The answer is to
+        do it for everyone and look at the whole distribution. Each dot below is one
+        participant's cross-validated AUC — the number you produced yourself in the last
+        chapter, computed 67 times.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">All 67 participants, by task and classifier</div>
+      <div class="figure__sub">
+        Each dot is one person. The thick line is the group mean; the box is its 95%
+        confidence interval. Hover any dot.
+      </div>
+      <div class="controls" id="swarm-controls"></div>
+      <div id="swarm"></div>
+      <div class="figure__note" id="swarm-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        Two things jump out. The mean sits a little above the chance line and its
+        confidence interval clears it comfortably — the effect is real. And a good number
+        of individual participants land <em>below</em> chance. That is not a
+        contradiction; it is what a small true effect plus noise looks like. Nobody's
+        brain is anti-predictive. Their AUC just landed on the low side of a distribution
+        centred slightly above 0.5.
+      </p>
+      <div class="keypoint">
+        <strong>The group is the result; the individual is not.</strong> This is why you
+        will never see a claim about a single participant in this project, and why the
+        statistics below are one-sample t-tests over participants, each contributing a
+        single number.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>The headline table</h2>
+      <p>
+        This is the result. Every value is recomputed in your browser from the committed
+        per-participant outputs, so it cannot drift from what the code produced.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Group results, raw time-domain features</div>
+      <div class="figure__sub" id="table-sub"></div>
+      <div class="table-scroll">
+        <table class="data" id="group-table"></table>
+      </div>
+      <div class="figure__note">
+        Confidence intervals use the t distribution; p values are two-sided one-sample
+        t-tests against 0.5, one AUC per participant. N is 65 rather than 67 for FA vs CR
+        because two participants produced too few false alarms to score at all.
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
+        LDA edges out SVM on every task. That is worth sitting with for a moment, because
+        it is the opposite of what people expect: the simpler, older, faster method wins.
+        With a few hundred trials and 280 features, a fancier model has nothing to work
+        with — there is simply not enough data for extra flexibility to pay off. Chapter
+        4's overfitting curve is the reason.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Does the pipeline choice matter?</h2>
+      <p>
+        This is the actual research question, so here is the actual answer. Each row below
+        is a full re-run of everything with one thing changed.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Preprocessing variants</div>
+      <div class="figure__sub">
+        Recorded runs from <code>docs/multivariate_parameter_testing_results.txt</code>.
+        Click a task to compare.
+      </div>
+      <div class="controls" id="pipe-controls"></div>
+      <div id="pipe-chart"></div>
+      <div class="figure__note" id="pipe-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        The honest summary: <strong>it barely matters</strong>. Throwing out
+        artifact-contaminated trials, applying a Laplacian spatial filter, excluding
+        participants on behavioural grounds — all of it moves the AUC by a hundredth or
+        two, in a range where the fold shuffle alone moves it by a hundredth. The
+        Laplacian is perhaps a nose ahead, especially for FA vs CR.
+      </p>
+      <div class="callout">
+        <strong>A null result that is genuinely useful.</strong> If these choices do not
+        matter much, future studies can stop agonising over them and fix them in advance —
+        which is precisely what the manuscript sets out to provide.
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>The sweep that did matter</h2>
+      <p>
+        One thing changed the answer a lot. Instead of feeding the classifier the raw
+        voltage, feed it a transformed version — the absolute value, the square, the cube.
+      </p>
+      <p>
+        This is not idle curiosity. Squaring is close to what computing
+        <em>power</em> does, and power is the basis of the spectral features that
+        chapter 7 is about. So this sweep is a direct test: is the spectral advantage just
+        a nonlinear transformation in disguise?
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Feature transformations</div>
+      <div class="figure__sub">
+        LDA, moving bins, from <code>docs/feature_label_fixed_bins_results.txt</code>.
+        N = 61 (61 for Old/New and Hit/Miss, 57 for FA/CR).
+      </div>
+      <div id="trans-chart"></div>
+      <div class="legend" id="trans-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="trans-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        Absolute value and squaring <strong>destroy</strong> the signal. FA vs CR falls to
+        0.497 and 0.494 — statistically indistinguishable from a coin flip
+        (p = 0.83 and p = 0.69). Old/New drops from 0.579 to about 0.53. Cube, which
+        preserves the sign, survives much better.
+      </p>
+      <div class="keypoint">
+        <strong>That pattern is a clue, and it points at the sign.</strong> Absolute value
+        and squaring both throw away whether the voltage was positive or negative; cube
+        keeps it. The information the classifier was using is substantially
+        <em>in the sign</em>, and any transform that discards it discards the signal. So
+        whatever makes spectral features good, it is not simply that they pass voltage
+        through a nonlinearity — that operation on its own only makes things worse.
+      </div>
+      <p>
+        This is the manuscript's first real answer, and it is a negative one: it rules out
+        the simplest explanation for the spectral advantage. In the abstract's words,
+        “the spectrographic advantage was not attributable to voltage being passed through
+        a nonlinear transformation.”
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>How many features is the right number?</h2>
+      <p>
+        The 280 features come from a 100 ms window sliding in 40 ms steps. Change those
+        two numbers and you get a different feature count. Does it help?
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Bin size and step size</div>
+      <div class="figure__sub">LDA on raw features. Hover a point for the exact configuration.</div>
+      <div id="bins-chart"></div>
+      <div class="legend" id="bins-legend" style="margin-top:0.6rem"></div>
+      <div class="figure__note" id="bins-note"></div>
+    </div>
+
+    <div class="prose">
+      <p>
+        Essentially flat from 120 features to 570, with a gentle peak around 190–280 and a
+        slight decline at 570 — the overfitting you would predict from chapter 4. The
+        pipeline's 280 is close enough to optimal, and nothing was left on the table by
+        choosing it.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>What about the classic ERP components?</h2>
+      <p>
+        For comparison, the manuscript also ran the traditional analysis: take one number
+        per trial from the FN400 window and one from the LPP window, and see how well
+        each predicts on its own.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width:48rem">
+      <div class="figure__title">Single ERP components as predictors</div>
+      <div class="figure__sub">From the manuscript's Table 1. * marks a CI excluding 0.5.</div>
+      <div class="table-scroll">
+        <table class="data">
+          <thead><tr><th style="text-align:left">Component</th><th>Old/New</th><th>Hit/Miss</th><th>FA/CR</th></tr></thead>
+          <tbody>
+            <tr><td style="text-align:left"><b>FN400</b> <span class="muted">300–500 ms, Fz</span></td>
+              <td>0.508 *</td><td>0.507</td><td>0.507</td></tr>
+            <tr><td style="text-align:left"><b>LPP</b> <span class="muted">500–800 ms, P3</span></td>
+              <td>0.535 *</td><td>0.503</td><td>0.496</td></tr>
+            <tr><td style="text-align:left"><b>All 280 features</b> <span class="muted">LDA</span></td>
+              <td><b>0.580</b> *</td><td><b>0.575</b> *</td><td><b>0.554</b> *</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="figure__note">
+        The bottom row is the multivariate classifier, for scale.
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
+        The famous components, used one at a time, predict almost nothing — 0.508 is a
+        rounding error away from chance, even though it is “statistically significant”
+        across 67 people. Using all 280 features together roughly triples the distance
+        above chance.
+      </p>
+      <p>
+        That is the entire argument of chapter 2 in one table. The FN400 is a real,
+        replicable, decades-old effect. It is also nearly useless for predicting what any
+        individual trial will do. Both are true, and only the classifier could tell you
+        the second one.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>Where this leaves us</h2>
+      <div class="stats" style="margin:1.4rem 0">
+        <div class="stat"><div class="stat__value">0.58</div><div class="stat__label">best AUC, time-domain features</div></div>
+        <div class="stat"><div class="stat__value">0.72</div><div class="stat__label">reported with spectral features<br><span class="muted">Danyluik et al. 2025, LDA</span></div></div>
+        <div class="stat"><div class="stat__value">?</div><div class="stat__label">why</div></div>
+      </div>
+      <p>
+        We can predict memory from single trials, reliably and modestly. We know the
+        pipeline choices barely matter. We know a plain nonlinear transformation does not
+        explain the spectral advantage — it makes things worse.
+      </p>
+      <p>
+        Which leaves the question the project actually exists to answer, and that is the
+        next chapter.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab, University of Alberta ·
+    <a href="https://github.com/Computational-Memory-Lab/Classifiers">Classifiers repository</a>
+  </div>
+</footer>
+
+<script type="module">
+import {
+  initChrome, loadJSON, svgRoot, frame, scale, linePath, el, responsive, token,
+  tooltip, mean, sd, tTest, fmtAuc,
+} from './assets/site.js';
+
+initChrome();
+const tip = tooltip();
+const P = await loadJSON('data/participants.json');
+
+const TASKS = [
+  ['OldNew', 'Old vs New'],
+  ['HitMiss', 'Hit vs Miss'],
+  ['FAvsCR', 'FA vs CR'],
+];
+
+/* ================= swarm ================= */
+{
+  const host = document.getElementById('swarm');
+  const ctrls = document.getElementById('swarm-controls');
+  const note = document.getElementById('swarm-note');
+  let clf = 'lda';
+
+  ctrls.innerHTML = `<div class="segmented" id="clf-seg">
+      <button data-v="lda" aria-pressed="true">LDA</button>
+      <button data-v="svm" aria-pressed="false">SVM</button>
+    </div>`;
+  ctrls.querySelectorAll('#clf-seg button').forEach((b) => {
+    b.onclick = () => {
+      clf = b.dataset.v;
+      ctrls.querySelectorAll('#clf-seg button').forEach((o) => o.setAttribute('aria-pressed', o.dataset.v === clf));
+      draw();
+    };
+  });
+
+  let draw;
+  draw = () => {
+    const w = 940, h = 400;
+    const pad = { l: 58, r: 24, t: 22, b: 52 };
+    const svg = svgRoot(host, w, h);
+    const ys = scale(0.35, 0.78, h - pad.b, pad.t);
+    const xs = scale(-0.5, 2.5, pad.l, w - pad.r);
+    frame(svg, w, h, pad, xs, ys, {
+      yLabel: 'AUC (one dot per participant)', xTicks: [], yFmt: (v) => v.toFixed(2),
+    });
+    // chance
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(0.5), y2: ys(0.5),
+      stroke: token('--critical'), 'stroke-width': 1.5, 'stroke-dasharray': '5 3' }, svg);
+    el('text', { x: w - pad.r - 3, y: ys(0.5) - 6, 'text-anchor': 'end', class: 'tick',
+      fill: token('--critical'), 'font-weight': 620 }, svg).textContent = 'chance = 0.5';
+
+    const lines = [];
+    TASKS.forEach(([key, label], ti) => {
+      const vals = P.participants
+        .map((p) => ({ id: p.id, v: p[clf]?.[key], d: p.dprime, counts: p.counts }))
+        .filter((o) => typeof o.v === 'number');
+      const stat = tTest(vals.map((o) => o.v));
+      const cx = xs(ti);
+
+      // beeswarm: nudge collisions sideways
+      const placed = [];
+      for (const o of [...vals].sort((a, b) => a.v - b.v)) {
+        const y = ys(o.v);
+        let off = 0;
+        for (let k = 0; k < 40; k++) {
+          const cand = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * 9;
+          if (!placed.some((p2) => Math.abs(p2.y - y) < 7.5 && Math.abs(p2.off - cand) < 8.5)) { off = cand; break; }
+        }
+        placed.push({ y, off, o });
+      }
+      for (const { y, off, o } of placed) {
+        const c = el('circle', {
+          cx: cx + off, cy: y, r: 4.2,
+          fill: token(o.v >= 0.5 ? '--series-1' : '--text-muted'),
+          opacity: o.v >= 0.5 ? 0.85 : 0.6,
+          stroke: token('--surface-1'), 'stroke-width': 1.2,
+          style: 'cursor:pointer',
+        }, svg);
+        const html = `<b>Participant ${o.id}</b><br>${label} AUC <b>${o.v.toFixed(3)}</b><br>`
+          + `d′ ${o.d.toFixed(2)} · ${o.counts.Hit} hits, ${o.counts.Miss} misses, ${o.counts.FA} false alarms`;
+        c.addEventListener('pointerenter', (ev) => tip.show(html, ev.clientX, ev.clientY));
+        c.addEventListener('pointermove', (ev) => tip.show(html, ev.clientX, ev.clientY));
+        c.addEventListener('pointerleave', () => tip.hide());
+      }
+
+      // CI box + mean line
+      const bw = 54;
+      el('rect', { x: cx - bw / 2, y: ys(stat.mean + stat.ci95), width: bw,
+        height: Math.max(2, ys(stat.mean - stat.ci95) - ys(stat.mean + stat.ci95)),
+        fill: token('--text-primary'), opacity: 0.1, rx: 3 }, svg);
+      el('line', { x1: cx - bw / 2, x2: cx + bw / 2, y1: ys(stat.mean), y2: ys(stat.mean),
+        stroke: token('--text-primary'), 'stroke-width': 3, 'stroke-linecap': 'round' }, svg);
+      // halo so the number stays legible where it overlaps the dots
+      el('text', { x: cx, y: ys(stat.mean) - 10, 'text-anchor': 'middle', 'font-size': 13,
+        'font-weight': 680, fill: token('--text-primary'),
+        stroke: token('--surface-1'), 'stroke-width': 4, 'stroke-linejoin': 'round',
+        style: 'paint-order:stroke fill' }, svg).textContent = stat.mean.toFixed(3);
+
+      el('text', { x: cx, y: h - pad.b + 18, 'text-anchor': 'middle', class: 'axis-label',
+        'font-weight': 640 }, svg).textContent = label;
+      el('text', { x: cx, y: h - pad.b + 33, 'text-anchor': 'middle', class: 'tick' }, svg)
+        .textContent = `N = ${vals.length} · ${vals.filter((o) => o.v < 0.5).length} below chance`;
+      lines.push(`${label}: ${stat.mean.toFixed(3)}, t(${stat.df}) = ${stat.t.toFixed(2)}`);
+    });
+    el('text', { x: pad.l, y: 13, class: 'axis-label', 'font-weight': 620 }, svg)
+      .textContent = `${clf.toUpperCase()} · raw time-domain features · box = 95% CI of the mean`;
+    note.innerHTML = `${clf.toUpperCase()}: ${lines.join(' · ')}. `
+      + `Recomputed live from <code>outputs/${clf.toUpperCase()}/${clf.toUpperCase()}_results_raw.mat</code>. `
+      + `Grey dots fell below chance — expected when the true effect is this small.`;
+  };
+  responsive(host, draw);
+}
+
+/* ================= group table ================= */
+{
+  const t = document.getElementById('group-table');
+  document.getElementById('table-sub').innerHTML =
+    'Recomputed in your browser from the committed per-participant AUCs.';
+  const head = `<thead><tr><th style="text-align:left">Classifier</th><th style="text-align:left">Task</th>
+    <th>Mean AUC</th><th>95% CI</th><th>t</th><th>p</th><th>N</th></tr></thead>`;
+  const rows = [];
+  for (const clf of ['lda', 'svm']) {
+    TASKS.forEach(([key, label], i) => {
+      const vals = P.participants.map((p) => p[clf]?.[key]).filter((v) => typeof v === 'number');
+      const s = tTest(vals);
+      rows.push(`<tr>
+        <td style="text-align:left">${i === 0 ? `<b>${clf.toUpperCase()}</b>` : ''}</td>
+        <td style="text-align:left">${label}</td>
+        <td class="num">${s.mean.toFixed(3)}</td>
+        <td>[${(s.mean - s.ci95).toFixed(3)}, ${(s.mean + s.ci95).toFixed(3)}]</td>
+        <td>${s.t.toFixed(2)} <span class="muted">(${s.df})</span></td>
+        <td>${s.p < 0.0001 ? '&lt; 0.0001' : s.p.toFixed(4)}</td>
+        <td>${vals.length}</td></tr>`);
+    });
+  }
+  // RVM comes from the recorded log; its outputs were never committed
+  rows.push(`<tr><td style="text-align:left"><b>RVM</b></td><td style="text-align:left">Old/New</td>
+    <td class="num">0.570</td><td>[0.555, 0.586]</td><td>9.10 <span class="muted">(66)</span></td><td>&lt; 0.0001</td><td>67</td></tr>`);
+  rows.push(`<tr><td></td><td style="text-align:left">Hit/Miss</td>
+    <td class="num">0.569</td><td>[0.548, 0.590]</td><td>6.39 <span class="muted">(66)</span></td><td>&lt; 0.0001</td><td>67</td></tr>`);
+  rows.push(`<tr><td></td><td style="text-align:left">FA/CR</td>
+    <td class="num">0.546</td><td>[0.524, 0.568]</td><td>4.11 <span class="muted">(64)</span></td><td>0.0001</td><td>65</td></tr>`);
+  t.innerHTML = head + `<tbody>${rows.join('')}</tbody>`;
+}
+
+/* ================= pipeline variants ================= */
+{
+  // recorded runs, docs/multivariate_parameter_testing_results.txt
+  const PIPE = [
+    { name: 'Raw', sub: 'no extra exclusions',
+      lda: { OldNew: [0.580, 0.566, 0.594, 67], HitMiss: [0.575, 0.553, 0.598, 67], FAvsCR: [0.554, 0.534, 0.575, 65] },
+      svm: { OldNew: [0.567, 0.553, 0.580, 67], HitMiss: [0.555, 0.534, 0.576, 67], FAvsCR: [0.552, 0.530, 0.574, 65] } },
+    { name: 'Stage 1 only', sub: 'behavioural only',
+      lda: { OldNew: [0.578, 0.564, 0.593, 64], HitMiss: [0.583, 0.564, 0.602, 64], FAvsCR: [0.553, 0.532, 0.575, 62] },
+      svm: { OldNew: [0.564, 0.551, 0.578, 64], HitMiss: [0.560, 0.540, 0.580, 64], FAvsCR: [0.553, 0.531, 0.576, 62] } },
+    { name: 'Full pipeline', sub: 'stages 1–3 + artifacts',
+      lda: { OldNew: [0.569, 0.556, 0.583, 49], HitMiss: [0.579, 0.558, 0.599, 49], FAvsCR: [0.544, 0.522, 0.565, 49] },
+      svm: { OldNew: [0.553, 0.540, 0.566, 49], HitMiss: [0.555, 0.533, 0.578, 49], FAvsCR: [0.551, 0.527, 0.575, 49] } },
+    { name: 'Laplacian', sub: 'CSD filter',
+      lda: { OldNew: [0.581, 0.567, 0.595, 67], HitMiss: [0.581, 0.557, 0.604, 67], FAvsCR: [0.565, 0.542, 0.588, 65] },
+      svm: { OldNew: [0.562, 0.548, 0.575, 67], HitMiss: [0.557, 0.535, 0.579, 67], FAvsCR: [0.550, 0.529, 0.571, 65] } },
+  ];
+  const host = document.getElementById('pipe-chart');
+  const ctrls = document.getElementById('pipe-controls');
+  const note = document.getElementById('pipe-note');
+  let task = 'OldNew';
+  ctrls.innerHTML = `<div class="segmented" id="pipe-seg">${TASKS.map(([k, l]) =>
+    `<button data-v="${k}" aria-pressed="${k === task}">${l}</button>`).join('')}</div>`;
+  ctrls.querySelectorAll('#pipe-seg button').forEach((b) => {
+    b.onclick = () => {
+      task = b.dataset.v;
+      ctrls.querySelectorAll('#pipe-seg button').forEach((o) => o.setAttribute('aria-pressed', o.dataset.v === task));
+      draw();
+    };
+  });
+
+  let draw;
+  draw = () => {
+    const w = 940, h = 300;
+    const pad = { l: 152, r: 100, t: 26, b: 46 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(0.5, 0.63, pad.l, w - pad.r);
+    const rowH = (h - pad.t - pad.b) / PIPE.length;
+    frame(svg, w, h, pad, xs, scale(0, 1, h - pad.b, pad.t), {
+      xLabel: 'AUC', yTicks: [], xTicks: [0.5, 0.52, 0.54, 0.56, 0.58, 0.6, 0.62],
+      xFmt: (v) => v.toFixed(2),
+    });
+    el('line', { x1: xs(0.5), x2: xs(0.5), y1: pad.t, y2: h - pad.b,
+      stroke: token('--critical'), 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, svg);
+    el('text', { x: xs(0.5), y: pad.t - 6, 'text-anchor': 'middle', class: 'tick',
+      fill: token('--critical') }, svg).textContent = 'chance';
+
+    PIPE.forEach((p, i) => {
+      const y = pad.t + rowH * (i + 0.5);
+      el('text', { x: pad.l - 12, y: y - 3, 'text-anchor': 'end', class: 'axis-label',
+        'font-weight': 640 }, svg).textContent = p.name;
+      el('text', { x: pad.l - 12, y: y + 11, 'text-anchor': 'end', class: 'tick' }, svg).textContent = p.sub;
+      for (const [clf, col, dy] of [['lda', '--series-1', -7], ['svm', '--series-2', 7]]) {
+        const [m, lo, hi, n] = p[clf][task];
+        el('line', { x1: xs(lo), x2: xs(hi), y1: y + dy, y2: y + dy,
+          stroke: token(col), 'stroke-width': 2, 'stroke-linecap': 'round', opacity: 0.55 }, svg);
+        const c = el('circle', { cx: xs(m), cy: y + dy, r: 5,
+          fill: token(col), stroke: token('--surface-1'), 'stroke-width': 1.5, style: 'cursor:pointer' }, svg);
+        const html = `<b>${p.name}</b> · ${clf.toUpperCase()}<br>AUC <b>${m.toFixed(3)}</b><br>`
+          + `95% CI [${lo.toFixed(3)}, ${hi.toFixed(3)}]<br>N = ${n}`;
+        c.addEventListener('pointerenter', (ev) => tip.show(html, ev.clientX, ev.clientY));
+        c.addEventListener('pointermove', (ev) => tip.show(html, ev.clientX, ev.clientY));
+        c.addEventListener('pointerleave', () => tip.hide());
+        if (i === 0) {
+          el('text', { class: 'direct-label', x: w - pad.r + 8, y: y + dy + 4, fill: token(col) }, svg)
+            .textContent = clf.toUpperCase();
+        }
+      }
+    });
+    const all = PIPE.map((p) => p.lda[task][0]);
+    note.innerHTML = `Across every preprocessing variant, LDA on <b>${TASKS.find((t) => t[0] === task)[1]}</b> spans `
+      + `<b>${Math.min(...all).toFixed(3)} to ${Math.max(...all).toFixed(3)}</b> — a range of `
+      + `<b>${(Math.max(...all) - Math.min(...all)).toFixed(3)}</b> AUC. `
+      + `For scale, chapter 5 showed one participant's score moving by more than that from the fold shuffle alone. `
+      + `Bars are 95% confidence intervals. Note the full pipeline drops N to 49 by excluding 18 people.`;
+  };
+  responsive(host, draw);
+}
+
+/* ================= transformations ================= */
+{
+  const TRANS = [
+    { name: 'Raw', sub: 'voltage as recorded', keeps: true,
+      OldNew: [0.579, 0.563, 0.594, '< 0.0001'], HitMiss: [0.581, 0.563, 0.599, '< 0.0001'], FAvsCR: [0.549, 0.528, 0.570, '< 0.0001'] },
+    { name: 'Absolute', sub: '|v| — discards the sign', keeps: false,
+      OldNew: [0.528, 0.517, 0.539, '< 0.0001'], HitMiss: [0.543, 0.524, 0.563, '< 0.0001'], FAvsCR: [0.497, 0.469, 0.524, '0.83'] },
+    { name: 'Square', sub: 'v² — discards the sign', keeps: false,
+      OldNew: [0.530, 0.519, 0.541, '< 0.0001'], HitMiss: [0.550, 0.529, 0.571, '< 0.0001'], FAvsCR: [0.494, 0.467, 0.522, '0.69'] },
+    { name: 'Cube', sub: 'v³ — keeps the sign', keeps: true,
+      OldNew: [0.557, 0.542, 0.571, '< 0.0001'], HitMiss: [0.564, 0.547, 0.581, '< 0.0001'], FAvsCR: [0.543, 0.521, 0.565, '0.0002'] },
+  ];
+  const host = document.getElementById('trans-chart');
+  const note = document.getElementById('trans-note');
+  document.getElementById('trans-legend').innerHTML = TASKS.map(([k, l], i) =>
+    `<span class="legend__item"><span class="legend__swatch" style="background:${token(`--series-${i + 1}`)}"></span>${l}</span>`
+  ).join('') + `<span class="legend__item muted">hollow = not significantly above chance</span>`;
+
+  responsive(host, () => {
+    const w = 940, h = 340;
+    const pad = { l: 56, r: 24, t: 26, b: 62 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(-0.5, TRANS.length - 0.5, pad.l, w - pad.r);
+    const ys = scale(0.46, 0.61, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, { yLabel: 'AUC', xTicks: [], yFmt: (v) => v.toFixed(2) });
+    el('line', { x1: pad.l, x2: w - pad.r, y1: ys(0.5), y2: ys(0.5),
+      stroke: token('--critical'), 'stroke-width': 1.5, 'stroke-dasharray': '5 3' }, svg);
+    el('text', { x: w - pad.r - 3, y: ys(0.5) - 6, 'text-anchor': 'end', class: 'tick',
+      fill: token('--critical'), 'font-weight': 620 }, svg).textContent = 'chance';
+
+    TRANS.forEach((t, i) => {
+      const cx = xs(i);
+      if (!t.keeps) {
+        el('rect', { x: cx - 46, y: pad.t, width: 92, height: h - pad.t - pad.b,
+          fill: token('--critical'), opacity: 0.05 }, svg);
+      }
+      TASKS.forEach(([key], k) => {
+        const [m, lo, hi, p] = t[key];
+        const dx = (k - 1) * 26;
+        const sig = p !== '0.83' && p !== '0.69';
+        el('line', { x1: cx + dx, x2: cx + dx, y1: ys(lo), y2: ys(hi),
+          stroke: token(`--series-${k + 1}`), 'stroke-width': 2, 'stroke-linecap': 'round', opacity: 0.5 }, svg);
+        const c = el('circle', { cx: cx + dx, cy: ys(m), r: 5.5,
+          fill: sig ? token(`--series-${k + 1}`) : token('--surface-1'),
+          stroke: token(sig ? '--surface-1' : `--series-${k + 1}`), 'stroke-width': 2,
+          style: 'cursor:pointer' }, svg);
+        const html = `<b>${t.name}</b> · ${TASKS[k][1]}<br>AUC <b>${m.toFixed(3)}</b><br>`
+          + `95% CI [${lo.toFixed(3)}, ${hi.toFixed(3)}]<br>p = ${p}`
+          + (sig ? '' : '<br><span style="opacity:.7">indistinguishable from chance</span>');
+        c.addEventListener('pointerenter', (ev) => tip.show(html, ev.clientX, ev.clientY));
+        c.addEventListener('pointermove', (ev) => tip.show(html, ev.clientX, ev.clientY));
+        c.addEventListener('pointerleave', () => tip.hide());
+      });
+      el('text', { x: cx, y: h - pad.b + 20, 'text-anchor': 'middle', class: 'axis-label',
+        'font-weight': 640 }, svg).textContent = t.name;
+      el('text', { x: cx, y: h - pad.b + 34, 'text-anchor': 'middle', class: 'tick' }, svg)
+        .textContent = t.sub;
+      el('text', { x: cx, y: h - pad.b + 50, 'text-anchor': 'middle', class: 'tick',
+        fill: token(t.keeps ? '--good' : '--critical'), 'font-weight': 620 }, svg)
+        .textContent = t.keeps ? '✓ keeps sign' : '✗ loses sign';
+    });
+    note.innerHTML = `The two transformations that discard the sign of the voltage (shaded) are also the two that `
+      + `destroy FA vs CR — <b>0.497</b> and <b>0.494</b>, p = 0.83 and p = 0.69. Cube is just as nonlinear but keeps the sign, `
+      + `and keeps most of the signal. Whatever the classifier is reading, the direction of the voltage is a big part of it.`;
+  });
+}
+
+/* ================= bin sweep ================= */
+{
+  const BINS = [
+    { n: 120, cfg: '25-sample bins, no overlap', OldNew: 0.571, HitMiss: 0.574, FAvsCR: 0.550 },
+    { n: 190, cfg: '30-sample bins, 15-sample step (19 bins)', OldNew: 0.578, HitMiss: 0.584, FAvsCR: 0.555 },
+    { n: 280, cfg: '25-sample bins, 10-sample step (28 bins) — the pipeline', OldNew: 0.579, HitMiss: 0.581, FAvsCR: 0.549 },
+    { n: 570, cfg: '20-sample bins, 5-sample step (57 bins)', OldNew: 0.576, HitMiss: 0.575, FAvsCR: 0.543 },
+  ];
+  const host = document.getElementById('bins-chart');
+  document.getElementById('bins-legend').innerHTML = TASKS.map(([k, l], i) =>
+    `<span class="legend__item"><span class="legend__swatch legend__swatch--line" style="background:${token(`--series-${i + 1}`)}"></span>${l}</span>`
+  ).join('');
+  document.getElementById('bins-note').innerHTML =
+    'Flat from 120 to 570 features, peaking around 190–280 and slipping at 570. '
+    + 'The pipeline uses 280 (highlighted). More features is not better once you run out of trials to learn from.';
+
+  responsive(host, () => {
+    const w = 940, h = 300;
+    const pad = { l: 56, r: 90, t: 26, b: 48 };
+    const svg = svgRoot(host, w, h);
+    const xs = scale(0, 3, pad.l, w - pad.r);
+    const ys = scale(0.53, 0.60, h - pad.b, pad.t);
+    frame(svg, w, h, pad, xs, ys, {
+      xLabel: 'number of features', yLabel: 'AUC', xTicks: [], yFmt: (v) => v.toFixed(2),
+    });
+    // highlight the pipeline's choice
+    el('rect', { x: xs(2) - 40, y: pad.t, width: 80, height: h - pad.t - pad.b,
+      fill: token('--series-6'), opacity: 0.07 }, svg);
+    el('text', { x: xs(2), y: pad.t - 6, 'text-anchor': 'middle', class: 'tick',
+      fill: token('--series-6'), 'font-weight': 620 }, svg).textContent = 'the pipeline';
+
+    TASKS.forEach(([key, label], k) => {
+      const pts = BINS.map((b, i) => [xs(i), ys(b[key])]);
+      el('path', { class: 'series-line', d: linePath(pts), stroke: token(`--series-${k + 1}`) }, svg);
+      el('text', { class: 'direct-label', x: w - pad.r + 7, y: pts[3][1] + 4,
+        fill: token(`--series-${k + 1}`) }, svg).textContent = label;
+      BINS.forEach((b, i) => {
+        const c = el('circle', { cx: xs(i), cy: ys(b[key]), r: 5,
+          fill: token(`--series-${k + 1}`), stroke: token('--surface-1'), 'stroke-width': 1.5,
+          style: 'cursor:pointer' }, svg);
+        const html = `<b>${b.n} features</b> · ${label}<br>AUC <b>${b[key].toFixed(3)}</b><br>`
+          + `<span style="opacity:.75">${b.cfg}</span>`;
+        c.addEventListener('pointerenter', (ev) => tip.show(html, ev.clientX, ev.clientY));
+        c.addEventListener('pointermove', (ev) => tip.show(html, ev.clientX, ev.clientY));
+        c.addEventListener('pointerleave', () => tip.hide());
+      });
+    });
+    BINS.forEach((b, i) => {
+      el('text', { x: xs(i), y: h - pad.b + 18, 'text-anchor': 'middle', class: 'axis-label',
+        'font-weight': 640 }, svg).textContent = b.n;
+    });
+  });
+}
+</script>
+</body>
+</html>
