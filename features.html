@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>3. From brain waves to 280 numbers | CML primer</title>
-<meta name="description" content="How one trial of 257-channel EEG becomes the 280-number feature vector a classifier actually reads.">
+<title>3. From EEG to 280 numbers | CML primer</title>
+<meta name="description" content="How one trial of 256-electrode EEG becomes the 280-number feature vector a classifier actually reads.">
 <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
   <section style="padding: 2.5rem 0 0;">
     <div class="prose">
       <p class="eyebrow">Chapter 3</p>
-      <h1>From brain waves to 280 numbers</h1>
+      <h1>From EEG to 280 numbers</h1>
       <p class="lede">
         A classifier cannot read a squiggle. It reads a list of numbers. This chapter is
         about how we turn one into the other — and why that step is where most of the
@@ -33,9 +33,21 @@
     <div class="prose">
       <h2>What one trial actually is</h2>
       <p>
-        When a word appears on screen, we save a slice of EEG running from 100 ms
-        <em>before</em> the word to 1,200 ms after it. Every electrode is sampled 250
-        times a second, so that slice is 325 measurements per electrode.
+        When a word appears on screen, we save a slice of EEG around it. In this study
+        that slice runs from <strong>100 ms before</strong> the word to
+        <strong>1,200 ms after</strong> it, and every electrode is sampled 250 times a
+        second — so the slice is 325 measurements per electrode, 1.3 seconds in total.
+      </p>
+      <p>
+        Those two numbers are choices, and both have a reason. The 100 ms
+        <strong>before</strong> the word is the <em>baseline</em>: nothing has happened
+        yet, so whatever the voltage is doing there is drift and background noise rather
+        than a response. Subtracting its average from the rest of the trial puts every
+        trial on a common zero, which is what makes trials comparable at all. The 1,200 ms
+        after is long enough to contain the responses anyone expects to matter — the
+        visual response by ~200 ms, the memory-related effects between 300 and 800 ms —
+        with room to spare. Stop at 500 ms and you would cut off the later effects; run to
+        3 seconds and you would mostly be recording the next trial.
       </p>
     </div>
 
@@ -43,35 +55,59 @@
       <div class="figure__title">The shape of one participant's data</div>
       <div id="cube"></div>
       <div class="figure__note">
-        That is 37.5 million numbers per participant, and about 140 MB on disk. Multiply
-        by 67 people and you have the 8.7 GB sitting on the lab Drive.
+        That is 37.6 million numbers per participant, about 140 MB on disk. Multiply by
+        67 people and you have the 8.7 GB sitting on the lab Drive.
       </div>
     </div>
 
     <div class="prose">
       <p>
-        We cannot hand a classifier 83,525 numbers per trial. With only 450 trials to
-        learn from, a model with that many inputs would simply memorise the training
-        trials — the problem chapter 4 calls overfitting. So we have to reduce. Two
-        decisions do almost all the reducing: <strong>which electrodes</strong>, and
-        <strong>how finely in time</strong>.
+        We cannot hand a classifier 83,200 numbers per trial, and the reason is worth
+        understanding now rather than later.
+      </p>
+      <p>
+        A classifier learns one weight per input. With 83,200 inputs and only 450 trials
+        to learn from, it has far more knobs to turn than facts to constrain them — so
+        there will always be some combination of weights that separates <em>these</em> 450
+        trials perfectly, even when the inputs are pure noise. The model can simply assign
+        weights that memorise which trial is which, the way you could draw a line through
+        any two points. It has learned the trials rather than the pattern, so it scores
+        beautifully on them and no better than chance on anything new. That is
+        <strong>overfitting</strong>, and it is the central hazard of this whole
+        enterprise; chapter 4 lets you watch it happen.
+      </p>
+      <p>
+        The defence is to give the model far fewer inputs than you have trials. So we
+        reduce, and two decisions do almost all the reducing: <strong>which
+        electrodes</strong>, and <strong>how finely in time</strong>.
       </p>
     </div>
   </section>
 
   <section class="chapter">
     <div class="prose">
-      <h2>Decision 1: ten electrodes out of 257</h2>
+      <h2>Decision 1: ten electrodes out of 256</h2>
       <p>
-        The pipeline keeps ten. They are written into the code as a bare list of
-        numbers, with no names attached:
+        The pipeline keeps ten. In the code they are a bare list of numbers with no names
+        attached, which makes them look arbitrary:
       </p>
       <p><code>electrodes = [64 194 21 41 214 8 101 87 153 137]</code></p>
       <p>
-        Two of them you will meet again and again: <strong>21</strong> is Fz, near the
-        front of the head on the midline, and <strong>87</strong> is P3, back and to the
-        left. Those are the two the classic ERP analysis uses.
+        They are not. Plot them on the scalp and the design is obvious: <strong>four sit
+        on the midline, front to back, and the other six are three left/right mirror
+        pairs</strong>. Between them they sample the whole head — front, centre, back,
+        left and right — with as few electrodes as that coverage allows.
       </p>
+    </div>
+
+    <div class="figure" style="max-width: 46rem;">
+      <div class="figure__title">Where the ten electrodes actually are</div>
+      <div class="figure__sub">
+        All 256 electrodes of the net, viewed from above, nose at the top. The ten the
+        pipeline uses are highlighted. Hover any of them.
+      </div>
+      <div id="topo"></div>
+      <div class="figure__note" id="topo-note"></div>
     </div>
 
     <div class="figure figure--wide">
@@ -88,14 +124,22 @@
     </div>
 
     <details class="aside" style="max-width:34rem;margin:1.4rem auto">
-      <summary>Why these ten, specifically?</summary>
+      <summary>Why ten, and why these ten?</summary>
       <p class="small">
-        Honest answer: to match the earlier study this project follows. The only note in
-        the code says <em>“10 electrodes to match suchetas approach”</em>, referring to
-        <a href="https://doi.org/10.1152/jn.00293.2020">Chakravarty et al. (2020)</a>.
-        Whether a different ten — or all 257 — would do better is an open question, and
-        one nobody has swept. It is on the list of unclaimed threads at the end of
-        chapter 7, and it is a genuinely available project for a new student.
+        <b>Why so few:</b> the overfitting argument above. Ten electrodes × 28 bins is 280
+        inputs against 450 trials, which is already a stretch; all 256 electrodes would be
+        7,168 inputs and hopeless.
+      </p>
+      <p class="small">
+        <b>Why these:</b> even coverage of the scalp, following the earlier study this
+        project builds on (<a href="https://doi.org/10.1152/jn.00293.2020">Chakravarty et
+        al., 2020</a>) so the results can be compared with it. The map shows the logic —
+        a midline chain plus symmetric pairs. Two of them are the sites the classic ERP
+        analysis uses anyway: Fz for the FN400 and P3 for the LPP.
+      </p>
+      <p class="small">
+        <b>What is not known:</b> whether a different ten would do better. Nobody has
+        swept it. It is on the list of unclaimed threads at the end of chapter 7.
       </p>
     </details>
   </section>
@@ -145,7 +189,7 @@
       </p>
       <div class="callout">
         <strong>10 electrodes × 28 bins = 280 features.</strong> That is the number you
-        will see everywhere in this project. One trial, which started as 83,525 numbers,
+        will see everywhere in this project. One trial, which started as 83,200 numbers,
         is now a list of 280.
       </div>
     </div>
@@ -224,6 +268,7 @@ initChrome();
 const tip = tooltip();
 
 const E = await loadJSON('data/erp.json');
+const M = await loadJSON('data/montage.json');
 const F = await loadJSON('data/features_45.json');
 const fbuf = await loadBin('data/features_45.bin');
 const fraw = new Int16Array(fbuf);
@@ -254,13 +299,102 @@ const NBINS = F.binStartMs.length;
 
     lab(ox + bw / 2, oy + bh + 22, '325 time points', 'middle', 620);
     lab(ox + bw / 2, oy + bh + 37, '−100 to +1200 ms, 250 per second', 'middle', 400, 10.5, '--text-muted');
-    lab(ox - 10, oy + bh / 2, '257', 'end', 620);
+    lab(ox - 10, oy + bh / 2, '256', 'end', 620);
     lab(ox - 10, oy + bh / 2 + 15, 'electrodes', 'end', 400, 10.5, '--text-muted');
+    lab(ox - 10, oy + bh / 2 + 28, '(+ the Cz reference)', 'end', 400, 9.5, '--text-muted');
     lab(ox + bw + dx + 8, oy + dy + bh / 2, '450 trials', 'start', 620);
     lab(ox + bw + dx + 8, oy + dy + bh / 2 + 15, 'one per test word', 'start', 400, 10.5, '--text-muted');
 
     el('text', { x: w / 2, y: h - 8, 'text-anchor': 'middle', class: 'tick' }, svg)
-      .textContent = 'test_45.mat  ·  data: 257 × 325 × 450  ·  one trial = 257 × 325 = 83,525 numbers';
+      .textContent = 'stored as 257 × 325 × 450 — the 256 electrodes plus the Cz reference  ·  one trial = 256 × 325 = 83,200 numbers';
+  });
+}
+
+/* ================= scalp map ================= */
+{
+  const host = document.getElementById('topo');
+  const note = document.getElementById('topo-note');
+  const TEN = new Set(M.electrodes);
+  const NAMES = M.names;                       // only the sites with standard names
+
+  // Layout is already projected: +Y anterior, +X right ear, 1.0 = ear level.
+  // The 256-channel net reaches past the ears and onto the face, so some
+  // electrodes legitimately sit outside the head circle.
+  const R = 1.62;
+
+  note.innerHTML = `Positions come from the net's own coordinate file `
+    + `(<code>${M.source}</code>), flattened the way scalp maps always are: distance from `
+    + `the top of the head becomes distance from the centre. The circle is ear level, so `
+    + `the outer sensors — the ones the net puts on the face and neck — fall outside it. `
+    + `Cz, the vertex, is the reference: it sits at the centre and is why the recordings `
+    + `have 257 channels for 256 electrodes.`;
+
+  responsive(host, () => {
+    const w = 560, h = 560;
+    const svg = svgRoot(host, w, h);
+    const cx = w / 2, cy = h / 2 + 8;
+    const k = (w / 2 - 26) / R;                // data units -> px
+    const X = (x) => cx + x * k;
+    const Y = (y) => cy - y * k;               // +Y anterior = up
+
+    const head = 1.0 * k;
+    // nose
+    el('path', { d: `M${cx - 12} ${cy - head + 3} L${cx} ${cy - head - 20} L${cx + 12} ${cy - head + 3} Z`,
+      fill: 'none', stroke: token('--baseline'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+    // ears
+    for (const s of [-1, 1]) {
+      el('path', {
+        d: `M${cx + s * head} ${cy - 22} q${s * 13} 22 0 44`,
+        fill: 'none', stroke: token('--baseline'), 'stroke-width': 2,
+      }, svg);
+    }
+    el('circle', { cx, cy, r: head, fill: 'none', stroke: token('--baseline'), 'stroke-width': 2 }, svg);
+
+    // every electrode that is not one of the ten
+    for (const [label, p] of Object.entries(M.all)) {
+      const n = +label.slice(1);
+      if (TEN.has(n)) continue;
+      el('circle', { cx: X(p[0]), cy: Y(p[1]), r: 2.2, fill: token('--text-muted'), opacity: 0.32 }, svg);
+    }
+    // the reference
+    el('circle', { cx: X(M.cz[0]), cy: Y(M.cz[1]), r: 3, fill: 'none',
+      stroke: token('--text-muted'), 'stroke-width': 1.2 }, svg);
+    el('text', { x: X(M.cz[0]) + 7, y: Y(M.cz[1]) + 3, class: 'tick' }, svg).textContent = 'Cz (ref)';
+
+    // the ten, on top
+    for (const n of M.electrodes) {
+      const p = M.all[`E${n}`];
+      const named = NAMES[String(n)];
+      const g = el('g', { style: 'cursor:pointer' }, svg);
+      el('circle', { cx: X(p[0]), cy: Y(p[1]), r: 8.5, fill: token('--series-1'),
+        stroke: token('--surface-1'), 'stroke-width': 2 }, g);
+      el('text', { x: X(p[0]), y: Y(p[1]) + 3.3, 'text-anchor': 'middle', 'font-size': 9,
+        'font-weight': 700, fill: '#fff' }, g).textContent = n;
+      if (named) {
+        el('text', { x: X(p[0]), y: Y(p[1]) - 13, 'text-anchor': 'middle', 'font-size': 11,
+          'font-weight': 700, fill: token('--series-1'),
+          stroke: token('--surface-1'), 'stroke-width': 3, 'stroke-linejoin': 'round',
+          style: 'paint-order:stroke fill' }, g).textContent = named;
+      }
+      const side = Math.abs(p[0]) < 0.08 ? 'midline'
+        : (p[0] < 0 ? 'left' : 'right');
+      const ap = p[1] > 0.15 ? 'front' : p[1] < -0.15 ? 'back' : 'centre';
+      const html = `<b>Electrode ${n}</b>${named ? ` · ${named}` : ''}<br>`
+        + `${ap}, ${side}`
+        + (named === 'Fz' ? '<br><span style="opacity:.75">the FN400 site</span>'
+          : named === 'P3' ? '<br><span style="opacity:.75">the LPP site</span>' : '');
+      g.addEventListener('pointerenter', (ev) => tip.show(html, ev.clientX, ev.clientY));
+      g.addEventListener('pointermove', (ev) => tip.show(html, ev.clientX, ev.clientY));
+      g.addEventListener('pointerleave', () => tip.hide());
+    }
+
+    // orientation
+    el('text', { x: cx, y: cy - head - 26, 'text-anchor': 'middle', class: 'tick',
+      'font-weight': 620 }, svg).textContent = 'front';
+    el('text', { x: cx, y: cy + head + 20, 'text-anchor': 'middle', class: 'tick',
+      'font-weight': 620 }, svg).textContent = 'back';
+    el('text', { x: cx - head - 16, y: cy + 4, 'text-anchor': 'end', class: 'tick' }, svg).textContent = 'L';
+    el('text', { x: cx + head + 16, y: cy + 4, class: 'tick' }, svg).textContent = 'R';
   });
 }
 

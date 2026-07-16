@@ -23,17 +23,18 @@
       <p class="eyebrow">Computational Memory Lab · University of Alberta</p>
       <h1>Can we tell, from brain activity alone, whether someone remembers a word?</h1>
       <p class="lede">
-        This is a hands-on introduction to what our lab does and why. It assumes no
-        background in machine learning and no programming. You will build the
-        intuition by playing with the real thing: real EEG, from real participants,
-        with the real results.
+        A hands-on introduction to predicting memory from single trials of EEG: what the
+        experiment is, what a classifier does, and what the results actually show. It
+        assumes no background in machine learning and no programming. You will build the
+        intuition by playing with the real thing — real EEG, real participants, real
+        results.
       </p>
     </div>
   </section>
 
   <!-- The hook: the classic effect, and the question. -->
   <figure class="figure figure--wide" id="hook" style="margin-top: 2.5rem;">
-    <div class="figure__title" id="hook-title">The effect that started all of this</div>
+    <div class="figure__title" id="hook-title">The FN400 old/new effect, at test</div>
     <div class="figure__sub" id="hook-sub"></div>
     <div id="hook-chart"></div>
     <div class="legend" id="hook-legend" style="margin-top: 0.6rem;"></div>
@@ -63,9 +64,37 @@
       </p>
     </div>
 
+    <div class="prose">
+      <h3 style="margin-top:1.6rem">How we score it: AUC</h3>
+      <p>
+        We need one number for “how well did it predict”. The obvious choice, the
+        percentage of trials it got right, turns out to be badly misleading here, because
+        the two things being told apart are rarely equally common. A classifier can score
+        very well simply by always guessing whichever is more frequent, and never look at
+        the EEG at all.
+      </p>
+      <p>
+        So the standard measure is <strong>AUC</strong> — the area under the ROC curve.
+        Instead of forcing a yes/no answer, the classifier rates every trial by how
+        confident it is, and AUC asks a question about the <em>ordering</em> of those
+        ratings:
+      </p>
+      <div class="callout">
+        <strong>Take one random trial of each kind. How often does the classifier rate
+        them in the right order?</strong> That proportion is the AUC. It ignores how
+        common each kind is, so the always-guess-the-common-one trick scores exactly 0.5.
+      </div>
+      <p>
+        <strong>0.5 is chance</strong> — the ordering is no better than a coin flip.
+        <strong>1.0 is perfect</strong> — every trial of one kind is rated above every
+        trial of the other. Chapters 2 and 4 build this up properly; the scale is all you
+        need for now.
+      </p>
+    </div>
+
     <div class="figure" style="max-width: 44rem;">
       <div class="figure__title">What we actually find</div>
-      <div class="figure__sub">Averaged over 67 participants. AUC is a prediction score: 0.5 is pure chance, 1.0 is perfect.</div>
+      <div class="figure__sub">One AUC per participant, averaged over 67 participants.</div>
       <div class="stats" id="headline-stats"></div>
       <div class="figure__note" id="headline-note"></div>
     </div>
@@ -96,17 +125,16 @@
     <div class="prose">
       <h2>Where the numbers on this site come from</h2>
       <p>
-        Everything quoted here is computed from the lab's actual data rather than
-        typed in by hand. The group results are recomputed from the per-participant
-        classifier outputs committed in
-        <code>outputs/</code>; the brain waves and the trainable classifier in chapter 5
-        are built from one participant's EEG on the lab Drive.
+        Everything quoted here is computed from the real data rather than typed in by
+        hand. The group results are recomputed from the per-participant classifier
+        outputs stored in the repository; the EEG traces and the trainable classifier in
+        chapter 5 are derived from one participant's recording on the lab Drive.
       </p>
       <p class="small muted">
         The EEG was recorded by <a href="https://doi.org/10.1007/s00221-014-4003-0">Chen et al. (2014)</a>:
-        67 participants, 257 electrodes, 250 samples per second. The full provenance is
-        traced in <code>data/DATA.md</code>. This site ships only small derived
-        summaries — no raw EEG, nothing identifiable.
+        67 participants, 256 electrodes sampled 250 times a second. Where the files came
+        from and how they were checked is documented in the repository. This site ships
+        only small derived summaries — no raw EEG, nothing identifiable.
       </p>
     </div>
   </section>
@@ -154,7 +182,7 @@ const P = await loadJSON('data/participants.json');
 const tasks = [
   ['OldNew', 'Old vs New', 'Was the word actually studied?'],
   ['HitMiss', 'Hit vs Miss', 'Will a studied word be remembered?'],
-  ['FAvsCR', 'FA vs CR', 'Will a new word be falsely called old?'],
+  ['FAvsCR', 'False Alarm vs Correct Rejection', 'Will a new word be falsely called old?'],
 ];
 document.getElementById('headline-stats').innerHTML = tasks.map(([k, label]) => {
   const g = P.group.lda[k];
@@ -198,15 +226,16 @@ document.getElementById('hook-legend').innerHTML = series.map((s) =>
     .map((r) => r.Fz_FN400_Hit - r.Fz_FN400_CR);
   const s = tTest(diffs, 0);
   document.getElementById('hook-note-2').innerHTML =
-    `The big dip just after 100 ms is the brain reacting to <em>seeing</em> a word — it happens `
-    + `whether or not the word is remembered. The interesting part is the shaded window, where the `
-    + `two lines pull apart. Hover to read the difference at any moment.<br><br>`
-    + `Measured across all ${diffs.length} participants, Hits are <b>${mean(diffs).toFixed(2)} µV</b> `
-    + `more positive than Correct Rejections in that window `
+    `The big dip just after 100 ms is <b>visual processing</b> — the response to a word `
+    + `appearing on screen at all. It is there whether or not the word is remembered, and it `
+    + `carries no memory information. The part that does is the shaded window. Hover to read `
+    + `the difference at any moment.<br><br>`
+    + `Across all ${diffs.length} participants, Hits are <b>${mean(diffs).toFixed(2)} µV</b> `
+    + `more positive than Correct Rejections there `
     + `(t(${s.df}) = ${s.t.toFixed(2)}, p = ${s.p < 0.001 ? '< 0.001' : s.p.toFixed(3)}). `
-    + `That is a real, replicable effect — and it is about a fifth of a microvolt. `
-    + `It is the foundation of forty years of memory research, and this site is about why `
-    + `a gap that size is not enough.`;
+    + `That is the <b>FN400 old/new effect</b>: a reliable, much-replicated difference between `
+    + `studied and unstudied words, about a fifth of a microvolt in size. This site is about `
+    + `what you can and cannot conclude from a difference that size.`;
 }
 
 const tip = tooltip();

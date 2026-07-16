@@ -32,9 +32,10 @@
     <div class="prose">
       <h2>Read these four</h2>
       <p>
-        There are seventeen PDFs in <code>papers/</code>. You do not need them all. Read
-        these four and you will understand what the project is doing and why. The rest are
-        reference — open them when you hit the specific thing they explain.
+        You do not need to read everything. Read these four and you will understand what
+        the project is doing and why; the rest are reference, to open when you hit the
+        specific thing they explain. Each card links to the copy on the lab's Google Drive,
+        under <code>CML documents / Papers</code>.
       </p>
     </div>
 
@@ -95,8 +96,8 @@
         </table>
       </div>
       <div class="figure__note">
-        <code>README.md</code> has the full pipeline diagram; <code>data/DATA.md</code> has
-        the data provenance, traced file by file.
+        <code>README.md</code> has the full pipeline diagram, and the repository documents
+        where every data file came from and how it was checked.
       </div>
     </div>
 
@@ -157,7 +158,7 @@
       <div class="keypoint" style="margin-top:1rem">
         <p style="margin:0 0 0.7rem">
           People study words and then judge them old or new. Every trial gets one of four
-          labels, and we record 257 channels of EEG throughout.
+          labels, and we record EEG from 256 electrodes throughout.
         </p>
         <p style="margin:0 0 0.7rem">
           Averaging those trials shows a real difference between remembered and
@@ -184,8 +185,8 @@
       </p>
       <p class="small muted">
         Built from the lab's own data and results: the group numbers are recomputed from
-        <code>outputs/</code>, the brain waves and the trainable classifier from the EEG on
-        the Drive. Regenerate the derived files with <code>python3 site/build_data.py</code>.
+        <code>outputs/</code>, and the EEG traces and the trainable classifier from the
+        recordings on the Drive. Regenerate the derived files with <code>python3 site/build_data.py</code>.
       </p>
     </div>
   </section>
@@ -210,41 +211,48 @@ const PAPERS = [
     title: 'Chen, Lithgow, Hemmerich &amp; Caplan (2014)',
     what: '<em>Is what goes in what comes out?</em> Exp Brain Res 232, 3175–3190.',
     why: 'This is our data. Every file on the Drive is a re-analysis of these recordings. Read it for the task design and what the trial codes mean. Start here even if you read nothing else.',
-    href: 'https://doi.org/10.1007/s00221-014-4003-0',
-    file: 'papers/Chen_Etal_2014.pdf',
+    id: '14Uo8U-9GszqQ0HVlz36Stb84ItwOsqeI',
+    file: 'Chen_Etal_2014.pdf',
   },
   {
     n: 'THEN',
     title: 'Chakravarty, Chen &amp; Caplan (2020)',
     what: '<em>Predicting memory from study-related brain activity.</em> J Neurophysiol 124(6), 2060–2075.',
     why: 'The paper this project follows. Same dataset, same lab, but asking the question of the study phase. It also makes the case for why prediction beats description — the argument in chapter 2.',
-    href: 'https://doi.org/10.1152/jn.00293.2020',
-    file: 'papers/Chakravarty_Etal_2020.pdf',
+    id: '1TZBwlMslUkIaHSWVMXtAH3hEqMBuQ2xS',
+    file: 'Chakravarty_Etal_2020.pdf',
   },
   {
     n: 'THEN',
     title: 'Danyluik, Chakravarty &amp; Caplan (2025)',
     what: '<em>EEG activity predictive of learning through feedback.</em> Comput Brain Behav 9, 155–183.',
     why: 'Why the project exists. This is where the spectral-beats-time-domain finding comes from, and answering “why?” is what the current manuscript is for. Chapter 7 is about this paper.',
-    href: 'https://doi.org/10.1007/s42113-025-00234-y',
-    file: 'papers/Danyluik_Etal_2025.pdf',
+    id: '179IUJAQ-wvgXuRMqvNQ6UCxdsZpO9NBq',
+    file: 'Danyluik_Etal_2025b.pdf',
+    note: 'Note the b: Danyluik_Etal_2025a on the Drive is a different paper entirely.',
   },
   {
     n: 'IF YOU WANT DEPTH',
     title: 'Chakravarty (2021)',
     what: 'PhD thesis, University of Alberta.',
     why: 'The long version — the whole predictive-approach programme in one place. The best single document if you would rather read one argument than four. Skim the chapters relevant to you.',
-    file: 'papers/Chakravarty_2021_thesis.pdf',
+    id: '1qeSnlvxsyzqa8jz-ZcepabGrmjSAxLj4',
+    file: 'Chakravarty_2021.pdf',
   },
 ];
 
+// Link straight to the copy on the lab's Drive rather than to the publisher:
+// everyone reading this has Drive access, and not everyone has a subscription.
 document.getElementById('papers').innerHTML = PAPERS.map((p) => `
-  <a ${p.href ? `href="${p.href}"` : 'href="#" onclick="return false" style="cursor:default"'}>
+  <a href="https://drive.google.com/file/d/${p.id}/view" target="_blank" rel="noopener">
     <div class="n">${p.n}</div>
     <h3>${p.title}</h3>
     <p style="margin-bottom:0.5rem">${p.what}</p>
     <p>${p.why}</p>
-    <p class="small muted" style="margin-top:0.6rem"><code>${p.file}</code></p>
+    ${p.note ? `<p class="small" style="margin-top:0.5rem;color:var(--warning)">${p.note}</p>` : ''}
+    <p class="small muted" style="margin-top:0.6rem">
+      Opens on the CML Drive · <code>${p.file}</code>
+    </p>
   </a>`).join('');
 </script>
 </body>

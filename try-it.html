@@ -24,7 +24,7 @@
       <p class="lede">
         This is not a simulation. The classifier below runs in your browser on
         participant 45's actual EEG — the same 450 × 280 feature matrix from chapter 3,
-        the same maths the MATLAB pipeline uses.
+        the same math the MATLAB pipeline uses.
       </p>
     </div>
   </section>
@@ -65,8 +65,8 @@
       </div>
 
       <div class="controls">
-        <label class="field">
-          Regularisation γ
+        <label class="field" title="How strongly the model is stopped from trusting the feature correlations it measured">
+          Regularization γ
           <input type="range" id="gamma" min="0" max="100" value="50">
           <output id="gamma-out">0.50</output>
         </label>
@@ -88,6 +88,48 @@
 
     <div class="prose">
       <div class="callout" id="compare-callout" hidden></div>
+    </div>
+
+    <div class="prose">
+      <h3 style="margin-top:2rem">What the γ slider is doing</h3>
+      <p>
+        Linear discriminant analysis does not just ask which features differ between Hits
+        and Misses. It also measures how the features <em>move together</em> — electrode
+        21 at 400 ms and electrode 21 at 440 ms overlap in time, so they rise and fall
+        almost in step, and the model can exploit that to work out which of them is
+        actually carrying the signal.
+      </p>
+      <p>
+        To do that it needs the correlation between every pair of features. With 280
+        features that is 280 × 279 ÷ 2 = <strong>39,060 correlations</strong>, estimated
+        from a few hundred trials. Most of them are being measured from far too little
+        data, so their values are mostly noise — and the model, taking them at face value,
+        builds elaborate weightings on relationships that are not really there.
+      </p>
+      <p>
+        <strong>γ (gamma) is how much you tell it to distrust those measurements.</strong>
+        It slides between two extremes:
+      </p>
+      <ul style="line-height:1.7">
+        <li><strong>γ = 0</strong> — trust every measured correlation completely. Maximum
+          flexibility, maximum noise-fitting.</li>
+        <li><strong>γ = 1</strong> — ignore them all and pretend the features are unrelated.
+          Maximum caution, and it throws away real structure along with the noise.</li>
+        <li><strong>γ = 0.5</strong> — what the pipeline uses: shrink every measured
+          correlation halfway towards zero. Keep the ones strong enough to survive being
+          halved, discount the rest.</li>
+      </ul>
+      <p>
+        It is the same trade as chapter 4's flexibility slider, applied to a different
+        knob. And it is not optional here: with 280 features and sometimes fewer than 100
+        trials in a class, the correlation estimates are singular — mathematically
+        unusable — and the model cannot be fitted at all without some shrinkage. Drag γ to
+        0 above and watch what happens.
+      </p>
+      <p class="small muted">
+        Spelled “regularisation” in most of the ERP literature and “regularization” in most
+        of the machine-learning literature. Same thing.
+      </p>
     </div>
   </section>
 
@@ -111,7 +153,7 @@
             </tr>
             <tr>
               <td style="text-align:left"><b>Drag γ to 0</b></td>
-              <td style="text-align:left">With 280 features and a few hundred trials, the model can no longer estimate how the features co-vary and the result degrades. γ pulls it back towards something stable. The pipeline fixes γ = 0.5.</td>
+              <td style="text-align:left">Turns the safety off, and the AUC usually drops. See below for what γ is actually doing. The pipeline fixes it at 0.5.</td>
             </tr>
             <tr>
               <td style="text-align:left"><b>One electrode instead of ten</b></td>
@@ -199,10 +241,10 @@
         trials land in which fold, which is the wobble the previous section is about.
       </p>
       <p class="small muted">
-        That check is a script, not a claim: run <code>setup_paths</code> then
-        <code>verify_against_matlab</code> from <code>site/</code>. Its browser
-        counterpart is <code>site/_selftest.html</code>. If someone changes the MATLAB
-        feature extractor and forgets this page, those two are what catch it.
+        That check is a script, not a claim — it ships alongside this site, together with a
+        browser-based counterpart that checks the classifier. If someone changes the MATLAB
+        feature extractor and forgets this page, those two are what catch it. The site's
+        own README says how to run them.
       </p>
       <p class="small muted">
         Deliberately different from the repo: this page uses participant 45, while the

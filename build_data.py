@@ -54,9 +54,43 @@ FZ, P3 = 21, 87              # the univariate electrodes (1-based)
 CODES = {1: "Hit", 2: "Miss", 3: "CR", 4: "FA"}
 
 
+SFP = os.path.join(REPO, "AdultAverageNet256_v1 (1).sfp")
+
+
 def sample_to_ms(idx0):
     """0-based sample index -> ms relative to stimulus onset."""
     return (idx0 - BASELINE_SAMPLES) * 1000.0 / FS
+
+
+def read_montage():
+    """Electrode positions from the .sfp, projected flat for a scalp map.
+
+    The file holds 3 fiducials, E1..E256, and Cz -- i.e. 256 electrodes plus the
+    vertex reference, which is why the recordings have 257 channels.
+
+    Projection is azimuthal equidistant, the standard for scalp maps: distance
+    from the vertex is proportional to the angle from it, so the equator (ear
+    level) lands on the unit circle and everything below it falls outside.
+    """
+    rows = []
+    with open(SFP) as fh:
+        for line in fh:
+            p = line.split()
+            if len(p) == 4:
+                rows.append((p[0], float(p[1]), float(p[2]), float(p[3])))
+    fids = {r[0]: r[1:] for r in rows if r[0].startswith("Fid")}
+    elecs = [r for r in rows if not r[0].startswith("Fid")]
+
+    out = {}
+    for label, x, y, z in elecs:
+        r = (x * x + y * y + z * z) ** 0.5
+        phi = np.arccos(np.clip(z / r, -1, 1))       # 0 at the vertex
+        az = np.arctan2(y, x)
+        rad = phi / (np.pi / 2)                      # 1 at the equator
+        # +Y is anterior (towards the nose), +X is the right ear
+        out[label] = [round(float(rad * np.cos(az)), 4),
+                      round(float(rad * np.sin(az)), 4)]
+    return out, fids
 
 
 def bin_starts():
@@ -187,6 +221,24 @@ def main():
         "participants": per_participant,
         "group": group,
         "source": "outputs/{LDA,SVM}/*_results_raw.mat + events_NN.mat on the lab Drive",
+    })
+
+    # -- 2b. the montage, for the scalp map -------------------------------
+    # The ten feature electrodes are not scattered: four sit on the midline and
+    # the other six form three exact left/right mirror pairs. The map is how you
+    # see that, and it is the real answer to "why these ten".
+    pos, fids = read_montage()
+    named = {21: "Fz", 87: "P3", 101: "Pz", 153: "P4"}
+    write("montage.json", {
+        "source": os.path.basename(SFP),
+        "projection": "azimuthal equidistant; +Y anterior, +X right ear, 1.0 = equator",
+        "note": ("E1..E256 are the electrodes; Cz is the vertex reference, which is "
+                 "why the recordings have 257 channels but only 256 electrodes."),
+        "all": {k: v for k, v in pos.items() if k != "Cz"},
+        "cz": pos.get("Cz"),
+        "electrodes": ELECTRODES,
+        "names": {str(k): v for k, v in named.items()},
+        "fiducials": {k: list(v) for k, v in fids.items()},
     })
 
     # -- 3. the demo participant's EEG ------------------------------------

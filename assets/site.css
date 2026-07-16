@@ -102,7 +102,11 @@
 
 * { box-sizing: border-box; }
 
-html { scroll-behavior: smooth; }
+/* Everything below is sized in rem, so this one number is the page's zoom.
+   115% of the 16px browser default -- readers were reaching for the zoom
+   control at the old size. Charts scale too: their SVG viewBox stretches to a
+   container whose width is set in rem. */
+html { font-size: 115%; scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -113,7 +117,7 @@ body {
   background: var(--page);
   color: var(--text-primary);
   font-family: var(--sans);
-  font-size: 17px;
+  font-size: 1.0625rem;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }

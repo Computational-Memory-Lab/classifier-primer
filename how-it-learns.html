@@ -110,10 +110,12 @@
           <input type="range" id="thr" min="0" max="1000" value="500">
         </label>
         <label class="field">
-          Overlap
-          <input type="range" id="ovl" min="0" max="100" value="55">
+          How separable
+          <input type="range" id="ovl" min="0" max="100" value="45">
           <output id="ovl-out"></output>
         </label>
+        <button class="btn" id="best2">Let the classifier solve it</button>
+        <button class="btn" id="reset-thr">Reset the threshold</button>
       </div>
       <div class="split split--roc">
         <div id="dist-chart"></div>
@@ -127,13 +129,27 @@
       <p>
         Every possible threshold gives one pair of numbers: the fraction of Hits you
         caught, and the fraction of Misses you wrongly called Hits. Plot that pair for
-        every threshold and you trace out the ROC curve. A useless classifier gives the
-        diagonal. A good one bulges towards the top-left.
+        every threshold and you trace out the curve. A useless classifier gives the
+        diagonal — it catches Hits and raises false alarms at exactly the same rate. A
+        good one bulges towards the top-left, where you catch a lot and mistake few.
       </p>
+      <div class="keypoint" style="border-left-color:var(--series-1)">
+        <strong>ROC is the <em>receiver operating characteristic</em></strong> — an odd
+        name with a literal history. It was developed for radar operators in the 1940s,
+        who had to decide how faint a blip on a screen counted as an aircraft. Set the
+        threshold low and you catch every aircraft but scramble fighters at flocks of
+        birds; set it high and you miss real ones. The curve described how a given
+        <em>receiver</em> traded those two errors off as its threshold was
+        <em>operated</em> — hence the name. The problem is identical here, with Hits for
+        aircraft and Misses for birds, which is why psychology borrowed the tool
+        wholesale.
+      </div>
       <div class="keypoint">
         <strong>AUC is the area under that curve</strong> — and it equals the probability
-        that a randomly chosen Hit scores higher than a randomly chosen Miss. Because it
-        sweeps every threshold, you never have to pick one, and because it only cares
+        that a randomly chosen Hit scores higher than a randomly chosen Miss. The diagonal
+        cuts the square in half, so a useless classifier scores 0.5. Filling the whole
+        square means every Hit outranks every Miss, so a perfect one scores 1.0. Because
+        it sweeps every threshold, you never have to pick one, and because it only cares
         about ordering, it is immune to lopsided classes.
       </div>
     </div>
@@ -155,17 +171,35 @@
       </p>
     </div>
 
+    <div class="prose">
+      <p>
+        “Flexibility” is not a vague quality — it is a count. It is the number of knobs the
+        model is allowed to turn, and every knob is one more thing it can fit to your
+        particular sample. In the demo below the model is a curve, and flexibility is how
+        many bends the curve may have: at 1 it can only be a straight line, at 3 it can
+        bend twice, at 14 it can wander through almost any set of points you like.
+      </p>
+      <p>
+        The classifiers in this project have the same knob, wearing a different name. Each
+        of the 280 features gets its own weight, so a classifier given all 280 has 280
+        knobs; give it one electrode's 28 bins and it has 28. That is why chapter 3 spent
+        so long cutting 83,200 numbers down to 280 — and why chapter 5's regularisation
+        slider, which limits how extreme those weights may get, is doing the same job as
+        this one.
+      </p>
+    </div>
+
     <div class="figure figure--wide">
       <div class="figure__title">The same model, scored two ways</div>
       <div class="figure__sub">
-        Turn up the model's flexibility. Watch the two lines go opposite directions —
-        that gap is overfitting.
+        Flexibility = how many bends the curve is allowed. Turn it up and watch the two
+        lines go opposite ways — that gap is overfitting.
       </div>
       <div class="controls">
         <label class="field">
           Model flexibility
           <input type="range" id="flex" min="1" max="14" value="1">
-          <output id="flex-out"></output>
+          <output id="flex-out" style="min-width:9em"></output>
         </label>
       </div>
       <div class="split split--even">
@@ -194,14 +228,61 @@
     <div class="prose">
       <h2>The fix: cross-validation</h2>
       <p>
-        We only have 450 trials per person, and we cannot afford to throw a chunk away
-        just to have something to test on. Cross-validation is the trick that lets every
-        trial be tested exactly once, while never being tested by a model that saw it.
+        We know the rule: never judge the model on trials it trained on. The obvious way
+        to obey it is to split the data once — train on 80% of the trials, test on the
+        remaining 20%, report that. This is called a <strong>holdout</strong>, and for a
+        study like this it is a bad deal for two reasons.
       </p>
       <p>
-        Split the trials into <em>k</em> equal folds. Train on <em>k</em>−1 of them, test
-        on the one left out. Then rotate, so each fold takes a turn being the test set.
-        Average the results.
+        <strong>It wastes data.</strong> Those 90 test trials taught the model nothing,
+        and 90 out of 450 is a lot to spend when data is this expensive — every trial is a
+        person sitting in a lab wearing 256 electrodes.
+      </p>
+      <p>
+        <strong>And the answer depends on which 20% you happened to pick.</strong> Test on
+        90 trials and your AUC is estimated from 90 trials, which is a small and noisy
+        sample. Draw a different 20% and you get a visibly different number, with no way
+        to tell which is closer to the truth.
+      </p>
+      <p>
+        Cross-validation gets around both. The idea: <strong>do the holdout repeatedly, so
+        that every trial takes a turn being held out — and average.</strong>
+      </p>
+
+      <h3>What a fold is</h3>
+      <p>
+        A <strong>fold</strong> is just one of the equal piles you deal the trials into.
+        Ten folds of 450 trials means ten piles of 45. Nothing more exotic than that; the
+        word is dealing terminology, not mathematics.
+      </p>
+      <p>
+        The piles are <em>stratified</em>, which means each one gets the same mix of
+        classes as the whole set. If 33% of the trials are Misses, each fold gets roughly
+        33% Misses. Deal them at random and one fold might, by chance, contain almost no
+        Misses at all — and a fold with only one class in it cannot be scored, because
+        AUC needs both.
+      </p>
+
+      <h3>The rotation</h3>
+      <p>
+        Now run the holdout ten times, holding out a different pile each round:
+      </p>
+      <ul style="line-height:1.7">
+        <li><strong>Round 1</strong> — train on folds 2–10 (405 trials), test on fold 1 (45 trials).</li>
+        <li><strong>Round 2</strong> — train on folds 1 and 3–10, test on fold 2.</li>
+        <li>…and so on, until every fold has been the test set exactly once.</li>
+      </ul>
+      <p>
+        Each round trains a <em>fresh</em> model from scratch — nothing carries over —
+        and scores it only on the pile that model never saw. So the rule is never broken.
+        But because the rounds between them cover all ten piles, <strong>every one of the
+        450 trials has been predicted exactly once by a model that had not seen it</strong>.
+        No trial is wasted, and none is graded by a model that knew the answer.
+      </p>
+      <p>
+        Averaging the ten scores gives the participant's AUC. That average is a much
+        steadier estimate than any single holdout, because it rests on all 450 trials
+        rather than a lucky or unlucky 90.
       </p>
     </div>
 
@@ -214,17 +295,30 @@
     </div>
 
     <div class="prose">
+      <h3>Why ten, and why five for false alarms</h3>
       <p>
-        The pipeline uses <strong>10 folds</strong> for Old/New and Hit/Miss, and
-        <strong>5 folds</strong> for FA vs CR — fewer folds there because false alarms
-        are so rare that ten folds could leave a fold with no false alarms in it at all.
+        The number of folds is a trade. More folds means more training data per round
+        (with ten, each model sees 90% of the trials) and therefore a model closer to the
+        one you would get from everything — but it also means each test pile is smaller
+        and noisier, and it means training the model ten times over. Ten is the
+        conventional compromise, and it is what this pipeline uses for Old/New and Hit vs
+        Miss.
       </p>
       <p>
-        Crucially, all of this happens <strong>within one participant</strong>. We never
-        train on Alice and test on Bob. Brains differ enough that a rule learned on one
-        person does not transfer well, so each person gets their own classifier and their
-        own AUC, and only then do we ask whether those AUCs beat chance across the group.
+        <strong>FA vs CR gets five folds instead</strong>, and the reason is participant
+        45's 14 false alarms. Split 14 across ten folds and each holds one or two; a
+        single unlucky deal leaves a fold with none, that fold cannot be scored, and the
+        ones that can are scored on a single false alarm apiece. Five folds means about
+        three false alarms per fold — still thin, but workable. When the rare class is
+        that rare, the fold count stops being a free choice.
       </p>
+      <div class="keypoint">
+        <strong>All of this happens within one participant.</strong> We never train on
+        Alice and test on Bob. Head shape, electrode placement and the anatomy underneath
+        all differ enough that a weighting learned on one person means something different
+        on the next, so each person gets their own classifier and their own AUC. Only then
+        do we ask whether those AUCs beat chance across the group — which is chapter 6.
+      </div>
     </div>
   </section>
 
@@ -237,9 +331,31 @@
         rejection” — and take it.
       </p>
       <p>
-        The pipeline's answer is <strong>SMOTE</strong>, which builds extra synthetic
-        minority-class examples by interpolating between real ones, until the classes are
-        even. A synthetic false alarm is a blend of two real false alarms.
+        The pipeline's answer is <strong>SMOTE</strong> — <strong>Synthetic Minority
+        Over-sampling Technique</strong> (<a href="https://doi.org/10.1613/jair.953">Chawla
+        et al., 2002</a>). The name says what it does: it over-samples the minority class
+        by <em>synthesising</em> new members of it.
+      </p>
+      <p>
+        The obvious way to balance classes is to duplicate the rare ones — copy the 14
+        false alarms fifteen times each. That fails, because exact copies tell the model
+        nothing new; it just weights those same 14 points more heavily and memorises them
+        harder. SMOTE's insight is to make new points that are <em>plausible</em> rather
+        than identical:
+      </p>
+      <ol style="line-height:1.7">
+        <li>Pick one of the 14 real false alarms at random.</li>
+        <li>Find its nearest neighbours among the other false alarms — the trials most
+          like it. The pipeline uses the closest four.</li>
+        <li>Pick one of those neighbours, and place a new point somewhere on the line
+          between the two, at a random distance along it.</li>
+        <li>Repeat until there are as many false alarms as correct rejections.</li>
+      </ol>
+      <p>
+        The new point is a blend of two real false alarms, so it sits in a part of the
+        space where false alarms genuinely live — but it is not a copy of either. The
+        effect is to fill in the rare class's territory rather than to pile up on its
+        handful of known addresses.
       </p>
     </div>
 
@@ -259,10 +375,20 @@
     <div class="prose">
       <div class="keypoint">
         <strong>SMOTE is applied to the training fold only — never the test fold.</strong>
-        Inventing test data would be cheating, and inventing it out of trials you are
-        about to be tested on would be a spectacular way to fool yourself. Getting this
-        boundary right is one of the fiddliest parts of the real code.
+        This matters more than it sounds. If you balanced the whole dataset first and then
+        split it into folds, synthetic points built from a trial in fold 3 would end up in
+        the training data for the model that is later tested on fold 3 — so the model
+        would effectively have seen the answer, dressed up as a different trial. The AUC
+        would come out flattering and meaningless. Balance inside each fold, after the
+        split, and the test trials stay untouched.
       </div>
+      <p>
+        And a limit worth keeping in mind: SMOTE adds no information. Every synthetic
+        point is built from the same 14 real trials, and it can only fill the space
+        between them. It stops the model taking the lazy option; it does not conjure
+        evidence that was never recorded. If FA vs CR looks weak in chapter 6, this is
+        part of why.
+      </p>
       <p>
         You now know every idea the pipeline uses. In the next chapter you get to run it.
       </p>
@@ -309,11 +435,44 @@ const tip = tooltip();
   // line as point + angle
   let line = { cx: 0, cy: 0, ang: -Math.PI / 4 };
   const reset = () => { line = { cx: 0, cy: 0, ang: -Math.PI / 4 }; };
+  let anim = null;                 // in-flight animation to the solved line
+  let grabSign = 1;                // which end of the line the pointer took hold of
 
   // signed distance from the line; positive side = predicted Hit
   const nx = () => -Math.sin(line.ang);
   const ny = () => Math.cos(line.ang);
   const dist = (p) => (p.x - line.cx) * nx() + (p.y - line.cy) * ny();
+
+  /** Ease the line towards a target, taking the short way round on the angle. */
+  function animateTo(target, ms = 650) {
+    cancelAnimationFrame(anim);
+    const from = { ...line };
+    // never spin more than half a turn to reach the same orientation
+    let d = target.ang - from.ang;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+
+    const settle = () => { line.cx = target.cx; line.cy = target.cy; line.ang = from.ang + d; };
+    // Animation is decoration; the result is not. If frames are not being
+    // served -- reduced-motion, a background tab, a headless run -- go straight
+    // to the answer rather than leaving the line wherever it happened to be.
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { settle(); draw(); return; }
+
+    const t0 = performance.now();
+    let landed = false;
+    const tick = (now) => {
+      const u = Math.min(1, (now - t0) / ms);
+      const e = u < 0.5 ? 2 * u * u : 1 - ((-2 * u + 2) ** 2) / 2;   // ease in/out
+      line.cx = from.cx + (target.cx - from.cx) * e;
+      line.cy = from.cy + (target.cy - from.cy) * e;
+      line.ang = from.ang + d * e;
+      draw();
+      if (u < 1) anim = requestAnimationFrame(tick); else landed = true;
+    };
+    anim = requestAnimationFrame(tick);
+    // backstop: if no frame ever arrives, land on the target anyway
+    setTimeout(() => { if (!landed) { cancelAnimationFrame(anim); settle(); draw(); } }, ms + 250);
+  }
 
   function solve() {
     // LDA on two features: w = inv(S) (m1 - m0)
@@ -333,11 +492,15 @@ const tip = tooltip();
     const dx = m1[0] - m0[0], dy = m1[1] - m0[1];
     const wx = (s11 * dx - s01 * dy) / det;
     const wy = (-s01 * dx + s00 * dy) / det;
-    line.ang = Math.atan2(wy, wx) - Math.PI / 2;   // line is perpendicular to w
-    line.cx = (m1[0] + m0[0]) / 2;
-    line.cy = (m1[1] + m0[1]) / 2;
-    // ensure the positive normal points at the Hit cloud
-    if (dist({ x: m1[0], y: m1[1] }) < 0) line.ang += Math.PI;
+    const target = {
+      ang: Math.atan2(wy, wx) - Math.PI / 2,        // the line is perpendicular to w
+      cx: (m1[0] + m0[0]) / 2,
+      cy: (m1[1] + m0[1]) / 2,
+    };
+    // the positive side must be the one the Hit cloud is on
+    const nx2 = -Math.sin(target.ang), ny2 = Math.cos(target.ang);
+    if ((m1[0] - target.cx) * nx2 + (m1[1] - target.cy) * ny2 < 0) target.ang += Math.PI;
+    animateTo(target);
   }
 
   let draw;
@@ -437,13 +600,26 @@ const tip = tooltip();
       const p = toData(ev);
       const dCentre = Math.hypot(p.x - line.cx, p.y - line.cy);
       drag = dCentre < 1.2 ? 'move' : 'rot';
-      svg.setPointerCapture(ev.pointerId);
+      // Remember which end was grabbed. Without this, rotating snaps the line to
+      // the pointer's angle from the centre -- so grabbing the far end flips the
+      // line half a turn on the first pixel of movement, and every trial swaps
+      // sides. Keeping the grabbed end under the cursor is what people expect.
+      grabSign = Math.sign((p.x - line.cx) * Math.cos(line.ang)
+                         + (p.y - line.cy) * Math.sin(line.ang)) || 1;
+      cancelAnimationFrame(anim);
+      // Capture keeps the drag alive when the pointer leaves the plot. It throws
+      // if the pointer isn't active, which must not take the drag down with it.
+      try { svg.setPointerCapture(ev.pointerId); } catch { /* not capturable */ }
     });
     svg.addEventListener('pointermove', (ev) => {
       if (!drag) return;
       const p = toData(ev);
       if (drag === 'move') { line.cx = p.x; line.cy = p.y; }
-      else line.ang = Math.atan2(p.y - line.cy, p.x - line.cx);
+      else {
+        let a = Math.atan2(p.y - line.cy, p.x - line.cx);
+        if (grabSign < 0) a += Math.PI;      // keep hold of the same end
+        line.ang = a;
+      }
       draw();
     });
     svg.addEventListener('pointerup', () => { drag = null; });
@@ -465,7 +641,9 @@ const tip = tooltip();
 
   let data = [];
   function make() {
-    const d = 3.2 - (+ovl.value / 100) * 3.0;
+    // the slider now means separability, matching the card above, so a high
+    // value must mean the two distributions are further apart
+    const d = 0.2 + (+ovl.value / 100) * 3.0;
     const r = rng(9);
     data = [];
     for (let i = 0; i < 160; i++) data.push({ s: gauss(r) + d / 2, c: 1 });
@@ -520,7 +698,8 @@ const tip = tooltip();
       el('line', { x1: xs(t), x2: xs(t), y1: pad.t, y2: h - pad.b,
         stroke: token('--text-primary'), 'stroke-width': 2.5 }, svg);
       el('text', { x: xs(t), y: pad.t - 3, 'text-anchor': 'middle', class: 'tick',
-        fill: token('--text-primary'), 'font-weight': 620 }, svg).textContent = 'threshold';
+        fill: token('--text-primary'), 'font-weight': 620 }, svg)
+        .textContent = 'threshold (this is the line)';
       el('text', { x: pad.l + 4, y: pad.t + 12, class: 'tick', fill: token('--c-miss'), 'font-weight': 620 }, svg)
         .textContent = '← called Miss';
       el('text', { x: w - pad.r - 4, y: pad.t + 12, 'text-anchor': 'end', class: 'tick',
@@ -564,12 +743,23 @@ const tip = tooltip();
         .textContent = 'shaded area';
     }
     note.innerHTML = `At this threshold you catch <b>${(tpr * 100).toFixed(0)}%</b> of Hits `
-      + `but wrongly flag <b>${(fpr * 100).toFixed(0)}%</b> of Misses. The black dot on the ROC curve is `
+      + `but wrongly flag <b>${(fpr * 100).toFixed(0)}%</b> of Misses. The dot on the ROC curve is `
       + `<em>this</em> threshold; the curve is every other one. Slide the threshold and the dot moves — but `
-      + `<b>the curve and the AUC (${fmtAuc(A)}) never change</b>, because they describe the classifier, not your choice of cut-off.`;
+      + `<b>the curve and the AUC (${fmtAuc(A)}) never change</b>, because they describe the classifier, not your choice of cut-off. `
+      + `Drag “how separable” instead and the whole curve moves: that is a change to the classifier.`;
   };
   thr.addEventListener('input', draw);
   ovl.addEventListener('input', () => { make(); draw(); });
+  // "Solving" here means putting the threshold where it does least damage: the
+  // point where the two distributions cross, which is midway between them.
+  document.getElementById('best2').onclick = () => {
+    const m1 = mean(data.filter((d) => d.c === 1).map((d) => d.s));
+    const m0 = mean(data.filter((d) => d.c === 0).map((d) => d.s));
+    const target = (m1 + m0) / 2;
+    thr.value = Math.round(((target - LO) / (HI - LO)) * 1000);
+    draw();
+  };
+  document.getElementById('reset-thr').onclick = () => { thr.value = 500; draw(); };
   responsive(dHost, draw);
 }
 
@@ -635,7 +825,8 @@ const tip = tooltip();
   let draw;
   draw = () => {
     const deg = +flex.value;
-    flexOut.textContent = deg;
+    flexOut.textContent = deg === 1 ? '1 (a straight line)'
+      : `${deg} (${deg} bends allowed)`;
     const f = polyfit(train, deg);
 
     {
@@ -659,9 +850,10 @@ const tip = tooltip();
         el('circle', { cx: xs(p.x), cy: ys(p.y), r: 5, fill: token('--series-1'),
           stroke: token('--surface-1'), 'stroke-width': 1.5 }, svg);
       }
-      el('text', { x: pad.l + 4, y: pad.t + 11, class: 'tick', fill: token('--series-1'), 'font-weight': 620 }, svg)
-        .textContent = '● 14 training trials';
-      el('text', { x: pad.l + 4, y: pad.t + 24, class: 'tick' }, svg).textContent = '● held-back trials';
+      el('text', { x: pad.l + 4, y: pad.t + 11, class: 'tick', fill: token('--series-1'),
+        'font-weight': 620 }, svg).textContent = '\u25cf 14 training trials';
+      el('text', { x: pad.l + 4, y: pad.t + 25, class: 'tick', fill: token('--text-muted') }, svg)
+        .textContent = '\u25cf held-back trials';
     }
     {
       const w = 430, h = 290;

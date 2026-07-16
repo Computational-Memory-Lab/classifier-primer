@@ -32,7 +32,7 @@
     <div class="prose">
       <h2>Study, distract, test — nine times over</h2>
       <p>
-        Participants sit in front of a screen wearing a net of 257 electrodes. The
+        Participants sit in front of a screen wearing a net of 256 electrodes. The
         experiment runs in three-part blocks, and the whole thing repeats nine times.
       </p>
     </div>
@@ -48,9 +48,11 @@
         The words are ordinary 4–8 letter nouns drawn from the
         <a href="https://doi.org/10.3758/BF03203275">Toronto Word Pool</a> — <em>chapter</em>,
         <em>artist</em>, <em>motor</em>. The arithmetic in the middle is not measuring
-        anything. It is there to clear out short-term memory, so that when a word comes
-        back at test the participant has to actually <em>remember</em> it rather than
-        just still be holding it in mind.
+        anything. It is there to occupy the participant so they cannot keep rehearsing the
+        list, which removes <strong>recency effects</strong>: without it, the last few
+        studied words would still be sitting in short-term memory at test and would be
+        recognised from that rather than from having been learned. The distractor forces
+        every word to be retrieved from memory proper.
       </p>
     </div>
   </section>
@@ -157,13 +159,25 @@
         Before asking a computer to read the EEG, it is worth knowing how well the
         participants themselves did. Each dot is one of the 67 people in the dataset.
       </p>
+      <p>
+        The measure is <strong>d′</strong>, and it exists because raw accuracy is easy to
+        fake. Someone who answers “old” to everything gets every old word right, and a
+        100% hit rate looks excellent until you notice they also called every new word
+        old. d′ subtracts that away: it is the hit rate minus the false-alarm rate, both
+        converted to standard-deviation units, so it only rewards genuinely
+        <em>separating</em> the two. Zero means the rates are identical — no ability to
+        tell old from new. This is the same logic AUC uses for the classifier, applied to
+        the person.
+      </p>
     </div>
 
     <div class="figure figure--wide">
       <div class="figure__title">Behaviour of all 67 participants</div>
       <div class="figure__sub">
-        d′ (“d-prime”) measures how well someone separates old from new words.
-        0 means no ability to tell them apart; higher is better. Hover any dot.
+        Hover any dot. <b>d′</b> (“d-prime”) is the standard measure of how well someone
+        tells old words from new ones. It is the distance between two rates, expressed in
+        standard deviations: how often they called an old word “old” (the hit rate) versus
+        how often they called a <em>new</em> word “old” (the false-alarm rate).
       </div>
       <div id="dprime-chart"></div>
       <div class="figure__note" id="dprime-note"></div>
@@ -206,51 +220,67 @@ const counts = E.counts;
 {
   const host = document.getElementById('block-diagram');
   responsive(host, () => {
-    const w = 940, h = 210;
+    const w = 940, h = 230;
     const svg = svgRoot(host, w, h);
     const panels = [
       { t: 'STUDY', sub: '25 words', words: ['CHAPTER', 'ARTIST', 'MOTOR'],
         note: 'each word 1,500 ms\nblank gap 300–500 ms', c: '--series-1' },
       { t: 'DISTRACTOR', sub: '5 problems', words: ['5 + 6 − 3 = ?', '9 − 5 + 2 = ?', '4 + 7 − 1 = ?'],
-        note: 'clears short-term memory', c: '--series-4' },
+        note: 'blocks rehearsal, removes\nrecency effects', c: '--series-4' },
       { t: 'TEST', sub: '50 words', words: ['CHAPTER', 'MERCY', 'ARTIST'],
         note: 'key 1 = “old”\nkey 2 = “new”', c: '--series-2' },
     ];
-    const pw = 250, gap = 60, y0 = 26;
+    // Card stacks are laid out first so the arrows can be placed in the gaps
+    // between them rather than on top of them.
+    const cardW = 190, cardH = 42, dx = 17, dy = 24, y0 = 28;
+    const stackW = cardW + dx * 2;                       // full width of a stack
+    const stackH = cardH + dy * 2;
+    const gap = 76;
+    const total = panels.length * stackW + (panels.length - 1) * gap;
+    const x0 = (w - total) / 2;
+
     panels.forEach((p, i) => {
-      const x = 30 + i * (pw + gap);
-      el('text', { x: x + pw / 2, y: 12, 'text-anchor': 'middle', class: 'axis-label',
+      const sx = x0 + i * (stackW + gap);                // stack's left edge
+      const mid = sx + stackW / 2;                       // stack's centre
+
+      el('text', { x: mid, y: 14, 'text-anchor': 'middle', class: 'axis-label',
         fill: token(p.c), 'font-weight': 700 }, svg).textContent = p.t;
-      // Stacked cards, drawn back to front. Each card is offset far enough that
-      // its own word stays readable in the strip the next card does not cover.
-      const cardW = pw - 46, cardH = 42, dx = 17, dy = 24;
+
+      // Stacked cards, back to front. Each word sits vertically centred in the
+      // strip of its own card that the next card does not cover.
       p.words.forEach((word, k) => {
-        const cx = x + k * dx, cy = y0 + k * dy;
+        const cx = sx + k * dx, cy = y0 + k * dy;
+        const covered = k < p.words.length - 1;          // is another card on top?
+        const strip = covered ? dy : cardH;              // visible height
         el('rect', { x: cx, y: cy, width: cardW, height: cardH, rx: 5,
           fill: token('--surface-1'), stroke: token('--border-strong') }, svg);
-        el('text', { x: cx + 10, y: cy + 15, 'text-anchor': 'start',
+        el('text', { x: cx + cardW / 2, y: cy + strip / 2 + 4, 'text-anchor': 'middle',
           fill: token('--text-primary'), 'font-size': 12, 'letter-spacing': '0.04em',
           'font-family': p.t === 'DISTRACTOR' ? 'var(--mono)' : 'inherit' }, svg).textContent = word;
       });
-      const cx = x + pw / 2 - 20;
-      el('text', { x: cx, y: y0 + 112, 'text-anchor': 'middle',
+
+      // caption, centred under the stack
+      el('text', { x: mid, y: y0 + stackH + 22, 'text-anchor': 'middle',
         class: 'axis-label', 'font-weight': 600 }, svg).textContent = p.sub;
       p.note.split('\n').forEach((line, k) => {
-        el('text', { x: cx, y: y0 + 128 + k * 13, 'text-anchor': 'middle',
+        el('text', { x: mid, y: y0 + stackH + 38 + k * 13, 'text-anchor': 'middle',
           class: 'tick' }, svg).textContent = line;
       });
-      if (i < 2) {
-        const ax = x + pw - 26;
-        el('path', { d: `M${ax} ${y0 + 50} L${ax + 30} ${y0 + 50}`, stroke: token('--baseline'), 'stroke-width': 2 }, svg);
-        el('path', { d: `M${ax + 30} ${y0 + 50} l-7 -4 v8 z`, fill: token('--baseline') }, svg);
+
+      // arrow, in the gap between this stack and the next
+      if (i < panels.length - 1) {
+        const a = sx + stackW + 14, b = sx + stackW + gap - 14;
+        const ay = y0 + stackH / 2;
+        el('path', { d: `M${a} ${ay} L${b} ${ay}`, stroke: token('--baseline'), 'stroke-width': 2 }, svg);
+        el('path', { d: `M${b} ${ay} l-8 -4.5 v9 z`, fill: token('--baseline') }, svg);
       }
     });
     // repeat bar
-    const by = h - 24;
+    const by = h - 26;
     el('line', { x1: 30, x2: w - 30, y1: by, y2: by, stroke: token('--baseline'), 'stroke-width': 1.5 }, svg);
     el('path', { d: `M${w - 30} ${by} l-8 -4 v8 z`, fill: token('--baseline') }, svg);
-    el('text', { x: (w) / 2, y: by + 16, 'text-anchor': 'middle', class: 'axis-label' }, svg)
-      .textContent = 'repeated for 9 blocks → 225 study words, 450 test words';
+    el('text', { x: w / 2, y: by + 17, 'text-anchor': 'middle', class: 'axis-label' }, svg)
+      .textContent = '9 blocks → 225 study words, 450 test words (225 old + 225 new)';
   });
 }
 
@@ -260,15 +290,14 @@ const counts = E.counts;
   const note = document.getElementById('matrix-note');
   const cells = [
     { r: 0, c: 0, name: 'Hit', code: 1, key: 'Hit', col: '--c-hit', ok: true,
-      say: 'Correctly remembered a studied word.' },
+      say: 'Correctly said that a word was old.' },
     { r: 0, c: 1, name: 'Miss', code: 2, key: 'Miss', col: '--c-miss', ok: false,
-      say: 'Forgot a word they had studied.' },
+      say: 'Incorrectly said that a word was new.' },
     { r: 1, c: 0, name: 'False Alarm', code: 4, key: 'FA', col: '--c-fa', ok: false,
-      say: 'Fooled: the word felt familiar, but they never studied it.' },
+      say: 'Incorrectly said that a word was old.' },
     { r: 1, c: 1, name: 'Correct Rejection', code: 3, key: 'CR', col: '--c-cr', ok: true,
-      say: 'Correctly identified a word as new.' },
+      say: 'Correctly said that a word was new.' },
   ];
-  note.textContent = 'Participant 45 saw 225 old and 225 new words, like everyone else.';
   responsive(host, () => {
     const w = 560, h = 270;
     const svg = svgRoot(host, w, h);
@@ -323,6 +352,7 @@ const counts = E.counts;
   let testList = [];
   let responses = [];
   let mathA = 0, mathB = 0, mathC = 0;
+  let showWord = true;
 
   const shuffle = (a) => {
     const b = a.slice();
@@ -341,6 +371,12 @@ const counts = E.counts;
     step();
   }
 
+  // Chen et al. (2014): each study word is on screen for 1,500 ms, followed by a
+  // blank gap jittered between 300 and 500 ms. Matching that matters -- at a
+  // faster rate the task feels unreasonably hard and misrepresents the study.
+  const WORD_MS = 1500;
+  const GAP_MIN = 300, GAP_MAX = 500;
+
   function step() {
     if (state !== 'study') return;
     if (i >= STUDY.length) {
@@ -351,8 +387,13 @@ const counts = E.counts;
       render();
       return;
     }
+    showWord = true;
     render();
-    setTimeout(() => { i++; step(); }, 900);
+    setTimeout(() => {
+      showWord = false;              // the blank gap between words
+      render();
+      setTimeout(() => { i++; step(); }, GAP_MIN + rand() * (GAP_MAX - GAP_MIN));
+    }, WORD_MS);
   }
 
   function answer(saidOld) {
@@ -371,8 +412,9 @@ const counts = E.counts;
     if (state === 'intro') {
       host.innerHTML = `<div style="text-align:center;padding:2.2rem 1rem">
         <p style="color:var(--text-secondary);margin-bottom:1rem">
-          You will see eight words to memorise, one at a time. Then some arithmetic.
-          Then sixteen words to judge as old or new.</p>
+          You will see eight words to memorise, one at a time, at the same rate the real
+          participants saw them: 1,500 ms each. Then some arithmetic. Then sixteen words
+          to judge as old or new. It takes about 15 seconds.</p>
         <button class="btn btn--primary" id="go">Start the block</button></div>`;
       host.querySelector('#go').onclick = begin;
       return;
@@ -380,8 +422,9 @@ const counts = E.counts;
     if (state === 'study') {
       host.innerHTML = `<div style="text-align:center;padding:1rem">
         <div class="eyebrow">Study phase · word ${Math.min(i + 1, 8)} of 8</div>
-        <div style="font-size:2.4rem;font-weight:600;letter-spacing:0.06em;margin:2rem 0;min-height:3rem">${STUDY[i] ?? ''}</div>
-        <div class="small muted">Just read each word and try to remember it.</div></div>`;
+        <div style="font-size:2.4rem;font-weight:600;letter-spacing:0.06em;margin:2rem 0;min-height:3rem">${showWord ? (STUDY[i] ?? '') : ''}</div>
+        <div class="small muted">Just read each word and try to remember it.<br>
+          <span style="opacity:.7">1,500 ms per word, then a blank gap of 300–500 ms — the real rate.</span></div></div>`;
       return;
     }
     if (state === 'math') {
@@ -442,14 +485,22 @@ const counts = E.counts;
           <div class="stat__label">${NAMES[c]}<br><span class="muted">code ${c}</span></div></div>`).join('')}
       </div>
       <p class="small" style="color:var(--text-secondary)">
-        Your d′ was <b>${d.toFixed(2)}</b>. For comparison, the 67 people in the real dataset
-        averaged <b>${mean(P.participants.map((p) => p.dprime)).toFixed(2)}</b> — over 450 trials
-        rather than 16, and after a much longer study list.
+        Those four numbers get summarised into one, <b>d′</b> (“d-prime”), and yours is
+        <b>${d.toFixed(2)}</b>. It compares how often you said “old” to an old word (your hit
+        rate, ${(hr * 100).toFixed(0)}%) with how often you said “old” to a new word (your
+        false-alarm rate, ${(fr * 100).toFixed(0)}%). Saying “old” a lot inflates both, so the
+        gap between them — not the hit rate alone — is what shows you could actually tell them
+        apart. d′ = 0 means the two rates are equal and you are guessing.
+      </p>
+      <p class="small" style="color:var(--text-secondary)">
+        The 67 people in the real dataset averaged
+        <b>${mean(P.participants.map((p) => p.dprime)).toFixed(2)}</b>, over 450 trials rather
+        than 16 and after a much longer study list.
       </p>
       <p class="small muted">
-        Every one of those trials also has a second of 257-channel EEG attached to it.
-        That pairing — a brain response and a code from 1 to 4 — is the raw material for
-        everything that follows.
+        Every one of those trials also carries 1.3 seconds of EEG from 256 electrodes,
+        recorded while the word was on screen. That pairing — an EEG response and a code
+        from 1 to 4 — is the raw material for everything that follows.
       </p>
       <div class="controls" style="margin-top:0.8rem"><button class="btn" id="again">Run another block</button></div>
     </div>`;
