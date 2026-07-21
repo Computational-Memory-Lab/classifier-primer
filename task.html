@@ -32,14 +32,14 @@
     <div class="prose">
       <h2>Study, distract, test — nine times over</h2>
       <p>
-        Participants sit in front of a screen wearing a net of 256 electrodes. The
+        Participants sit in front of a screen wearing an EEG net of 256 electrodes. The
         experiment runs in three-part blocks, and the whole thing repeats nine times.
       </p>
     </div>
 
     <div class="figure figure--wide">
       <div class="figure__title">One block of the experiment</div>
-      <div class="figure__sub">Repeated nine times, giving 225 studied words and 450 test words per participant.</div>
+      <div class="figure__sub">Repeated nine times, giving 225 studied words and 450 test words per participant — the 225 studied “old” words mixed with 225 “new” lures that were never studied.</div>
       <div id="block-diagram"></div>
     </div>
 
@@ -127,13 +127,13 @@
       <p>
         Here is the step that takes people a while to see. Because every trial carries
         both <em>what the word was</em> and <em>what the participant said</em>, you can
-        slice the same trials three different ways — and each slice asks a genuinely
+        contrast the same trials three different ways — and each contrast asks a genuinely
         different psychological question.
       </p>
     </div>
 
     <div class="figure figure--wide">
-      <div class="figure__title">The same 450 trials, sliced three ways</div>
+      <div class="figure__title">The same 450 trials, contrasted three ways</div>
       <div class="figure__sub">Click a task to see which trials it uses and which are set aside. Counts are participant 45's.</div>
       <div class="controls" id="task-controls"></div>
       <div id="task-split"></div>
@@ -166,8 +166,10 @@
         old. d′ subtracts that away: it is the hit rate minus the false-alarm rate, both
         converted to standard-deviation units, so it only rewards genuinely
         <em>separating</em> the two. Zero means the rates are identical — no ability to
-        tell old from new. This is the same logic AUC uses for the classifier, applied to
-        the person.
+        tell old from new — and the higher it climbs the sharper the memory: the best
+        participants here reach about 4, near-perfect recognition, mixing up old and new
+        almost never. This is the same logic AUC uses for the classifier, applied to the
+        person.
       </p>
     </div>
 
@@ -548,7 +550,7 @@ const counts = E.counts;
       note: 'Uses all 450 trials. Note this is what the word actually was — not what the participant said. A Miss is still an old word.',
     },
     HitMiss: {
-      label: 'Hit vs Miss', q: 'Among studied words, does the brain predict remembering?',
+      label: 'Hit vs Miss', q: 'Among studied words, does the brain predict remembering what was studied?',
       groups: [
         { name: 'Hit', keys: ['Hit'], col: '--c-hit' },
         { name: 'Miss', keys: ['Miss'], col: '--c-miss' },
@@ -556,7 +558,7 @@ const counts = E.counts;
       note: 'Uses only the 225 old words. All the new words are set aside. Every word here was studied — the only difference is whether memory worked.',
     },
     FAvsCR: {
-      label: 'FA vs CR', q: 'Among new words, does the brain predict a false memory?',
+      label: 'FA vs CR', q: 'Among new words, does the brain predict “remembering” what was never studied?',
       groups: [
         { name: 'False Alarm', keys: ['FA'], col: '--c-fa' },
         { name: 'Correct Rejection', keys: ['CR'], col: '--c-cr' },
