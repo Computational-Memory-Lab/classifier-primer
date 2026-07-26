@@ -11,7 +11,8 @@ export const CHAPTERS = [
   { href: 'try-it.html', short: '5 Try it', title: 'Train one yourself, on real data' },
   { href: 'results.html', short: '6 Results', title: 'What we have found so far' },
   { href: 'open-question.html', short: '7 Open', title: 'The question we are trying to answer' },
-  { href: 'reading.html', short: '8 Reading', title: 'Where to go next' },
+  { href: 'simulation.html', short: '8 How much data', title: 'How much data would it take?' },
+  { href: 'reading.html', short: '9 Reading', title: 'Where to go next' },
 ];
 
 /* ---------- theme ---------- */

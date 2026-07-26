@@ -1,0 +1,454 @@
+/* Interactives for the trial-count simulation chapter.
+
+   Four figures, in the order the argument runs:
+     1  trialCurve    how achieved AUC depends on trials, features and effect size
+     2  ldaMechanics  what LDA actually computes, step by step
+     3  svmMargin     what an SVM actually computes, step by step
+     4  smallN        why the two behave differently when trials are scarce
+
+   Closed forms are used where one exists and honest training where it does not,
+   so the pictures cannot drift away from the claims in the prose. Everything
+   runs from file:// with no build step, like the rest of the site. Charts use a
+   fixed viewBox and are scaled by CSS, matching how-it-learns.html. */
+
+import { el, svgRoot, scale, frame, linePath, token, responsive } from './site.js';
+
+/* ============================== shared maths ============================== */
+
+/** Normal CDF, Abramowitz & Stegun 26.2.17 -- accurate to ~7.5e-8. */
+export function normCdf(z) {
+  const s = z < 0 ? -1 : 1;
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t
+    - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return 0.5 * (1 + s * y);
+}
+
+/** Inverse normal CDF (Acklam). */
+export function normInv(p) {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
+    1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
+    6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
+    -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
+    3.754408661907416e+00];
+  const pl = 0.02425;
+  if (p < pl) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+      / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  if (p > 1 - pl) {
+    const q = Math.sqrt(-2 * Math.log(1 - p));
+    return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+      / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  const q = p - 0.5, r = q * q;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
+    / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}
+
+/** Separation that yields a given asymptotic AUC.  AUC = Phi(delta/sqrt2). */
+export const deltaForAuc = (a) => Math.SQRT2 * normInv(a);
+
+/**
+ * Achieved AUC for sample LDA. The estimated direction carries noise of squared
+ * norm ~4p/n, so the recovered separation is delta^2 / sqrt(delta^2 + 4p/n).
+ * This matched the cluster simulation to a median of 0.007 AUC across the grid.
+ */
+export function achievedAuc(delta, p, n) {
+  const d2 = delta * delta;
+  return normCdf((d2 / Math.sqrt(d2 + 4 * p / n)) / Math.SQRT2);
+}
+
+/** Smallest n reaching a given fraction of the way from 0.5 to the ceiling. */
+export function trialsForFraction(delta, p, frac) {
+  const ceil = normCdf(delta / Math.SQRT2);
+  const target = 0.5 + frac * (ceil - 0.5);
+  let lo = 4, hi = 1e12;
+  for (let i = 0; i < 160; i++) {
+    const mid = Math.sqrt(lo * hi);
+    if (achievedAuc(delta, p, mid) < target) lo = mid; else hi = mid;
+  }
+  return hi;
+}
+
+/* ------------------------------- 2-D data -------------------------------- */
+
+/* A small deterministic generator, so every redraw of the same settings gives
+   the same picture and sliders feel continuous rather than reshuffling. */
+function makeRand(seed) {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s ^= s << 13; s >>>= 0;
+    s ^= s >> 17;
+    s ^= s << 5; s >>>= 0;
+    return s / 4294967296;
+  };
+}
+function makeGauss(rand) {
+  return () => {
+    let u = 0, v = 0;
+    while (u === 0) u = rand();
+    while (v === 0) v = rand();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+}
+
+/** Two Gaussian clouds sharing a covariance set by the sds and correlation. */
+export function twoClouds({ n = 90, sep = 2, sx = 1, sy = 1, rho = 0, seed = 7 }) {
+  const g = makeGauss(makeRand(seed));
+  const L21 = sy * rho, L22 = sy * Math.sqrt(Math.max(1e-9, 1 - rho * rho));
+  const pts = [];
+  for (let c = 0; c < 2; c++) {
+    const mx = c === 0 ? -sep / 2 : sep / 2;
+    for (let i = 0; i < n; i++) {
+      const z1 = g(), z2 = g();
+      pts.push({ x: mx + sx * z1, y: L21 * z1 + L22 * z2, c });
+    }
+  }
+  return pts;
+}
+
+/** Class means and the pooled within-class covariance. */
+export function moments(pts) {
+  const m = [[0, 0], [0, 0]], k = [0, 0];
+  for (const p of pts) { m[p.c][0] += p.x; m[p.c][1] += p.y; k[p.c]++; }
+  for (const c of [0, 1]) { m[c][0] /= k[c] || 1; m[c][1] /= k[c] || 1; }
+  let sxx = 0, sxy = 0, syy = 0;
+  for (const p of pts) {
+    const dx = p.x - m[p.c][0], dy = p.y - m[p.c][1];
+    sxx += dx * dx; sxy += dx * dy; syy += dy * dy;
+  }
+  const dof = Math.max(1, pts.length - 2);
+  return { m, S: [[sxx / dof, sxy / dof], [sxy / dof, syy / dof]] };
+}
+
+/**
+ * LDA weights with fitcdiscr-style shrinkage: the CORRELATION matrix is pulled
+ * toward the identity by gamma and then rescaled by the standard deviations.
+ * gamma = 0 trusts the measured covariance; gamma = 1 discards the correlations
+ * entirely, which is what the published study-phase analysis does.
+ */
+export function ldaWeights(pts, gamma = 0) {
+  const { m, S } = moments(pts);
+  const s1 = Math.sqrt(Math.max(1e-12, S[0][0]));
+  const s2 = Math.sqrt(Math.max(1e-12, S[1][1]));
+  const r = S[0][1] / (s1 * s2);
+  const rg = r * (1 - gamma);
+  const A = [[s1 * s1, rg * s1 * s2], [rg * s1 * s2, s2 * s2]];
+  const det = A[0][0] * A[1][1] - A[0][1] * A[1][0] || 1e-12;
+  const inv = [[A[1][1] / det, -A[0][1] / det], [-A[1][0] / det, A[0][0] / det]];
+  const d = [m[1][0] - m[0][0], m[1][1] - m[0][1]];
+  const w = [inv[0][0] * d[0] + inv[0][1] * d[1], inv[1][0] * d[0] + inv[1][1] * d[1]];
+  return { w, m, S, d, rho: r };
+}
+
+/**
+ * Soft-margin linear SVM by subgradient descent on the hinge loss. Labels are
+ * +/-1 and C is the box constraint. Slow and simple, which is fine for a few
+ * dozen points, and it optimises the real objective rather than approximating
+ * the picture.
+ */
+export function svmTrain(pts, C = 1, iters = 3000) {
+  let w0 = 0, w1 = 0, b = 0;
+  const N = pts.length || 1;
+  for (let t = 1; t <= iters; t++) {
+    const eta = 1 / (0.05 * t + 1);
+    let g0 = w0, g1 = w1, gb = 0;                 // gradient of 0.5*||w||^2
+    for (const p of pts) {
+      const yi = p.c === 1 ? 1 : -1;
+      if (yi * (w0 * p.x + w1 * p.y + b) < 1) {
+        g0 -= C * yi * p.x; g1 -= C * yi * p.y; gb -= C * yi;
+      }
+    }
+    w0 -= eta * g0 / N; w1 -= eta * g1 / N; b -= eta * gb / N;
+  }
+  const norm = Math.hypot(w0, w1) || 1e-9;
+  const sv = pts.filter((p) => {
+    const yi = p.c === 1 ? 1 : -1;
+    return yi * (w0 * p.x + w1 * p.y + b) <= 1.02;
+  });
+  return { w: [w0, w1], b, margin: 1 / norm, sv };
+}
+
+/* --------------------------- drawing utilities --------------------------- */
+
+const W = 470, H = 400;
+const PAD = { l: 46, r: 18, t: 16, b: 42 };
+
+/** A line through `mid` perpendicular to `vec`, with a label at one end. */
+function boundary(svg, xs, ys, mid, vec, colour, dash, label) {
+  const n = Math.hypot(vec[0], vec[1]) || 1;
+  const ux = -vec[1] / n, uy = vec[0] / n;
+  const L = 12;
+  el('line', {
+    x1: xs(mid[0] - ux * L), y1: ys(mid[1] - uy * L),
+    x2: xs(mid[0] + ux * L), y2: ys(mid[1] + uy * L),
+    stroke: colour, 'stroke-width': 2.6, 'stroke-dasharray': dash || null,
+    'stroke-linecap': 'round',
+  }, svg);
+  if (label) {
+    el('text', {
+      x: xs(mid[0] + ux * 2.3) + 7, y: ys(mid[1] + uy * 2.3),
+      class: 'axis-label', fill: colour,
+    }, svg).textContent = label;
+  }
+}
+
+const stat = (label, value) =>
+  `<div class="stat"><div class="stat__label">${label}</div><div class="stat__value">${value}</div></div>`;
+
+/* ============================== figure 1 ================================= */
+
+export function trialCurve(host, out) {
+  const state = { ceil: 0.531, p: 120, n: 225 };
+  const LO = Math.log10(25), HI = Math.log10(20000);
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    const yTop = 0.85;
+    const xs = scale(LO, HI, PAD.l, W - PAD.r);
+    const ys = scale(0.48, yTop, H - PAD.b, PAD.t);
+    frame(svg, W, H, PAD, xs, ys, {
+      xTicks: [25, 100, 1000, 10000].map(Math.log10),
+      xFmt: (v) => { const n = Math.round(10 ** v); return n >= 1000 ? `${n / 1000}k` : `${n}`; },
+      yTicks: [0.5, 0.6, 0.7, 0.8],
+      yFmt: (v) => v.toFixed(2),
+      xLabel: 'study trials per participant',
+      yLabel: 'achieved AUC',
+    });
+
+    const delta = deltaForAuc(state.ceil);
+    const clamp = (v) => Math.min(yTop, Math.max(0.48, v));
+
+    el('line', {
+      x1: PAD.l, x2: W - PAD.r, y1: ys(clamp(state.ceil)), y2: ys(clamp(state.ceil)),
+      stroke: token('--series-6'), 'stroke-width': 1.6, 'stroke-dasharray': '5 4',
+    }, svg);
+    el('text', {
+      x: W - PAD.r - 3, y: ys(clamp(state.ceil)) - 6, 'text-anchor': 'end',
+      class: 'axis-label', fill: token('--series-6'),
+    }, svg).textContent = `ceiling ${state.ceil.toFixed(3)}`;
+
+    for (const mk of [{ n: 225, t: 'our study phase' }, { n: 720, t: 'feedback task' }]) {
+      const x = xs(Math.log10(mk.n));
+      el('line', {
+        x1: x, x2: x, y1: PAD.t, y2: H - PAD.b,
+        stroke: token('--baseline'), 'stroke-width': 1, 'stroke-dasharray': '3 3',
+      }, svg);
+      el('text', {
+        x: x + 4, y: PAD.t + 11, class: 'axis-label', fill: token('--text-muted'),
+      }, svg).textContent = mk.t;
+    }
+
+    const pts = [];
+    for (let i = 0; i <= 200; i++) {
+      const lx = LO + (HI - LO) * i / 200;
+      pts.push([xs(lx), ys(clamp(achievedAuc(delta, state.p, 10 ** lx)))]);
+    }
+    el('path', {
+      d: linePath(pts), fill: 'none', stroke: token('--series-1'), 'stroke-width': 2.6,
+    }, svg);
+
+    const got = achievedAuc(delta, state.p, state.n);
+    el('circle', {
+      cx: xs(Math.log10(state.n)), cy: ys(clamp(got)), r: 7,
+      fill: token('--surface-1'), stroke: token('--series-1'), 'stroke-width': 3,
+    }, svg);
+
+    const need = trialsForFraction(delta, state.p, 0.9);
+    const frac = (got - 0.5) / Math.max(1e-9, state.ceil - 0.5);
+    out.innerHTML = stat('you would measure', got.toFixed(3))
+      + stat('of the ceiling', `${(100 * frac).toFixed(0)}%`)
+      + stat('trials for 90% of it', need > 5e5 ? '500k+' : Math.round(need).toLocaleString());
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
+/* ============================== figure 2 ================================= */
+
+export function ldaMechanics(host, out) {
+  const state = { rho: 0.75, gamma: 0, step: 3 };
+  const R = 4.6;
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    const xs = scale(-R, R, PAD.l, W - PAD.r);
+    const ys = scale(-R, R, H - PAD.b, PAD.t);
+    frame(svg, W, H, PAD, xs, ys, {
+      xTicks: [], yTicks: [],
+      xLabel: 'a feature (say, Pz at 500 ms)', yLabel: 'another feature',
+    });
+
+    const pts = twoClouds({ n: 90, sep: 1.7, sx: 1, sy: 1, rho: state.rho, seed: 11 });
+    for (const p of pts) {
+      el('circle', {
+        cx: xs(p.x), cy: ys(p.y), r: 3.4,
+        fill: token(p.c === 1 ? '--c-hit' : '--c-miss'), opacity: 0.5,
+      }, svg);
+    }
+
+    const { w, m, S, d } = ldaWeights(pts, state.gamma);
+
+    if (state.step >= 2) {
+      const tr = S[0][0] + S[1][1];
+      const det = S[0][0] * S[1][1] - S[0][1] * S[1][0];
+      const disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+      const l1 = Math.sqrt(Math.max(1e-9, tr / 2 + disc));
+      const l2 = Math.sqrt(Math.max(1e-9, tr / 2 - disc));
+      const th = 0.5 * Math.atan2(2 * S[0][1], S[0][0] - S[1][1]);
+      const unit = xs(1) - xs(0);
+      for (const c of [0, 1]) {
+        el('ellipse', {
+          cx: xs(m[c][0]), cy: ys(m[c][1]), rx: l1 * unit, ry: l2 * unit,
+          transform: `rotate(${-th * 180 / Math.PI} ${xs(m[c][0])} ${ys(m[c][1])})`,
+          fill: 'none', stroke: token('--text-muted'),
+          'stroke-width': 1.6, 'stroke-dasharray': '4 3',
+        }, svg);
+      }
+    }
+
+    for (const c of [0, 1]) {
+      el('circle', {
+        cx: xs(m[c][0]), cy: ys(m[c][1]), r: 7,
+        fill: token(c === 1 ? '--c-hit' : '--c-miss'),
+        stroke: token('--surface-1'), 'stroke-width': 2.5,
+      }, svg);
+    }
+
+    const mid = [(m[0][0] + m[1][0]) / 2, (m[0][1] + m[1][1]) / 2];
+    if (state.step >= 1) boundary(svg, xs, ys, mid, d, token('--series-4'), '5 4', 'difference of means');
+    if (state.step >= 3) boundary(svg, xs, ys, mid, w, token('--series-7'), null, 'LDA');
+
+    let ang = Math.abs(Math.atan2(w[1], w[0]) - Math.atan2(d[1], d[0])) * 180 / Math.PI;
+    if (ang > 180) ang = 360 - ang;
+    if (ang > 90) ang = 180 - ang;
+    out.innerHTML = stat('correlation', state.rho.toFixed(2))
+      + stat('shrinkage &Gamma;', state.gamma.toFixed(2))
+      + stat('angle between the rules', `${ang.toFixed(0)}&deg;`);
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
+/* ============================== figure 3 ================================= */
+
+export function svmMargin(host, out) {
+  const state = { C: 1, sep: 1.9, n: 26 };
+  const R = 4.2;
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    const xs = scale(-R, R, PAD.l, W - PAD.r);
+    const ys = scale(-R, R, H - PAD.b, PAD.t);
+    frame(svg, W, H, PAD, xs, ys, {
+      xTicks: [], yTicks: [],
+      xLabel: 'a feature', yLabel: 'another feature',
+    });
+
+    const pts = twoClouds({ n: state.n, sep: state.sep, sx: 0.85, sy: 0.85, rho: 0.1, seed: 23 });
+    const { w, b, margin, sv } = svmTrain(pts, state.C);
+    const svSet = new Set(sv);
+
+    const n = Math.hypot(w[0], w[1]) || 1e-9;
+    const ux = -w[1] / n, uy = w[0] / n;          // along the boundary
+    const px = w[0] / n, py = w[1] / n;           // across it
+    const cx = -b * w[0] / (n * n), cy = -b * w[1] / (n * n);
+    const L = 12;
+    const mg = Math.min(margin, 6);               // keep the band on screen
+
+    const corner = (s, t) => [xs(cx + ux * s * L + px * t * mg), ys(cy + uy * s * L + py * t * mg)];
+    el('polygon', {
+      points: [corner(-1, 1), corner(1, 1), corner(1, -1), corner(-1, -1)]
+        .map((q) => q.join(',')).join(' '),
+      fill: token('--series-1'), 'fill-opacity': 0.10,
+    }, svg);
+    for (const s of [1, -1]) {
+      el('line', {
+        x1: corner(-1, s)[0], y1: corner(-1, s)[1],
+        x2: corner(1, s)[0], y2: corner(1, s)[1],
+        stroke: token('--series-1'), 'stroke-width': 1.2, 'stroke-dasharray': '4 4',
+      }, svg);
+    }
+    el('line', {
+      x1: xs(cx - ux * L), y1: ys(cy - uy * L),
+      x2: xs(cx + ux * L), y2: ys(cy + uy * L),
+      stroke: token('--series-1'), 'stroke-width': 2.8, 'stroke-linecap': 'round',
+    }, svg);
+
+    for (const p of pts) {
+      const isSv = svSet.has(p);
+      el('circle', {
+        cx: xs(p.x), cy: ys(p.y), r: isSv ? 6 : 4,
+        fill: token(p.c === 1 ? '--c-hit' : '--c-miss'),
+        opacity: isSv ? 1 : 0.38,
+        stroke: isSv ? token('--text-primary') : 'none',
+        'stroke-width': isSv ? 2 : 0,
+      }, svg);
+    }
+
+    out.innerHTML = stat('box constraint C', state.C < 1 ? state.C.toFixed(2) : state.C.toFixed(1))
+      + stat('margin width', (2 * margin).toFixed(2))
+      + stat('points holding the line', `${sv.length} of ${pts.length}`);
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
+/* ============================== figure 4 ================================= */
+
+export function smallN(host, out) {
+  const state = { n: 12, rho: 0.8 };
+  const R = 4.6;
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    const xs = scale(-R, R, PAD.l, W - PAD.r);
+    const ys = scale(-R, R, H - PAD.b, PAD.t);
+    frame(svg, W, H, PAD, xs, ys, {
+      xTicks: [], yTicks: [],
+      xLabel: 'a feature', yLabel: 'another feature',
+    });
+
+    // The answer unlimited data would give. Nobody in a real study sees this.
+    const truth = twoClouds({ n: 400, sep: 1.5, rho: state.rho, seed: 5 });
+    const wTrue = ldaWeights(truth, 0).w;
+    const origin = [0, 0];
+
+    for (let s = 0; s < 5; s++) {
+      const samp = twoClouds({ n: state.n, sep: 1.5, rho: state.rho, seed: 101 + s * 7717 });
+      boundary(svg, xs, ys, origin, ldaWeights(samp, 0).w, token('--series-7'), null, null);
+      boundary(svg, xs, ys, origin, svmTrain(samp, 1, 1200).w, token('--series-6'), null, null);
+    }
+    // Redraw the truth on top so it stays readable.
+    boundary(svg, xs, ys, origin, wTrue, token('--text-primary'), '7 4', null);
+
+    const a0 = Math.atan2(wTrue[1], wTrue[0]);
+    const fold = (a) => { let x = (a - a0) * 180 / Math.PI; while (x > 90) x -= 180; while (x < -90) x += 180; return x; };
+    const errL = [], errS = [];
+    for (let s = 0; s < 20; s++) {
+      const samp = twoClouds({ n: state.n, sep: 1.5, rho: state.rho, seed: 4001 + s * 3313 });
+      const wl = ldaWeights(samp, 0).w;
+      const ws = svmTrain(samp, 1, 1000).w;
+      errL.push(fold(Math.atan2(wl[1], wl[0])));
+      errS.push(fold(Math.atan2(ws[1], ws[0])));
+    }
+    const rms = (a) => Math.sqrt(a.reduce((s, v) => s + v * v, 0) / a.length);
+    out.innerHTML = stat('trials per class', state.n)
+      + stat('LDA error', `${rms(errL).toFixed(0)}&deg;`)
+      + stat('SVM error', `${rms(errS).toFixed(0)}&deg;`);
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}

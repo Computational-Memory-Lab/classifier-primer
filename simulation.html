@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8. How much data would it take? | CML primer</title>
+<meta name="description" content="A live working document on the trial-count simulation: how many trials a memory classifier needs, why, and an in-depth interactive account of what LDA and SVM actually compute.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory Classifiers <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Chapter 8 · working document</p>
+      <h1>How much data would it take?</h1>
+      <p class="lede">
+        Our classifiers reach about 0.53. The obvious explanation is that we do not
+        have enough data — so we simulated brains where we knew the right answer, and
+        asked exactly how much would be enough.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>This page grows with the project.</strong> Everything below is
+          current as of the runs described, and figures marked <em>live</em> compute
+          in your browser from the same formulas the cluster runs used. Where a
+          result was withdrawn, it says so rather than disappearing.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ THE PROBLEM ============================ -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>The thing that limits us is not what we assumed</h2>
+      <p>
+        A classifier looking at study-phase EEG gets 120 numbers per trial — ten
+        electrodes at twelve time points. It has to work out how much weight to put
+        on each of those 120 numbers. To do that it uses the trials you give it.
+      </p>
+      <p>
+        Each participant studies <strong>225 words</strong>. Cross-validation holds
+        some back, so the classifier learns from about 202. That is
+        <strong>202 examples to pin down 120 weights</strong> — fewer than two
+        examples per weight. Its answer is mostly noise.
+      </p>
+      <p>
+        How badly this bites depends on how strong the memory effect is, and it
+        depends on it <em>squared</em>. Halve the effect and you need four times the
+        trials. Our effect is small, so the requirement grows fast.
+      </p>
+      <p>
+        Simulation gave a closed form, and it matched the measured curves to about
+        0.007 AUC across the whole grid:
+      </p>
+      <p style="text-align:center; font-size:1.05rem;">
+        trials needed &nbsp;=&nbsp; 4 &times; (number of features) &divide; (effect size)<sup>2</sup>
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">What a given experiment would actually measure <em>· live</em></div>
+      <div class="figure__sub">
+        Move the sliders. The curve is the closed form; the dot is the experiment you
+        just described.
+      </div>
+      <div class="controls">
+        <label class="field">
+          True effect (ceiling AUC)
+          <input type="range" id="tc-ceil" min="520" max="800" value="531">
+          <output id="tc-ceil-out"></output>
+        </label>
+        <label class="field">
+          Features
+          <input type="range" id="tc-p" min="10" max="280" step="10" value="120">
+          <output id="tc-p-out"></output>
+        </label>
+        <label class="field">
+          Trials per participant
+          <input type="range" id="tc-n" min="0" max="1000" value="430">
+          <output id="tc-n-out"></output>
+        </label>
+      </div>
+      <div id="tc-plot"></div>
+      <div class="stats" id="tc-out"></div>
+      <div class="figure__note">
+        Set the ceiling to 0.531 (our study-phase number), features to 120 and trials
+        to 225 — the actual experiment. Then try raising trials alone, and watch how
+        little it buys. Then drop features instead.
+      </div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <p>
+          <strong>Trials are not the lever.</strong> At our effect size, going from 225
+          to 1,800 trials — an eight-fold longer experiment — moves AUC by about 0.06.
+          Halving the feature count is worth roughly a quarter of that, for free.
+        </p>
+      </div>
+      <p>
+        There is a second lever, and it turned out to matter more than the first. It
+        is not <em>how many</em> numbers the classifier gets but <em>where the memory
+        signal sits</em> among them. To explain that we have to look at what these
+        classifiers actually do.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================== LDA ================================== -->
+  <section class="chapter">
+    <div class="prose">
+      <p class="eyebrow">In depth</p>
+      <h2>What LDA actually computes</h2>
+      <p>
+        Linear discriminant analysis is usually described as “drawing a line between
+        two clouds”. That is the output, not the method, and the difference is the
+        whole reason it struggles with few trials.
+      </p>
+
+      <h3>Step 1 — the obvious answer, and why it is wrong</h3>
+      <p>
+        Take the average of the remembered trials and the average of the forgotten
+        trials. Draw the line connecting them, and separate along it. That is the
+        <strong>difference of means</strong>, and it is right only when the features
+        are unrelated to each other.
+      </p>
+      <p>
+        They are not. Neighbouring electrodes and adjacent time points measure
+        overlapping activity, so the cloud of trials is stretched along some
+        directions and squashed along others. When that happens, the direction that
+        separates the two averages is <em>not</em> the direction that separates the
+        two clouds.
+      </p>
+
+      <h3>Step 2 — measure the shape of the noise</h3>
+      <p>
+        LDA measures how the features vary together within each class — the dashed
+        ellipses below. That shape tells it which directions are already noisy, so
+        that a difference along a noisy direction counts for less than the same
+        difference along a quiet one.
+      </p>
+
+      <h3>Step 3 — divide the signal by the noise</h3>
+      <p>
+        LDA multiplies the difference of means by the inverse of that shape. In effect
+        it stretches the space until the clouds are round, finds the connecting line
+        <em>there</em>, and maps it back. The result is the purple line.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The two rules, and when they part company <em>· live</em></div>
+      <div class="figure__sub">
+        Yellow is the difference of means. Purple is LDA. Increase the correlation and
+        watch them separate.
+      </div>
+      <div class="controls">
+        <div class="segmented" id="lda-steps" role="group" aria-label="Build up">
+          <button class="btn" data-step="1">1 · difference of means</button>
+          <button class="btn" data-step="2">2 · shape of the noise</button>
+          <button class="btn btn--primary" data-step="3">3 · LDA</button>
+        </div>
+        <label class="field">
+          Correlation between features
+          <input type="range" id="lda-rho" min="0" max="95" value="75">
+          <output id="lda-rho-out"></output>
+        </label>
+        <label class="field">
+          Shrinkage &Gamma;
+          <input type="range" id="lda-gamma" min="0" max="100" value="0">
+          <output id="lda-gamma-out"></output>
+        </label>
+      </div>
+      <div id="lda-plot"></div>
+      <div class="stats" id="lda-out"></div>
+      <div class="figure__note">
+        At zero correlation the two rules coincide. Push correlation to 0.9 and they
+        diverge sharply — that gap is the work LDA is doing.
+      </div>
+    </div>
+
+    <div class="prose">
+      <h3>Step 4 — the catch, and what shrinkage is for</h3>
+      <p>
+        Dividing by the shape of the noise requires <em>knowing</em> the shape of the
+        noise, and with 120 features that means estimating 7,260 separate quantities
+        from 202 trials. There is nowhere near enough data. The estimate is unstable,
+        and inverting an unstable estimate amplifies its errors.
+      </p>
+      <p>
+        <strong>Shrinkage</strong> is the standard patch. The parameter &Gamma; pulls
+        the measured shape toward a simple one: at &Gamma;&nbsp;=&nbsp;0 LDA trusts
+        the measurement completely, and at &Gamma;&nbsp;=&nbsp;1 it ignores the
+        correlations entirely and treats every feature separately. Drag the &Gamma;
+        slider above and watch the purple line swing back toward the yellow one — that
+        is exactly what maximum shrinkage does.
+      </p>
+      <div class="callout callout--warn">
+        <p>
+          Our published study-phase analysis runs at <strong>&Gamma;&nbsp;=&nbsp;1</strong>,
+          the maximum. That is not a tuning choice so much as an admission: with 202
+          trials and 120 features there is not enough data to estimate the correlations
+          at all, so the pipeline throws them away.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== SVM ================================== -->
+  <section class="chapter">
+    <div class="prose">
+      <p class="eyebrow">In depth</p>
+      <h2>What a support vector machine actually computes</h2>
+      <p>
+        The SVM starts from a different question. LDA asks “given the shape of the
+        noise, which direction separates the averages best?” The SVM asks
+        <strong>“of all the lines that separate these points, which one leaves the
+        most room?”</strong>
+      </p>
+
+      <h3>Step 1 — the widest street</h3>
+      <p>
+        Between two separable clouds there are infinitely many lines that work. The
+        SVM picks the one with the widest empty corridor around it — the shaded band
+        below. The width of that band is the <strong>margin</strong>, and maximising
+        it is the entire objective.
+      </p>
+
+      <h3>Step 2 — most of your data is irrelevant</h3>
+      <p>
+        Only the points touching the edge of the corridor hold it in place. Those are
+        the <strong>support vectors</strong>, drawn with heavy outlines. Every other
+        point could be moved — as long as it stays on its own side and outside the
+        band — and the boundary would not shift by a hair.
+      </p>
+      <p>
+        This is the sharpest difference from LDA. LDA uses every trial, because every
+        trial contributes to the averages and to the noise shape. An SVM effectively
+        uses a handful.
+      </p>
+
+      <h3>Step 3 — C, and what happens when the clouds overlap</h3>
+      <p>
+        Real classes overlap, so no line separates them cleanly. The SVM allows
+        violations and charges for them, and <strong>C</strong> sets the price. Low C
+        buys a wide corridor by tolerating points inside it; high C insists on
+        classifying the training data correctly even if the corridor collapses to
+        nothing. Low C is a stronger constraint on the model, not a weaker one.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Margin, support vectors, and the price of violations <em>· live</em></div>
+      <div class="figure__sub">
+        Heavy outlines are the support vectors — the only points holding the boundary.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Box constraint C
+          <input type="range" id="svm-c" min="0" max="100" value="40">
+          <output id="svm-c-out"></output>
+        </label>
+        <label class="field">
+          How separable
+          <input type="range" id="svm-sep" min="20" max="340" value="190">
+          <output id="svm-sep-out"></output>
+        </label>
+        <label class="field">
+          Trials per class
+          <input type="range" id="svm-n" min="8" max="60" value="26">
+          <output id="svm-n-out"></output>
+        </label>
+      </div>
+      <div id="svm-plot"></div>
+      <div class="stats" id="svm-out"></div>
+      <div class="figure__note">
+        Push the clouds together and watch the support-vector count climb: when
+        classes overlap, almost every point ends up holding the boundary.
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================== THE COMPARISON =========================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>Why the two behave differently when trials are scarce</h2>
+      <p>
+        Put the two accounts side by side and the prediction falls out. LDA must
+        estimate the shape of the noise, and that estimate needs a lot of data. The
+        SVM never estimates it at all — it only needs to know which points sit near
+        the boundary. So when trials are scarce, LDA should degrade faster.
+      </p>
+      <p>
+        The figure below trains both methods five times on five small samples drawn
+        from the same underlying truth. The dashed black line is the answer you would
+        get with unlimited data. The coloured lines are what each method concluded
+        from its small sample.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Five small samples, same truth <em>· live</em></div>
+      <div class="figure__sub">
+        Purple: LDA. Orange: SVM. Dashed black: the truth. Spread away from the dashed
+        line is error.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Trials per class
+          <input type="range" id="sn-n" min="6" max="80" value="12">
+          <output id="sn-n-out"></output>
+        </label>
+        <label class="field">
+          Correlation between features
+          <input type="range" id="sn-rho" min="0" max="95" value="80">
+          <output id="sn-rho-out"></output>
+        </label>
+      </div>
+      <div id="sn-plot"></div>
+      <div class="stats" id="sn-out"></div>
+      <div class="figure__note">
+        The error figures are the root-mean-square angle away from the truth over 24
+        independent samples. Drop the trial count to 6 and the gap opens up.
+      </div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <p>
+          <strong>The simulation confirmed this on real feature counts.</strong> With
+          120 features and 50 trials, LDA scored <strong>0.440</strong> — below chance,
+          fitting noise and generalising worse than guessing — while the SVM stayed
+          above 0.5 throughout. From about 225 trials on, the two become
+          indistinguishable.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ FINDINGS =============================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>What the runs found</h2>
+      <p>
+        Two stages so far. Stage 1 used made-up numbers where the right answer was
+        known exactly. Stage 2 simulated an actual electrical source in a model head,
+        so that physics — not us — decided where the memory signal landed.
+      </p>
+
+      <h3>Confirmed</h3>
+      <ul>
+        <li>
+          <strong>The trial requirement scales as 4p/&Delta;&sup2;.</strong> Simulation
+          matched the closed form to a median of 0.007 AUC across the grid.
+        </li>
+        <li>
+          <strong>Fewer features buys real AUC.</strong> At 1,800 trials: 30 features
+          reach 0.634, 240 features reach 0.579.
+        </li>
+        <li>
+          <strong>Where the signal sits decides everything.</strong> Same effect size,
+          three placements, 1,800 trials: in the components that vary most it recovers
+          91% of the ceiling; spread evenly, 55%; in the components that barely vary,
+          7% — indistinguishable from chance.
+        </li>
+        <li>
+          <strong>A physically generated memory effect lands in the good place.</strong>
+          About 70% of its energy falls in the top tenth of components, where an
+          arbitrary signal would put 10% there.
+        </li>
+        <li>
+          <strong>The ten electrodes we use are well chosen.</strong> They beat random
+          tens by 0.08–0.14. But 64 electrodes reach 0.90 against their 0.82, and
+          twenty electrodes spread to the edges do no better than the ten — placement,
+          not count.
+        </li>
+      </ul>
+
+      <h3>Withdrawn</h3>
+      <p>
+        Two predictions made during this work turned out to be wrong, and the runs are
+        what showed it.
+      </p>
+      <ul>
+        <li>
+          <strong>That our scoring method was deflating the numbers.</strong> Measured
+          at &minus;0.001. It is unbiased. It adds noise, not bias.
+        </li>
+        <li>
+          <strong>That correlated features would cut the requirement 7–12&times;.</strong>
+          Real features carry only ~9.5 independent dimensions out of 120, which
+          looked like a large saving. It is not: a signal spread evenly across all
+          directions gains nothing, because the ones that barely vary are exactly the
+          ones estimated worst. The saving is real only for a signal that concentrates
+          where the variance is — which, per Stage 2, a real one does.
+        </li>
+      </ul>
+
+      <h3>Known limitation</h3>
+      <p>
+        The simulated features are almost perfectly smooth; real ones are not. A
+        standard measure of how often extreme values occur reads 3 for well-behaved
+        data. Our simulation gives 2.9. Real recordings give 23, and some participants
+        exceed 100 — blinks, muscle activity and transients that survive cleaning.
+        Second-order structure reproduces well; the tails do not. Every simulated
+        number here carries that caveat.
+      </p>
+    </div>
+  </section>
+
+  <section class="chapter">
+    <div class="prose">
+      <h2>The conclusion</h2>
+      <p>
+        Putting the formula together with where real effects sit gives a defensible
+        number rather than a worst case. Read the placement result as an
+        <strong>effective feature count</strong> — the number that reproduces what we
+        measured. A signal concentrated in the components that vary most behaves like
+        <strong>31</strong> features rather than 120; one spread evenly behaves like
+        <strong>318</strong>, which is worse than the nominal count.
+      </p>
+      <p>Applied to our own memory effect, an AUC of 0.531:</p>
+    </div>
+
+    <div class="figure">
+      <div class="figure__title">Trials the study-phase effect would actually need</div>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>assumption</th><th>noise = signal</th><th>90% of the ceiling</th></tr></thead>
+          <tbody>
+            <tr><td>best case (behaves like 31 features)</td><td><strong>10,100</strong></td><td>43,100</td></tr>
+            <tr><td>naive (120 features)</td><td>39,700</td><td>168,800</td></tr>
+            <tr><td>worst case (behaves like 318)</td><td>105,200</td><td>447,500</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="figure__note">We collect 225. Even the optimistic figure is 45 times that.</div>
+    </div>
+
+    <div class="prose">
+      <p>
+        The inverse is the more useful form. Rather than asking how many trials a weak
+        effect needs, ask how strong an effect a given study can handle. For the
+        classifier to recover 90% of what it is given:
+      </p>
+    </div>
+
+    <div class="figure">
+      <div class="figure__title">How large an effect would have to be</div>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>trials</th><th>best case</th><th>nominal</th></tr></thead>
+          <tbody>
+            <tr><td><strong>225</strong> (our study phase)</td><td><strong>AUC 0.825</strong></td><td>0.930</td></tr>
+            <tr><td>900</td><td>0.698</td><td>0.822</td></tr>
+            <tr><td>1,800</td><td>0.646</td><td>0.757</td></tr>
+            <tr><td>7,200</td><td>0.576</td><td>0.644</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="figure__note">
+        Our subsequent-memory effect is 0.531. The feedback task's time-frequency arm
+        is 0.722 — which is why that one works and this one does not.
+      </div>
+    </div>
+
+    <div class="prose">
+      <h3>Why every pipeline comparison we have run came out flat</h3>
+      <p>
+        At 225 trials with 120 features and a 0.531 effect, the classifier recovers
+        <strong>7.5%</strong> of the effect it is given. Attenuation that severe does
+        not merely lower the number — <strong>it compresses the differences between
+        pipelines by the same factor.</strong>
+      </p>
+      <p>So if one preprocessing choice genuinely beat another, we would measure:</p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>true A</th><th>true B</th><th>what we measure</th></tr></thead>
+          <tbody>
+            <tr><td>0.531</td><td>0.550</td><td>0.004</td></tr>
+            <tr><td>0.531</td><td>0.580</td><td>0.013</td></tr>
+            <tr><td>0.531</td><td>0.600</td><td>0.022</td></tr>
+            <tr><td>0.531</td><td>0.650</td><td>0.051</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        With 62 participants we can resolve about 0.02–0.03. Put the two together: a
+        preprocessing change would have to be worth roughly <strong>0.07 AUC in
+        truth</strong> before it became visible to us at all — and no preprocessing
+        change is worth that.
+      </p>
+      <div class="keypoint">
+        <p>
+          So the near-identical rows in our parameter sweeps — raw, filtered and
+          Laplacian within 0.001–0.014 of each other — were never evidence that those
+          choices do not matter. <strong>They are what this design produces whether or
+          not the choices matter.</strong> The sweeps could not have resolved a
+          realistic difference, and running more of them at this trial count cannot
+          change that.
+        </p>
+      </div>
+      <p>
+        That is the main result, and it is a statement about the experiment's design
+        rather than about preprocessing.
+      </p>
+
+      <h3>What we tested on real data, and what it showed</h3>
+      <p>
+        If the signal concentrates in about ten components, compressing the 120
+        features down to those ten before classifying should keep the signal and cut
+        the estimation burden. We ran it on two datasets.
+      </p>
+      <ul>
+        <li>
+          <strong>Study phase</strong> (1.7 training examples per weight):
+          compression gave <strong>+0.012</strong>, peaking at 10–20 components —
+          exactly the predicted shape. But <em>p</em> = 0.21, below the 0.025 this
+          dataset can resolve. It could not answer.
+        </li>
+        <li>
+          <strong>Feedback task</strong> (19 examples per weight): compression gave
+          <strong>+0.0002</strong>, <em>p</em> = 0.96. Nothing — on a dataset with the
+          power to detect something.
+        </li>
+      </ul>
+      <p>
+        Which is the predicted result, not a failed prediction. Compression is a
+        remedy for having more weights than examples, and the feedback task does not
+        have that problem. The intervention helps where the theory says it should and
+        is inert where it says it should be. It is a targeted fix, not a general
+        improvement to bolt onto the pipeline.
+      </p>
+
+      <h3>What follows</h3>
+      <ol>
+        <li>
+          <strong>Stop running pipeline comparisons at 225 trials.</strong> They
+          cannot answer the question asked of them, and a null from them means
+          nothing.
+        </li>
+        <li>
+          <strong>The levers are effect size and effective dimensionality</strong>, in
+          that order. Trials enter linearly; the effect enters squared. A paradigm
+          change that doubles the effect beats any achievable increase in session
+          length.
+        </li>
+        <li>
+          <strong>A learned low-dimensional representation is the one intervention
+          that moves the right quantity.</strong> It attacks effective dimensionality
+          directly, which no amount of extra recording does.
+        </li>
+      </ol>
+      <p class="small muted">
+        Every figure here assumes near-Gaussian features, and real ones are not
+        (kurtosis 23 against the simulator's 2.9). Treat these as accurate in order of
+        magnitude and in their ratios, not in the third decimal.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager" aria-label="Chapter navigation"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab · a working document, updated as the project runs.
+  </div>
+</footer>
+
+<script type="module">
+  import { initChrome } from './assets/site.js';
+  import { trialCurve, ldaMechanics, svmMargin, smallN } from './assets/simulation.js';
+
+  initChrome();
+
+  /* ---------- figure 1 ---------- */
+  const tc = trialCurve(document.getElementById('tc-plot'), document.getElementById('tc-out'));
+  const tcCeil = document.getElementById('tc-ceil');
+  const tcP = document.getElementById('tc-p');
+  const tcN = document.getElementById('tc-n');
+  const nFromSlider = (v) => Math.round(25 * Math.pow(20000 / 25, v / 1000));
+  const syncTc = () => {
+    tc.state.ceil = +tcCeil.value / 1000;
+    tc.state.p = +tcP.value;
+    tc.state.n = nFromSlider(+tcN.value);
+    document.getElementById('tc-ceil-out').textContent = tc.state.ceil.toFixed(3);
+    document.getElementById('tc-p-out').textContent = tc.state.p;
+    document.getElementById('tc-n-out').textContent = tc.state.n.toLocaleString();
+    tc.refresh();
+  };
+  [tcCeil, tcP, tcN].forEach((s) => s.addEventListener('input', syncTc));
+  syncTc();
+
+  /* ---------- figure 2 ---------- */
+  const lda = ldaMechanics(document.getElementById('lda-plot'), document.getElementById('lda-out'));
+  const ldaRho = document.getElementById('lda-rho');
+  const ldaGam = document.getElementById('lda-gamma');
+  const syncLda = () => {
+    lda.state.rho = +ldaRho.value / 100;
+    lda.state.gamma = +ldaGam.value / 100;
+    document.getElementById('lda-rho-out').textContent = lda.state.rho.toFixed(2);
+    document.getElementById('lda-gamma-out').textContent = lda.state.gamma.toFixed(2);
+    lda.refresh();
+  };
+  [ldaRho, ldaGam].forEach((s) => s.addEventListener('input', syncLda));
+  document.querySelectorAll('#lda-steps .btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      lda.state.step = +b.dataset.step;
+      document.querySelectorAll('#lda-steps .btn').forEach((o) => o.classList.toggle('btn--primary', o === b));
+      lda.refresh();
+    });
+  });
+  syncLda();
+
+  /* ---------- figure 3 ---------- */
+  const svm = svmMargin(document.getElementById('svm-plot'), document.getElementById('svm-out'));
+  const svmC = document.getElementById('svm-c');
+  const svmSep = document.getElementById('svm-sep');
+  const svmN = document.getElementById('svm-n');
+  const syncSvm = () => {
+    svm.state.C = Math.pow(10, -1.5 + 3 * (+svmC.value / 100));
+    svm.state.sep = +svmSep.value / 100;
+    svm.state.n = +svmN.value;
+    document.getElementById('svm-c-out').textContent = svm.state.C < 1 ? svm.state.C.toFixed(2) : svm.state.C.toFixed(1);
+    document.getElementById('svm-sep-out').textContent = svm.state.sep.toFixed(2);
+    document.getElementById('svm-n-out').textContent = svm.state.n;
+    svm.refresh();
+  };
+  [svmC, svmSep, svmN].forEach((s) => s.addEventListener('input', syncSvm));
+  syncSvm();
+
+  /* ---------- figure 4 ---------- */
+  const sn = smallN(document.getElementById('sn-plot'), document.getElementById('sn-out'));
+  const snN = document.getElementById('sn-n');
+  const snRho = document.getElementById('sn-rho');
+  const syncSn = () => {
+    sn.state.n = +snN.value;
+    sn.state.rho = +snRho.value / 100;
+    document.getElementById('sn-n-out').textContent = sn.state.n;
+    document.getElementById('sn-rho-out').textContent = sn.state.rho.toFixed(2);
+    sn.refresh();
+  };
+  [snN, snRho].forEach((s) => s.addEventListener('input', syncSn));
+  syncSn();
+</script>
+
+</body>
+</html>
