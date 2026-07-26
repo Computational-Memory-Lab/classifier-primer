@@ -426,9 +426,35 @@ export function simulateTrials(cfg) {
   const gain = chans.map((c) => dipolePotential(c.pos, pos, mom));
   const gmax = Math.max(...gain.map(Math.abs)) || 1;
 
+  /* A fresh 1/f draw per channel per trial costs O(harmonics x samples) each,
+     which measured 4.5 s at 64 channels x 600 trials -- unusable behind a
+     slider. Draw a pool once and sample it with a random sign instead. With 96
+     traces the chance two channels in a trial share one is small, and the
+     spectral character is identical either way. */
+  const POOL = 96;
+  const pool = [];
+  for (let i = 0; i < POOL; i++) pool.push(noiseWave(t, 1, noiseAmp, rand));
+
+  /* Labels are balanced and then SHUFFLED with an independent generator.
+     They used to be `k % 2`, which ties the class to the trial's position in
+     the generation stream -- and the xorshift32 here has a small but consistent
+     even/odd bias (even draws average ~0.005 above odd, same sign at every seed
+     tested). That leaked a real class difference into a zero-effect condition
+     and pushed the null check to 0.519, t = 2.03 against chance. Decoupling the
+     label from the stream removes it. A null check that is quietly off is worse
+     than no null check. */
+  const lab = [];
+  for (let k = 0; k < nTrials; k++) lab.push(k % 2);
+  const shuf = rng((seed * 7919 + 13) >>> 0);
+  for (let i = lab.length - 1; i > 0; i--) {
+    const j = (shuf() * (i + 1)) | 0;
+    [lab[i], lab[j]] = [lab[j], lab[i]];
+  }
+
+  const per = Math.floor(t.length / nBins);
   const X = [], y = [];
   for (let k = 0; k < nTrials; k++) {
-    const cls = k % 2;
+    const cls = lab[k];
     const peaks = [
       { amp: 6, lat: 120, width: 60 },
       { amp: 4 + (cls ? effect : 0), lat: 400, width: 160 },
@@ -437,12 +463,11 @@ export function simulateTrials(cfg) {
     const row = [];
     for (let c = 0; c < chans.length; c++) {
       const g = gain[c] / gmax;
-      const nz = noiseWave(t, 1, noiseAmp, rand);
-      const sig = src.map((v, i) => v * g + nz[i]);
-      const per = Math.floor(t.length / nBins);
+      const nz = pool[(rand() * POOL) | 0];
+      const sgn = rand() < 0.5 ? -1 : 1;
       for (let b = 0; b < nBins; b++) {
         let sm = 0;
-        for (let i = b * per; i < (b + 1) * per; i++) sm += sig[i];
+        for (let i = b * per; i < (b + 1) * per; i++) sm += src[i] * g + sgn * nz[i];
         row.push(sm / per);
       }
     }
@@ -481,16 +506,18 @@ export function decodeView(host, out) {
   function draw() {
     const W = 640, H = 300, PAD = { l: 58, r: 18, t: 14, b: 42 };
     const svg = svgRoot(host, W, H);
-    const { X, y } = simulate();
+
+    /* Simulate ONCE at the largest trial count on the ladder, then take
+       prefixes -- so a point drawn at 640 trials really was fitted on 640
+       trials. Slicing a smaller fixed pool made every point past its size
+       reuse the same data and plot an identical AUC at different x, which read
+       as the curve flattening when nothing of the sort had happened. */
+    const NS = [40, 80, 160, 320, 640, 1280];
+    const { X, y } = simulateTrials({ ...state, nTrials: Math.max(...NS) });
     const p = X[0].length;
 
-    // measured AUC as trials grow
-    const ns = [40, 80, 160, 320, 640, 1280].filter((v) => v <= state.nTrials * 4);
-    const measured = ns.map((n) => {
-      const k = Math.min(n, X.length);
-      return { n, a: fitScore(X.slice(0, k), y.slice(0, k)) };
-    });
-    const observed = fitScore(X, y);
+    const measured = NS.map((n) => ({ n, a: fitScore(X.slice(0, n), y.slice(0, n)) }));
+    const observed = fitScore(X.slice(0, state.nTrials), y.slice(0, state.nTrials));
 
     const xs = scale(Math.log10(30), Math.log10(2000), PAD.l, W - PAD.r);
     const ys = scale(0.45, 1.0, H - PAD.b, PAD.t);
@@ -508,6 +535,13 @@ export function decodeView(host, out) {
       el('circle', { cx: xs(Math.log10(d.n)), cy: ys(d.a), r: 4.5,
         fill: token('--page'), stroke: token('--series-6') || '#eb6834', 'stroke-width': 2 }, svg);
     }
+
+    // where the trials slider currently sits
+    el('circle', { cx: xs(Math.log10(state.nTrials)), cy: ys(observed), r: 7,
+      fill: token('--series-7') || '#2a78d6', stroke: token('--page'), 'stroke-width': 2 }, svg);
+    el('text', { x: xs(Math.log10(state.nTrials)), y: ys(observed) - 14,
+      'text-anchor': 'middle', fill: token('--text-secondary'), 'font-size': 11 }, svg)
+      .textContent = `your setting: ${observed.toFixed(3)}`;
 
     out.innerHTML = [
       ['features', p],

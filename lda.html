@@ -485,16 +485,34 @@
           <tbody>
             <tr><td><strong>0</strong></td><td>the measured covariance, completely</td><td>a full noise-cancelling filter</td></tr>
             <tr><td>between</td><td>partly — pulled toward round</td><td>a filter, damped</td></tr>
-            <tr><td><strong>1</strong></td><td>nothing; assume all features independent and equally noisy</td><td>exactly the difference of means</td></tr>
+            <tr><td><strong>1</strong></td><td>features are unrelated to each other, though still individually noisy</td><td>each feature's difference divided by its own variance</td></tr>
           </tbody>
         </table>
       </div>
       <p>
         That last row is worth sitting with. <strong>&Gamma; = 1 throws away every
-        off-diagonal entry of Σ</strong> and collapses LDA back to the naive
-        difference-of-means rule from §4. Every noise-cancelling weight — every Oz —
-        goes to zero.
+        off-diagonal entry of Σ.</strong> What survives is each feature's difference
+        scaled by how noisy that feature is on its own — a sensible rule, and one that
+        is <em>blind to every relationship between features</em>. Every noise-cancelling
+        weight, every Oz, goes to zero, because cancelling noise requires knowing that
+        two features share it.
       </p>
+      <div class="callout">
+        <p>
+          <strong>Two different things get called &Gamma; = 1, and the difference is
+          worth pinning down.</strong> The formula above shrinks the covariance toward
+          <em>ν</em><strong>I</strong> — a sphere — so at &Gamma; = 1 every feature is
+          treated as equally noisy and the weights become the raw difference of means.
+          That is Blankertz et al.'s convention. <strong>MATLAB's
+          <code>fitcdiscr</code>, which is what our pipeline runs, shrinks the
+          <em>correlation</em> matrix toward the identity and keeps each feature's own
+          variance.</strong> So our &Gamma; = 1 gives difference-of-means
+          <em>divided by variance</em>, not the raw difference. Both discard all
+          cross-feature structure, which is the point that matters here; they differ in
+          whether the surviving weights are still scaled per feature. The live figure
+          above follows MATLAB's convention, so it matches our pipeline.
+        </p>
+      </div>
       <p>
         The elegant part is that the mixing weight can be computed rather than tuned.
         Ledoit &amp; Wolf (2004), in the form given by Schäfer &amp; Strimmer (2005),
@@ -582,9 +600,15 @@
         </p>
       </div>
       <p>
-        A neat consequence: at &Gamma; = 1 the filter <em>is</em> the pattern, since all
-        the covariance correction has been removed. So the one setting whose weights are
-        safe to interpret is also the one that throws away the most information.
+        There is a consequence worth stating carefully, because it is easy to get
+        slightly wrong. Under the shrink-toward-a-sphere convention, &Gamma; = 1 makes
+        the filter <em>equal</em> the pattern — the weight map becomes the difference of
+        means and is safe to read. Under MATLAB's convention, which is ours, &Gamma; = 1
+        makes the filter the pattern <em>divided by each feature's variance</em>: much
+        closer to interpretable than a full filter, but still not a difference map, and
+        still capable of exaggerating a quiet feature. Either way the direction of the
+        trade is the same — <strong>the settings whose weights are easiest to interpret
+        are the ones that have thrown away the most information.</strong>
       </p>
     </div>
   </section>
@@ -611,7 +635,8 @@
         <table class="data data--prose">
           <thead><tr><th>classifier</th><th>what it estimates</th><th>trials needed</th></tr></thead>
           <tbody>
-            <tr><td>means only (&Gamma; = 1)</td><td>2 × 120 numbers</td><td>1.2 × features ≈ 144</td></tr>
+            <tr><td>Euclidean — means only</td><td>2 × 120 numbers</td><td>1.2 × features ≈ 144</td></tr>
+            <tr><td>our &Gamma; = 1 — means + one variance each</td><td>+ 120 numbers</td><td>between the two</td></tr>
             <tr><td><strong>full LDA (&Gamma; = 0)</strong></td><td>+ 7,260 covariance numbers</td><td><strong>4.0 × features ≈ 480</strong></td></tr>
             <tr><td>separate covariance per class</td><td>+ 7,260 more</td><td>10–32 × features</td></tr>
           </tbody>
@@ -621,7 +646,10 @@
         We train on 202. So full LDA is roughly a factor of 2.4 short, and even the
         means-only version is marginal. That 1.2-versus-4.0 gap is the entire case for
         shrinkage, derived analytically decades before we measured the same thing by
-        simulation.
+        simulation. Raudys &amp; Jain do not tabulate the middle row — diagonal LDA is
+        not one of the classifiers they costed — but it estimates 120 numbers more than
+        the Euclidean rule and 7,260 fewer than the full one, so it necessarily sits
+        between them.
       </p>
       <p>
         The figure below shows the consequence directly: how far the learned direction

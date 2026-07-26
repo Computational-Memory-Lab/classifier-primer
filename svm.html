@@ -603,8 +603,9 @@
       <div class="stats" id="sn-out"></div>
       <div class="figure__note">
         At high correlation LDA suffers more, because correlation is precisely what it
-        is trying to estimate. At low correlation there is little between them — which
-        is roughly what we observe on real data, where the two agree to about 0.01 AUC.
+        is trying to estimate. Drag trials down and the two converge on being equally
+        bad — which is what we see on our study-phase data, where they agree to about
+        0.01 AUC. On a dataset with enough trials they separate: see §10.
       </div>
     </div>
   </section>
@@ -627,8 +628,9 @@
         on fewer trials: LDA's Gaussian story is a strong constraint that does real work
         when data are scarce. Dropping it means nothing fills the gap. This is the
         standard trade, and at 1.7 trials per weight it does not obviously favour SVM —
-        which is consistent with what we see, the two landing within about 0.01 AUC of
-        each other.
+        which is consistent with what we see on the study-phase data, where the two land
+        within about 0.01 AUC of each other. Where there <em>are</em> enough trials, the
+        trade resolves in LDA's favour; §10 has the numbers.
       </p>
 
       <h3>Where it genuinely fails</h3>
@@ -677,11 +679,19 @@
 
       <h3>The honest summary of LDA versus SVM here</h3>
       <p>
-        On our data they perform almost identically, and the reason is
-        <a href="simulation.html">the trial-count result</a>: at 1.7 trials per weight
-        both are dominated by estimation noise, and the difference between two
-        reasonable estimators is small compared with the noise both are drowning in.
-        Choosing between them is not where the gains are.
+        On the study-phase data they perform almost identically, and
+        <a href="simulation.html">the trial-count result</a> says why: at 1.7 trials per
+        weight both are dominated by estimation noise, and the difference between two
+        reasonable estimators is small next to the noise both are drowning in. On that
+        dataset, choosing between them is not where the gains are.
+      </p>
+      <p>
+        <strong>It would be a mistake to generalise that.</strong> On the feedback task,
+        with 19 examples per weight, LDA beats SVM by 0.064 — so the equivalence is a
+        symptom of the study-phase design rather than a fact about the two models. This
+        is the same trap as the flat preprocessing sweeps: at 1.7 examples per weight
+        almost everything looks like it does not matter, and almost nothing has actually
+        been tested.
       </p>
     </div>
   </section>
@@ -699,19 +709,35 @@
             <tr><td>trials per weight</td><td><strong>1.7</strong></td><td>19</td></tr>
             <tr><td>kernel</td><td>linear</td><td>linear</td></tr>
             <tr><td>standardised</td><td>yes — required, see §7</td><td>yes</td></tr>
-            <tr><td>AUC</td><td>≈ 0.53</td><td>0.716 (time–frequency features)</td></tr>
+            <tr><td>AUC</td><td>≈ 0.53</td><td><strong>0.658</strong> (time–frequency features)</td></tr>
+            <tr><td>LDA on the same data</td><td>≈ 0.53</td><td><strong>0.722</strong></td></tr>
           </tbody>
         </table>
       </div>
       <p>
-        SVM and LDA land within roughly 0.01 AUC of each other on both datasets. Given
-        §8, that is the expected result rather than a surprising one: two different
-        reasonable ways of drawing a line, both limited by the same shortage of trials.
+        That last row is the interesting one, and it corrects a tempting story. On the
+        <em>study-phase</em> data the two land within about 0.01 of each other, which
+        invites the conclusion that the choice of classifier does not matter. On the
+        feedback data, where there are 19 training examples per weight instead of 1.7,
+        <strong>LDA beats SVM by 0.064</strong> — a gap far larger than anything our
+        preprocessing sweeps ever produced.
       </p>
+      <div class="keypoint">
+        <p>
+          <strong>So the two models look equivalent only when both are starved.</strong>
+          At 1.7 examples per weight neither can estimate anything and they tie at the
+          floor. Give them enough data and a real difference appears, in LDA's favour —
+          which fits §9: LDA's Gaussian assumption is a genuine constraint that does work
+          once there is enough data to make its covariance estimate worth having, while
+          SVM's assumption-light margin has nothing extra to offer these features.
+        </p>
+      </div>
       <p>
-        The lab also maintains an RBF-kernel arm, which reaches 0.658 on the standardised
-        comparison — below the linear arm. With this much data, the extra flexibility
-        costs more than it earns, exactly as §9 predicts.
+        The lab also maintains an RBF-kernel arm. Once standardised it reaches 0.658 —
+        <em>exactly tied with the linear SVM</em>, and well below LDA. So the extra
+        flexibility of a curved boundary buys nothing at all here, which is what §9
+        predicts at this much data: it is not that the nonlinearity hurts, it is that
+        there is nothing nonlinear for it to find.
       </p>
     </div>
   </section>

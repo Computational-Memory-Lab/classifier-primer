@@ -329,7 +329,7 @@
         </label>
         <label class="field">
           Trials
-          <input type="range" id="dc-n" min="40" max="600" step="20" value="200">
+          <input type="range" id="dc-n" min="40" max="1280" step="40" value="200">
           <output id="dc-n-out"></output>
         </label>
         <label class="field">
@@ -354,12 +354,18 @@
       <div id="dc-plot"></div>
       <div class="stats" id="dc-out"></div>
       <div class="figure__note">
-        Set the effect to zero. The curve should sit <em>around</em> 0.5, scattering
-        more at low trial counts because the held-out half is small — across five seeds
-        this build averages 0.514, with individual runs between 0.48 and 0.57. If a
-        simulation cannot produce chance from no effect, nothing else it says is worth
-        anything. Our cluster runs pass the same check more tightly, at 0.497–0.507,
-        because they average over many more repetitions.
+        Orange points are the fixed ladder of trial counts; the blue marker is wherever
+        your <em>trials</em> slider sits. Every point is fitted on exactly that many
+        trials — no reuse.
+        <br><br>
+        <strong>Set the effect to zero</strong> and the curve should sit around 0.5,
+        scattering more at low trial counts because the held-out half is small. Measured
+        over 20 seeds this build averages <strong>0.4946</strong>
+        (<em>t</em> = −0.63 against chance), and the check is pinned by a test in
+        <code>site/test/</code>. If a simulation cannot produce chance from no effect,
+        nothing else it says is worth anything — an earlier version of this page sat at
+        0.519 because the class label was tied to the random-number stream, which is
+        exactly the sort of thing the null check exists to catch.
       </div>
     </div>
   </section>

@@ -385,6 +385,22 @@ export function svmMargin(host, out) {
       stroke: token('--series-1'), 'stroke-width': 2.8, 'stroke-linecap': 'round',
     }, svg);
 
+    /* Name the two things the figure exists to show. Without these the boundary
+       and the margin band are distinguished only by line weight, which is not
+       something a first-time reader is going to decode. */
+    const lbl = (sx, tx, text, anchor) => {
+      const [px2, py2] = corner(sx, tx);
+      el('text', {
+        x: px2, y: py2 - 6, class: 'axis-label',
+        fill: token('--series-1'), 'text-anchor': anchor,
+      }, svg).textContent = text;
+    };
+    lbl(0.72, 1, 'margin', 'middle');
+    el('text', {
+      x: xs(cx + ux * L * 0.72), y: ys(cy + uy * L * 0.72) - 6,
+      class: 'axis-label', fill: token('--series-1'), 'text-anchor': 'middle',
+    }, svg).textContent = 'boundary';
+
     for (const p of pts) {
       const isSv = svSet.has(p);
       el('circle', {
@@ -425,13 +441,33 @@ export function smallN(host, out) {
     const wTrue = ldaWeights(truth, 0).w;
     const origin = [0, 0];
 
+    /* LDA solid, SVM dotted, truth long-dashed. The dash patterns matter: this is
+       the one figure whose whole job is telling two models apart, and with five
+       lines each a per-line label would be unreadable, so identity has to survive
+       without relying on hue. A legend follows below. */
     for (let s = 0; s < 5; s++) {
       const samp = twoClouds({ n: state.n, sep: 1.5, rho: state.rho, seed: 101 + s * 7717 });
       boundary(svg, xs, ys, origin, ldaWeights(samp, 0).w, token('--series-7'), null, null);
-      boundary(svg, xs, ys, origin, svmTrain(samp, 1, 1200).w, token('--series-6'), null, null);
+      boundary(svg, xs, ys, origin, svmTrain(samp, 1, 1200).w, token('--series-6'), '2 3', null);
     }
     // Redraw the truth on top so it stays readable.
     boundary(svg, xs, ys, origin, wTrue, token('--text-primary'), '7 4', null);
+
+    const key = [
+      ['LDA', token('--series-7'), null],
+      ['SVM', token('--series-6'), '2 3'],
+      ['the truth', token('--text-primary'), '7 4'],
+    ];
+    key.forEach(([name, colour, dash], i) => {
+      const y = PAD.t + 12 + i * 15;
+      el('line', {
+        x1: PAD.l + 8, x2: PAD.l + 30, y1: y, y2: y,
+        stroke: colour, 'stroke-width': 2.6, 'stroke-dasharray': dash || null,
+        'stroke-linecap': 'round',
+      }, svg);
+      el('text', { x: PAD.l + 36, y: y + 3.5, class: 'axis-label', fill: token('--text-secondary') }, svg)
+        .textContent = name;
+    });
 
     const a0 = Math.atan2(wTrue[1], wTrue[0]);
     const fold = (a) => { let x = (a - a0) * 180 / Math.PI; while (x > 90) x -= 180; while (x < -90) x += 180; return x; };
