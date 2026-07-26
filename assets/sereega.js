@@ -156,18 +156,31 @@ function project(p, cx, cy, s) {
 }
 
 /* Diverging map: blue (negative) -> neutral -> orange (positive). Two hues with
-   a neutral midpoint, never a rainbow. */
-function divergingColor(v, dark) {
+   a neutral midpoint, never a rainbow. Returns components so that lighting can be
+   applied to the COLOUR afterwards rather than to the value. */
+function divergingRGB(v, dark) {
   const c = Math.max(-1, Math.min(1, v));
   const neg = [42, 120, 214];
   const pos = [235, 104, 52];
   const mid = dark ? [58, 58, 62] : [238, 238, 234];
-  const a = Math.abs(c);
   const target = c < 0 ? neg : pos;
-  const g = Math.pow(a, 0.75);
-  return `rgb(${Math.round(mid[0] + (target[0] - mid[0]) * g)},${
-    Math.round(mid[1] + (target[1] - mid[1]) * g)},${
-    Math.round(mid[2] + (target[2] - mid[2]) * g)})`;
+  const g = Math.pow(Math.abs(c), 0.75);
+  return [0, 1, 2].map((i) => mid[i] + (target[i] - mid[i]) * g);
+}
+
+const rgbStr = (c) => `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
+
+/**
+ * Lambert shading, applied to the rendered colour and NOT to the value.
+ *
+ * It used to be folded into the value (`divergingColor(v * shade)`), which
+ * quietly lied: a quad angled away from the viewer was drawn as though it
+ * carried a weaker potential than it does, so the colour no longer meant what
+ * the figure's caption says it means. Lighting is a property of the picture;
+ * the value is the data. Keep them apart.
+ */
+function litColor(v, shade, dark) {
+  return rgbStr(divergingRGB(v, dark).map((ch) => ch * shade));
 }
 
 /* ============================== head view =============================== */
@@ -214,7 +227,15 @@ export function headView(host, out) {
     ctx = canvasOverlay(host, svg, W, H, { x: 0, y: 0, w: W, h: H }, 2);
     ctx.clearRect(0, 0, W, H);
 
-    const pos = [state.dx, state.dy, state.dz];
+    /* Keep the source inside the skull. The sliders reach a normalised radius of
+       1.20 at their corners -- a dipole 20% outside the head, which is not a
+       thing, and which made the depth readout go negative. Clamped to 0.92 so it
+       always sits in tissue, and the readout says when clamping is active rather
+       than silently ignoring the slider. */
+    const rNorm = Math.hypot(state.dx / HEAD.rx, state.dy / HEAD.ry, state.dz / HEAD.rz);
+    const clamped = rNorm > 0.92;
+    const k = clamped ? 0.92 / rNorm : 1;
+    const pos = [state.dx * k, state.dy * k, state.dz * k];
     const mom = moment(state.az, state.elv);
     const cx = W / 2, cy = H / 2 + 8, s = 150;
 
@@ -242,9 +263,12 @@ export function headView(host, out) {
         const a = grid[j][i], b = grid[j][i + 1], c = grid[j + 1][i + 1], d = grid[j + 1][i];
         const depth = (a.r[2] + b.r[2] + c.r[2] + d.r[2]) / 4;
         const v = (a.v + b.v + c.v + d.v) / 4;
-        // crude lambert shading so the sphere reads as solid
-        const nz = depth / Math.hypot(a.r[0], a.r[1], a.r[2] || 1);
-        quads.push({ pts: [a.r, b.r, c.r, d.r], depth, v, shade: 0.55 + 0.45 * Math.max(0, nz) });
+        /* Crude Lambert term so the ellipsoid reads as solid. The `|| 1` guard
+           belongs OUTSIDE hypot -- inside it, a legitimate zero z-component was
+           being replaced by 1, tilting the shading of the equator. */
+        const rad = Math.hypot(a.r[0], a.r[1], a.r[2]) || 1;
+        const nz = depth / rad;
+        quads.push({ pts: [a.r, b.r, c.r, d.r], depth, v, shade: 0.62 + 0.38 * Math.max(0, nz) });
       }
     }
     quads.sort((p, q) => p.depth - q.depth);
@@ -256,7 +280,7 @@ export function headView(host, out) {
       for (let k = 1; k < 4; k++) ctx.lineTo(scr[k][0], scr[k][1]);
       ctx.closePath();
       ctx.globalAlpha = q.depth > 0 ? 0.93 : 1;
-      ctx.fillStyle = divergingColor((q.v / maxAbs) * q.shade, dark);
+      ctx.fillStyle = litColor(q.v / maxAbs, q.shade, dark);
       ctx.fill();
       ctx.lineWidth = 0.35;
       ctx.strokeStyle = ctx.fillStyle;
@@ -298,7 +322,7 @@ export function headView(host, out) {
         const [ex, ey] = P(c.r);
         ctx.beginPath();
         ctx.arc(ex, ey, state.nCh > 40 ? 2.6 : 5, 0, 7);
-        ctx.fillStyle = divergingColor(c.v / maxAbs, dark);
+        ctx.fillStyle = rgbStr(divergingRGB(c.v / maxAbs, dark));  // unshaded: this is the readout
         ctx.fill();
         ctx.lineWidth = 1.2;
         ctx.strokeStyle = dark ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)';
@@ -324,12 +348,13 @@ export function headView(host, out) {
     const vals = readings.map((c) => Math.abs(c.v));
     const peak = Math.max(...vals);
     const spread = vals.filter((v) => v > peak * 0.5).length;
-    const depth = Math.hypot(pos[0] / HEAD.rx, pos[1] / HEAD.ry, pos[2] / HEAD.rz);
+    const r = Math.hypot(pos[0] / HEAD.rx, pos[1] / HEAD.ry, pos[2] / HEAD.rz);
     out.innerHTML = [
-      ['depth', `${(1 - depth).toFixed(2)} from surface`],
-      ['electrodes', state.nCh],
-      ['above half-peak', `${spread} (${((spread / state.nCh) * 100).toFixed(0)}%)`],
-    ].map(([k, v]) => `<div class="stat"><div class="stat__value">${v}</div><div class="stat__label">${k}</div></div>`).join('');
+      ['position', `${(r * 100).toFixed(0)}%${clamped ? ' (at the limit)' : ''}`,
+        'centre → scalp'],
+      ['electrodes', state.nCh, 'sampling the surface'],
+      ['above half-peak', `${spread} of ${state.nCh}`, 'how spread out it is'],
+    ].map(([lab, v, sub]) => `<div class="stat"><div class="stat__value">${v}</div><div class="stat__label">${lab}<br><span class="muted">${sub}</span></div></div>`).join('');
   }
 
   responsive(host, draw);

@@ -315,14 +315,16 @@
       <p>
         Now add a source of alpha rhythm at electrode Oz — activity that has
         <em>nothing</em> to do with the task and is identical in both classes. Because
-        of volume conduction it leaks into the other two electrodes, at 0.4 into CPz
-        and 0.2 into FCz. Classification on FCz and CPz now degrades badly: the leaked
-        alpha is pure added noise.
+        of volume conduction it leaks into the other two electrodes, at 0.4 into CPz and
+        0.2 into FCz. Classification on FCz and CPz collapses from 15% error to
+        <strong>37%</strong>: the leaked alpha is pure added noise, and it more than
+        doubles the error.
       </p>
       <p>
-        Add Oz as a third feature and the error returns to its original level. Oz
-        alone is useless — it contains no class information whatsoever. But it contains
-        a <em>clean measurement of the contaminant</em>, so the classifier gives it a
+        Add Oz as a third feature and the error returns to about 16% — essentially where
+        it started. Oz alone is useless: it contains no class information whatsoever, and
+        a classifier given only Oz would perform at chance. But it contains a
+        <em>clean measurement of the contaminant</em>, so the classifier gives it a
         weight whose job is to subtract the alpha back out of the other two channels.
       </p>
       <p>

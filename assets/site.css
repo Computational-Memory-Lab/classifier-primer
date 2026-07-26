@@ -524,9 +524,9 @@ details.aside > *:not(summary) { margin-top: 0.7rem; }
   width: 19rem;
   max-width: calc(100vw - 1rem);
   padding: 0.3rem;
-  background: var(--surface, var(--page));
+  background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
+  border-radius: var(--radius);
   box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
   flex-direction: column;
   gap: 0.1rem;
