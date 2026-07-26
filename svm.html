@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SVM, from the ground up | CML primer</title>
+<meta name="description" content="Support vector machines explained from no machine-learning background: what every weight is, where its value comes from, what the model assumes, and how it fails. Mirrors the LDA deep dive section for section.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory Classifiers <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Deep dive · 2 of 2</p>
+      <h1>SVM, from the ground up</h1>
+      <p class="lede">
+        A support vector machine produces the same kind of answer as LDA — a weighted
+        sum of the features — and arrives at it by reasoning that has nothing in common
+        with LDA's. Where LDA models how the data were produced, SVM ignores that
+        question entirely and asks a geometric one instead.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>No machine learning assumed.</strong> This page has the
+          <em>same eleven sections in the same order</em> as
+          <a href="lda.html">LDA, from the ground up</a>. Sections 1, 2 and 8 are
+          deliberately near-identical between the two — the shared ground is what makes
+          the differences legible. If you have read the LDA page you can skim those
+          three.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 0. THE SHORT VERSION ========================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">0</span>The short version</h2>
+      <p>
+        Many different lines will separate two groups of points. SVM picks the one with
+        the largest clearance on either side — the line that stays as far as possible
+        from the nearest points of both classes. It makes no assumption about how the
+        data were generated, no assumption of bell-shaped clouds, and no attempt to
+        estimate how features covary. It looks only at the points nearest the boundary
+        and ignores everything else. A single tuning parameter, <em>C</em>, controls how
+        much it is willing to misclassify in exchange for a wider clearance.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 1. WHAT ONE TRIAL IS ========================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">1</span>What one trial looks like to the model</h2>
+      <p>
+        Identical to the LDA page, because the input is identical — the models differ
+        only in what they do with it.
+      </p>
+      <p>
+        A participant sees a word. We keep <strong>10 electrodes</strong> and chop the
+        second after word onset into <strong>12 time bins</strong>, averaging the
+        voltage inside each. That gives 10 × 12 = <strong>120 numbers</strong> for that
+        word. The model never sees a scalp or a waveform — it sees a list of 120
+        numbers, called <strong><em>x</em></strong>, with the count of entries called
+        <strong><em>p</em></strong> = 120.
+      </p>
+      <p>
+        Each trial carries a <strong>label</strong>: later remembered or later
+        forgotten. For SVM the labels are conventionally written
+        <strong><em>y</em> = +1 and <em>y</em> = −1</strong> rather than 1 and 0. This
+        is not a different problem, just a convention that makes the algebra tidier —
+        multiplying by <em>y</em> then flips the sign for one class, which lets both
+        classes be written in one equation.
+      </p>
+      <div class="keypoint">
+        <p>
+          A <strong>feature</strong> is one of those 120 numbers — one electrode at one
+          time bin. The participant studies 225 words, so we have 225 pairs of (list of
+          120 numbers, label), of which about 202 are used for training on any given
+          fold.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 2. WHAT A WEIGHT IS =========================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">2</span>What a weight is</h2>
+      <p>Also identical to the LDA page. This is the shared ground.</p>
+      <p>
+        The model produces <strong>one number per feature</strong> — the
+        <strong>weights</strong> <em>w</em><sub>1</sub> … <em>w</em><sub>120</sub> — plus
+        one constant <em>b</em>, the <strong>bias</strong>. To classify a new trial,
+        multiply each feature by its weight, sum, add the bias:
+      </p>
+      <div class="formula">
+        score = <em>w</em><sub>1</sub><em>x</em><sub>1</sub>
+        + <em>w</em><sub>2</sub><em>x</em><sub>2</sub>
+        + … + <em>w</em><sub>120</sub><em>x</em><sub>120</sub> + <em>b</em>
+        <span class="lbl">written compactly as score = <em>w</em>ᵀ<em>x</em> + <em>b</em></span>
+      </div>
+      <p>
+        Positive score, predict one class; negative, the other. A weight is a
+        <strong>multiplier applied to one feature</strong>, and the set of them is the
+        entire learned content of the model.
+      </p>
+      <p>
+        Geometrically: with two features each trial is a dot on a page and the rule
+        "score = 0" is a straight line; with 120 it is a flat <strong>hyperplane</strong>
+        in 120-dimensional space. The weights set the orientation, the bias slides it
+        without rotating it.
+      </p>
+      <p>
+        <strong>So a trained LDA and a trained linear SVM are the same kind of
+        object.</strong> Handed only the final numbers you could not tell which produced
+        them. Everything that follows is about how the numbers were chosen.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>One quantity SVM needs that LDA does not.</strong> The
+          <em>size</em> of the weight vector, written ‖<em>w</em>‖ and read "the norm of
+          w", is the square root of the sum of the squared weights. For LDA this is
+          irrelevant — scaling every weight by 2 doubles all scores, flips nothing, and
+          changes no prediction. For SVM the scale is load-bearing, because it is what
+          sets the width of the clearance in §3.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 3. THE OBJECTIVE ============================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">3</span>What SVM is trying to make true</h2>
+      <p>
+        Here the two models part completely. LDA assumed a generative story — Gaussian
+        clouds of equal shape — and derived the optimal rule under it. SVM assumes
+        nothing about how the data arose. It states a geometric preference and optimises
+        for it.
+      </p>
+
+      <h3>The preference</h3>
+      <p>
+        If two groups of points can be separated by a straight line, they can usually be
+        separated by infinitely many. Most sit awkwardly close to some point. SVM's
+        claim is that the best choice is the one with the most room:
+      </p>
+      <div class="keypoint">
+        <p>
+          Choose the boundary that maximises the <strong>margin</strong> — the
+          perpendicular distance from the boundary to the nearest training point of
+          either class.
+        </p>
+      </div>
+      <p>
+        The reasoning is about generalisation rather than fit. A boundary squeezed
+        against a training point will misclassify a future point that lands slightly on
+        the wrong side. A boundary with clearance on both sides tolerates that jitter.
+        Since every future trial is a noisy version of the same underlying thing,
+        clearance is insurance.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>The two traditions are less separate than they look.</strong> Cortes
+          &amp; Vapnik's paper — the one that introduced the method we use — opens not
+          with margins but with Fisher (1936) and linear discriminant analysis. Their
+          equations 1 and 2 are QDA and LDA; their first observation is that estimating
+          a covariance takes on the order of <em>p</em>² numbers and that this is
+          unreliable when observations are few. SVM was proposed as an answer to a
+          problem the LDA page spends its §6 and §8 on.
+        </p>
+      </div>
+
+      <h3>Writing it down</h3>
+      <p>
+        Scores can be scaled arbitrarily, so we pin them: require that the nearest
+        points score exactly ±1. Every training point must then satisfy
+      </p>
+      <div class="formula">
+        <em>y</em><sub><em>i</em></sub> (<em>w</em>ᵀ<em>x</em><sub><em>i</em></sub> + <em>b</em>) ≥ 1
+        <span class="lbl">for every trial <em>i</em>; the <em>y</em> = ±1 convention makes one line cover both classes</span>
+      </div>
+      <p>
+        With that pinning, the total width of the clear strip works out to
+        <strong>2 ÷ ‖<em>w</em>‖</strong>. So making the margin as wide as possible means
+        making ‖<em>w</em>‖ as <em>small</em> as possible. The whole training problem
+        becomes:
+      </p>
+      <div class="formula">
+        minimise &nbsp;½‖<em>w</em>‖²&nbsp; subject to
+        <em>y</em><sub><em>i</em></sub>(<em>w</em>ᵀ<em>x</em><sub><em>i</em></sub> + <em>b</em>) ≥ 1 for all <em>i</em>
+        <span class="lbl">Boser, Guyon &amp; Vapnik (1992) — the hard-margin SVM</span>
+      </div>
+      <p>
+        Read plainly: <em>make the weights as small as you can while still getting every
+        training trial right by a clear margin.</em> Small weights mean a wide street.
+      </p>
+      <p>
+        This is a <strong>convex</strong> problem — bowl-shaped, one bottom, no local
+        traps. There is exactly one answer and an algorithm will find it. That property
+        is a large part of why SVMs became standard.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 4. HOW WEIGHTS GET VALUES ===================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">4</span>How each weight actually gets its value</h2>
+      <p>
+        LDA computes its weights from two averages and a covariance — every trial
+        contributes, in proportion to nothing in particular. SVM's answer has a
+        completely different character, and it is the most surprising fact about the
+        method.
+      </p>
+
+      <h3>The weights are a blend of a handful of trials</h3>
+      <p>Solving the problem in §3 yields the weight vector in this form:</p>
+      <div class="formula">
+        <em>w</em> = Σ<sub><em>i</em></sub> <em>α</em><sub><em>i</em></sub>
+        <em>y</em><sub><em>i</em></sub> <em>x</em><sub><em>i</em></sub>
+        <span class="lbl">a weighted sum of the training trials themselves</span>
+      </div>
+      <p>
+        Each training trial <em>x</em><sub><em>i</em></sub> gets a coefficient
+        <em>α</em><sub><em>i</em></sub> ≥ 0. The weight vector is those trials added up,
+        each scaled by its coefficient and by the sign of its label. So an individual
+        weight <em>w</em><sub>47</sub> is: <em>take feature 47's value in each
+        training trial, multiply by that trial's coefficient and label sign, and add
+        them up.</em>
+      </p>
+
+      <h3>And almost every coefficient is exactly zero</h3>
+      <p>
+        This is the part with the name attached. The solution has
+        <em>α</em><sub><em>i</em></sub> = 0 for every trial that sits comfortably on the
+        correct side. Only trials <em>on</em> the margin boundary, or violating it, get a
+        non-zero coefficient. Those are the <strong>support vectors</strong>.
+      </p>
+      <div class="keypoint">
+        <p>
+          <strong>Delete every trial that is not a support vector and retrain, and you
+          get exactly the same classifier.</strong> The model is defined entirely by the
+          points nearest the boundary. The comfortable majority contribute nothing.
+        </p>
+      </div>
+      <p>
+        The contrast with LDA is total. LDA's answer depends on the average of all
+        trials, so a single outlier moves it a little and every trial moves it a little.
+        SVM's answer depends only on the borderline cases, so most trials move it not at
+        all — but a single badly-placed point right at the boundary can move it a lot.
+      </p>
+
+      <h3>Why the problem is usually solved in the other form</h3>
+      <p>
+        Rewriting the optimisation in terms of the <em>α</em>'s instead of the
+        <em>w</em>'s — the <strong>dual</strong> form — has a useful consequence: the
+        data only ever appear as dot products between pairs of trials,
+        <em>x</em><sub><em>i</em></sub>ᵀ<em>x</em><sub><em>j</em></sub>. Never as
+        individual features.
+      </p>
+      <p>
+        That opens the door to the <strong>kernel trick</strong>: replace the dot
+        product with some other measure of similarity and you get a curved boundary,
+        with no change to the algorithm and without ever constructing the higher
+        dimensional space. A radial-basis kernel gives smooth blob-shaped regions; a
+        polynomial kernel gives curved ones.
+      </p>
+      <p>
+        <strong>We use the linear kernel</strong> — the plain dot product — throughout,
+        for a reason §8 makes clear: with 1.7 trials per weight, more flexibility is the
+        opposite of what the problem needs. This lab has an RBF-kernel arm and it does
+        not beat the linear one.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 5. WORKED EXAMPLE ============================= -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">5</span>A worked example you can check by hand</h2>
+      <p>Two features, two trials, all arithmetic visible.</p>
+      <ul>
+        <li>One remembered trial at <em>x</em> = (2, 2), label <em>y</em> = +1.</li>
+        <li>One forgotten trial at <em>x</em> = (0, 0), label <em>y</em> = −1.</li>
+      </ul>
+      <p>
+        By symmetry the best boundary is the perpendicular bisector of the segment
+        joining them, so <em>w</em> must point along (2,2) − (0,0), i.e. <em>w</em> =
+        (<em>a</em>, <em>a</em>) for some <em>a</em>. Now apply the two margin
+        conditions as equalities, since with only two points both are as close as
+        possible:
+      </p>
+      <div class="formula">
+        (+1)(2<em>a</em> + 2<em>a</em> + <em>b</em>) = 1 &nbsp;→&nbsp; 4<em>a</em> + <em>b</em> = 1<br>
+        (−1)(0 + 0 + <em>b</em>) = 1 &nbsp;→&nbsp; <em>b</em> = −1
+      </div>
+      <p>
+        Substituting the second into the first: 4<em>a</em> − 1 = 1, so 4<em>a</em> = 2
+        and <strong><em>a</em> = 0.5</strong>. The answer is
+      </p>
+      <div class="formula">
+        <em>w</em> = (0.5, 0.5), &nbsp; <em>b</em> = −1
+        <span class="lbl">margin width = 2 ÷ ‖<em>w</em>‖ = 2 ÷ 0.707 = 2.83</span>
+      </div>
+      <p>
+        Sanity check: the distance between the two points is √(2² + 2²) = 2.83. The
+        margin is the full gap, which is right — with one point per class, the widest
+        street is the whole space between them.
+      </p>
+
+      <h3>Reading off the coefficients</h3>
+      <p>
+        Both points are support vectors. Using <em>w</em> = Σ <em>α<sub>i</sub>
+        y<sub>i</sub> x<sub>i</sub></em>: only the first point is non-zero (the second
+        is at the origin), so <em>w</em> = <em>α</em><sub>1</sub>(+1)(2, 2) = (0.5, 0.5),
+        giving <strong><em>α</em><sub>1</sub> = 0.25</strong>. A further condition of the
+        solution requires Σ<em>α<sub>i</sub> y<sub>i</sub></em> = 0, so
+        <em>α</em><sub>2</sub> = 0.25 as well.
+      </p>
+
+      <h3>Now add a third trial that changes nothing</h3>
+      <p>
+        Put another remembered trial at (3, 3). Its score is 0.5×3 + 0.5×3 − 1 =
+        <strong>2</strong>, comfortably past the required 1. Its constraint is slack, so
+        its coefficient is zero, and the boundary does not move. You could delete it and
+        refit and get an identical model.
+      </p>
+      <div class="keypoint">
+        <p>
+          <strong>That is the whole personality of the method in one example.</strong>
+          The trial at (3,3) is the <em>most</em> clearly remembered trial in the set,
+          and it has no influence at all. LDA would have used it — it pulls the
+          remembered mean outward. SVM discards it as uninformative about where the
+          boundary belongs.
+        </p>
+      </div>
+      <p>The figure below is this, live, with as many points as you like.</p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The margin, and which points hold it up <em>· live</em></div>
+      <div class="figure__sub">
+        Ringed points are support vectors — the only ones with a non-zero coefficient.
+      </div>
+      <div class="controls">
+        <label class="field">
+          C (tolerance for error)
+          <input type="range" id="svm-c" min="0" max="100" value="50">
+          <output id="svm-c-out"></output>
+        </label>
+        <label class="field">
+          How separable
+          <input type="range" id="svm-sep" min="20" max="340" value="190">
+          <output id="svm-sep-out"></output>
+        </label>
+        <label class="field">
+          Trials per class
+          <input type="range" id="svm-n" min="8" max="60" value="26">
+          <output id="svm-n-out"></output>
+        </label>
+      </div>
+      <div id="svm-plot"></div>
+      <div class="stats" id="svm-out"></div>
+      <div class="figure__note">
+        Push the clouds together and watch the support-vector count climb. When classes
+        overlap heavily — as ours do — almost every trial ends up holding the boundary,
+        and the "only a few points matter" property quietly disappears.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 6. THE KNOB =================================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">6</span>The knob: C, and what happens when classes overlap</h2>
+      <p>
+        Section 3 assumed the two classes can be separated perfectly. Real data —
+        certainly ours, where the effect is worth about 0.53 AUC — cannot be. The
+        constraints of §3 have no solution at all, and the method as stated simply
+        fails.
+      </p>
+
+      <h3>Allowing violations, at a price</h3>
+      <p>
+        Cortes &amp; Vapnik (1995) fixed this, and it is the contribution that made SVMs
+        usable. Give every trial a permitted amount of violation
+        <em>ξ</em><sub><em>i</em></sub> ≥ 0 ("slack"), and charge for it:
+      </p>
+      <div class="formula">
+        minimise &nbsp;½‖<em>w</em>‖² + <em>C</em> Σ<sub><em>i</em></sub> <em>ξ</em><sub><em>i</em></sub>
+        &nbsp; subject to
+        <em>y</em><sub><em>i</em></sub>(<em>w</em>ᵀ<em>x</em><sub><em>i</em></sub> + <em>b</em>) ≥ 1 − <em>ξ</em><sub><em>i</em></sub>
+        <span class="lbl">Cortes &amp; Vapnik (1995) — the soft-margin SVM, and the citation to use</span>
+      </div>
+      <p>
+        Two competing terms. The first wants a wide margin. The second wants few and
+        small violations. <em>C</em> sets the exchange rate.
+      </p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th><em>C</em></th><th>what the model prefers</th><th>result</th></tr></thead>
+          <tbody>
+            <tr><td><strong>small</strong></td><td>violations are cheap; keep the margin wide</td><td>a smooth, stable boundary that tolerates errors; many support vectors</td></tr>
+            <tr><td><strong>large</strong></td><td>violations are expensive; classify the training data</td><td>a boundary contorted to catch every point; overfits</td></tr>
+            <tr><td>→ ∞</td><td>no violations allowed at all</td><td>back to §3, and no solution if the classes overlap</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <strong>Small <em>C</em> is the regularised end</strong>, which is the direction
+        you want with scarce data. This is the counterpart of LDA's &Gamma;: both trade
+        fidelity to the training data against stability, and both should be pushed toward
+        stability when <em>n</em> is small. They are not, however, the same knob in
+        disguise — &Gamma; regularises an <em>estimate of the noise structure</em>,
+        while <em>C</em> regularises the <em>size of the weights</em>. LDA has no notion
+        of tolerated errors, and SVM has no notion of covariance.
+      </p>
+
+      <h3>The hinge loss, which is what that really says</h3>
+      <p>The slack formulation is equivalent to charging each trial</p>
+      <div class="formula">
+        loss = max(0, 1 − <em>y</em><sub><em>i</em></sub>(<em>w</em>ᵀ<em>x</em><sub><em>i</em></sub> + <em>b</em>))
+        <span class="lbl">the hinge loss</span>
+      </div>
+      <p>
+        Zero cost once a trial is correct by a full margin; then rising linearly the
+        wronger it gets. Two consequences worth holding onto: being <em>very</em> right
+        earns no reward (the flat part), and being very wrong costs proportionally, not
+        catastrophically — which makes SVM more robust to a wild outlier than a
+        squared-error method, though less robust than one might hope, since a
+        mislabelled point near the boundary becomes a support vector and gets full say.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 7. READING THE WEIGHTS ======================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">7</span>Reading the weights — the same trap, plus one more</h2>
+      <p>
+        Everything the LDA page says in its §7 applies here unchanged, and for the same
+        reason. The weight vector is a <strong>filter</strong> — a recipe for extracting
+        a signal — not a <strong>pattern</strong> showing where the signal is. A feature
+        with no class information can carry a large weight because it provides a clean
+        measurement of a contaminant worth subtracting.
+      </p>
+      <p>
+        Haufe et al. (2014) covers linear models generally, SVM included, so the same
+        correction applies: to obtain an interpretable map, multiply the weights by the
+        data covariance. Do not plot an SVM weight vector on a head and call it a brain
+        map.
+      </p>
+
+      <h3>The extra trap: scaling</h3>
+      <div class="callout callout--warn">
+        <p>
+          <strong>SVM is not scale-invariant, and LDA is.</strong> Because the objective
+          penalises ‖<em>w</em>‖ — treating every weight as equally costly — a feature
+          measured in larger units needs a smaller weight, and is therefore penalised
+          less for the same real effect. Change a feature's units and you change the
+          model. LDA has no such problem, since Σ<sup>−1</sup> already normalises by
+          each feature's variance.
+        </p>
+      </div>
+      <p>
+        In practice this means SVM features should be standardised before training, and
+        our pipeline does it — <code>fitcsvm</code> is called with
+        <code>'Standardize', true</code>. It is not cosmetic. It also means an SVM
+        weight is doubly uninterpretable: it reflects the feature's units as well as its
+        role in the filter.
+      </p>
+
+      <h3>And the scores are not probabilities</h3>
+      <p>
+        LDA's score can be converted to a calibrated probability, because the model comes
+        with a probabilistic story. SVM's cannot — the number is a signed distance from a
+        boundary, and nothing in the method makes it a probability. Converting one
+        requires fitting an extra calibration step afterwards (Platt scaling), which
+        needs its own held-out data.
+      </p>
+      <p>
+        For us this is harmless: we score everything with AUC, which depends only on the
+        <em>ordering</em> of the scores and not on their values. AUC is the right measure
+        for exactly this reason.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 8. SMALL SAMPLES ============================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">8</span>What breaks when trials are scarce</h2>
+      <p>
+        This section appears on both deep-dive pages, because the problem is shared —
+        but the way each model suffers is different, and that difference is the useful
+        part.
+      </p>
+      <p>
+        The classifier has to pin down 120 weights from about 202 trials. For LDA the
+        damage is concentrated in one place: the 7,260-entry covariance matrix it cannot
+        estimate. SVM never estimates a covariance, so it might seem immune. It is not —
+        it fails a different way.
+      </p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th></th><th>LDA</th><th>SVM</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>what it must estimate</strong></td>
+              <td>2 means + a 120 × 120 covariance (7,260 numbers)</td>
+              <td>nothing statistical — it solves a geometry problem</td>
+            </tr>
+            <tr>
+              <td><strong>how few trials hurt</strong></td>
+              <td>the covariance estimate degrades systematically, and inverting it amplifies the error</td>
+              <td>the nearest few points are a small, noisy sample, so the margin is placed by accident</td>
+            </tr>
+            <tr>
+              <td><strong>the remedy</strong></td>
+              <td>shrinkage (&Gamma; → 1)</td>
+              <td>stronger regularisation (<em>C</em> → small)</td>
+            </tr>
+            <tr>
+              <td><strong>which trials decide it</strong></td>
+              <td>all of them, through two averages</td>
+              <td>only the borderline ones</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        SVM's specific vulnerability: with overlapping classes and few trials, nearly
+        every trial becomes a support vector, so the boundary is set by a large number
+        of individually unreliable points sitting in the overlap region. The property
+        that makes SVM elegant when classes are well separated — depending only on the
+        hard cases — becomes a liability when almost everything is a hard case.
+      </p>
+      <p>
+        Cortes &amp; Vapnik make this precise, and the result is worth stating because
+        it turns that paragraph from an intuition into a bound. For separable data they
+        show that the expected error rate is bounded by the fraction of training trials
+        that end up as support vectors:
+      </p>
+      <div class="formula">
+        E[Pr(error)] ≤ E[number of support vectors] ÷ number of training trials
+        <span class="lbl">Cortes &amp; Vapnik (1995), Eq. 5</span>
+      </div>
+      <p>
+        Notice what the bound does <em>not</em> contain: the number of features. That is
+        the striking claim of the method — a boundary held up by few points generalises
+        well even in an enormous space, and they report ratios as low as 0.03 on real
+        problems.
+      </p>
+      <div class="keypoint">
+        <p>
+          <strong>Now apply it to us.</strong> Our classes overlap almost completely —
+          the effect is worth about 0.53 AUC — so nearly every trial sits in the
+          contested region and becomes a support vector. The ratio approaches 1, and the
+          bound degrades to "the error rate is at most 100%": true, and empty. The
+          guarantee that justifies SVM is strongest exactly where we need it least, and
+          silent exactly where we need it most.
+        </p>
+      </div>
+      <p>
+        Raudys &amp; Jain (1991) analysed the classical family and found that trials
+        needed grow <em>linearly</em> with features for any linear classifier — about
+        4 × features for full LDA, 1.2 × for a means-only rule. Their table does not
+        cover SVM, which postdates it, but the linear-in-<em>p</em> scaling is a
+        property of linear models in general and our own simulations reproduce it for
+        both.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">How wrong the learned direction is <em>· live</em></div>
+      <div class="figure__sub">
+        Both models get the same data. The dashed line is the truth they are trying to
+        find; the error is the average angle they miss it by.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Trials per class
+          <input type="range" id="sn-n" min="6" max="200" value="20">
+          <output id="sn-n-out"></output>
+        </label>
+        <label class="field">
+          Correlation between features
+          <input type="range" id="sn-rho" min="0" max="95" value="60">
+          <output id="sn-rho-out"></output>
+        </label>
+      </div>
+      <div id="sn-plot"></div>
+      <div class="stats" id="sn-out"></div>
+      <div class="figure__note">
+        At high correlation LDA suffers more, because correlation is precisely what it
+        is trying to estimate. At low correlation there is little between them — which
+        is roughly what we observe on real data, where the two agree to about 0.01 AUC.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 9. ASSUMPTIONS ================================ -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">9</span>Assumptions, variants, and failure modes</h2>
+
+      <h3>What SVM assumes</h3>
+      <p>
+        Strikingly little. No distributional assumption, no equal-covariance
+        requirement, no requirement that features be Gaussian. This is its main
+        advantage over LDA in principle — and it matters here, since our features have
+        kurtosis around 23 against a Gaussian's 3, a substantial violation of what LDA
+        wants.
+      </p>
+      <p>
+        But "assumes less" is not "needs less data". Assumptions are how a model gets by
+        on fewer trials: LDA's Gaussian story is a strong constraint that does real work
+        when data are scarce. Dropping it means nothing fills the gap. This is the
+        standard trade, and at 1.7 trials per weight it does not obviously favour SVM —
+        which is consistent with what we see, the two landing within about 0.01 AUC of
+        each other.
+      </p>
+
+      <h3>Where it genuinely fails</h3>
+      <ul>
+        <li>
+          <strong>Unstandardised features</strong> — see §7. A silent, serious failure.
+        </li>
+        <li>
+          <strong>Heavily unbalanced classes.</strong> The majority class dominates the
+          total slack penalty and the boundary is pushed into the minority. Per-class
+          <em>C</em> weights are the fix; our pipeline instead balances by resampling.
+        </li>
+        <li>
+          <strong>Mislabelled points near the boundary.</strong> They become support
+          vectors and get full influence. A mislabelled point far from the boundary is
+          harmless to LDA-with-averaging and expensive to SVM.
+        </li>
+        <li>
+          <strong>Kernel choice with scarce data.</strong> An RBF kernel can fit
+          anything and, with 1.7 trials per weight, will.
+        </li>
+      </ul>
+
+      <h3>Practical notes</h3>
+      <ul>
+        <li>
+          <strong>It is not deterministic in practice.</strong> The solver
+          <code>fitcsvm</code> uses is Platt's SMO (1998), which is sensitive to its
+          random seed and to the library version. This is not academic for us: our
+          committed SVM reference file had to be regenerated after a seed was added,
+          while the LDA reference has never moved.
+        </li>
+        <li>
+          <strong>It is iterative, not one-shot.</strong> LDA computes its answer in
+          closed form; SVM runs an optimiser to convergence.
+        </li>
+        <li>
+          <strong>It is inherently two-class.</strong> More classes require several
+          binary models combined.
+        </li>
+        <li>
+          <strong>Cost scales with trials, not features.</strong> Between roughly
+          <em>n</em>² and <em>n</em>³. With 202 trials this is instant either way.
+        </li>
+      </ul>
+
+      <h3>The honest summary of LDA versus SVM here</h3>
+      <p>
+        On our data they perform almost identically, and the reason is
+        <a href="simulation.html">the trial-count result</a>: at 1.7 trials per weight
+        both are dominated by estimation noise, and the difference between two
+        reasonable estimators is small compared with the noise both are drowning in.
+        Choosing between them is not where the gains are.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 10. ON OUR DATA =============================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">10</span>What this looks like on our data</h2>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th></th><th>study phase (subsequent memory)</th><th>feedback task (Danyluik)</th></tr></thead>
+          <tbody>
+            <tr><td>trials per participant</td><td>225 (about 202 for training)</td><td>717</td></tr>
+            <tr><td>features</td><td>120</td><td>30</td></tr>
+            <tr><td>trials per weight</td><td><strong>1.7</strong></td><td>19</td></tr>
+            <tr><td>kernel</td><td>linear</td><td>linear</td></tr>
+            <tr><td>standardised</td><td>yes — required, see §7</td><td>yes</td></tr>
+            <tr><td>AUC</td><td>≈ 0.53</td><td>0.716 (time–frequency features)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        SVM and LDA land within roughly 0.01 AUC of each other on both datasets. Given
+        §8, that is the expected result rather than a surprising one: two different
+        reasonable ways of drawing a line, both limited by the same shortage of trials.
+      </p>
+      <p>
+        The lab also maintains an RBF-kernel arm, which reaches 0.658 on the standardised
+        comparison — below the linear arm. With this much data, the extra flexibility
+        costs more than it earns, exactly as §9 predicts.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 11. SOURCES =================================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">11</span>Where all this comes from</h2>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>work</th><th>what it contributed</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Vapnik &amp; Chervonenkis (1963–1974)</strong></td>
+              <td>The statistical learning theory underneath: why a wide margin should generalise, rather than merely feeling safer.</td>
+            </tr>
+            <tr>
+              <td><strong>Boser, Guyon &amp; Vapnik (1992)</strong></td>
+              <td>The hard-margin algorithm of §3, and the kernel trick.</td>
+            </tr>
+            <tr>
+              <td><strong>Cortes &amp; Vapnik (1995)</strong></td>
+              <td>The soft margin and <em>C</em> — what makes SVM usable on overlapping data, and the support-vector bound of §8. The citation to use for a modern SVM. <code>papers/Cortes_Vapnik_1995.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Burges (1998)</strong></td>
+              <td>The standard tutorial: the dual derivation and the support-vector conditions in full. <code>papers/Burges_1998.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Platt (1998)</strong></td>
+              <td>Sequential minimal optimisation — the solver <code>fitcsvm</code> actually runs, and the source of its seed sensitivity.</td>
+            </tr>
+            <tr>
+              <td><strong>Müller et al. (2001)</strong></td>
+              <td>Kernel methods introduced for the signal-processing and neuroscience audience.</td>
+            </tr>
+            <tr>
+              <td><strong>Raudys &amp; Jain (1991)</strong></td>
+              <td>The small-sample scaling of §8. Predates SVM, but the linear-in-features result applies to linear models generally. <code>papers/Raudys_Jain_1991.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Haufe et al. (2014)</strong></td>
+              <td>Why weight vectors are not brain maps — applies to SVM exactly as to LDA. <code>papers/Haufe_Etal_2014.pdf</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small muted">
+        Cortes &amp; Vapnik, Burges, Raudys &amp; Jain and Haufe et al. are filed in
+        this repository. The soft-margin formulation of §6 and the support-vector bound
+        of §8 are read directly from Cortes &amp; Vapnik; the SMO seed sensitivity in §9
+        is a property of our own pipeline, observed here rather than taken from Platt.
+        Boser, Guyon &amp; Vapnik (1992), Platt (1998) and Müller et al. (2001) are
+        cited from the standard literature and are not filed.
+      </p>
+      <p>
+        Back to <a href="lda.html">the LDA deep dive</a>, or on to
+        <a href="simulation.html">how much data any of this would actually need</a>.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager" aria-label="Page navigation"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab · a working document, updated as the project runs.
+  </div>
+</footer>
+
+<script type="module">
+  import { initChrome } from './assets/site.js';
+  import { svmMargin, smallN } from './assets/simulation.js';
+
+  initChrome();
+
+  /* ---------- the margin ---------- */
+  const svm = svmMargin(document.getElementById('svm-plot'), document.getElementById('svm-out'));
+  const svmC = document.getElementById('svm-c');
+  const svmSep = document.getElementById('svm-sep');
+  const svmN = document.getElementById('svm-n');
+  const syncSvm = () => {
+    svm.state.C = Math.pow(10, -1.5 + 3 * (+svmC.value / 100));
+    svm.state.sep = +svmSep.value / 100;
+    svm.state.n = +svmN.value;
+    document.getElementById('svm-c-out').textContent = svm.state.C < 1 ? svm.state.C.toFixed(2) : svm.state.C.toFixed(1);
+    document.getElementById('svm-sep-out').textContent = svm.state.sep.toFixed(2);
+    document.getElementById('svm-n-out').textContent = svm.state.n;
+    svm.refresh();
+  };
+  [svmC, svmSep, svmN].forEach((s) => s.addEventListener('input', syncSvm));
+  syncSvm();
+
+  /* ---------- small-sample drift ---------- */
+  const sn = smallN(document.getElementById('sn-plot'), document.getElementById('sn-out'));
+  const snN = document.getElementById('sn-n');
+  const snRho = document.getElementById('sn-rho');
+  const syncSn = () => {
+    sn.state.n = +snN.value;
+    sn.state.rho = +snRho.value / 100;
+    document.getElementById('sn-n-out').textContent = sn.state.n;
+    document.getElementById('sn-rho-out').textContent = sn.state.rho.toFixed(2);
+    sn.refresh();
+  };
+  [snN, snRho].forEach((s) => s.addEventListener('input', syncSn));
+  syncSn();
+</script>
+
+</body>
+</html>

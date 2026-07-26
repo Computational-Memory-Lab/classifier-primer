@@ -2,6 +2,10 @@
    SVG helpers. No dependencies and no build step -- everything here runs from
    file:// or from GitHub Pages unchanged. */
 
+/* The eight-chapter primer. This sequence is stable -- it is what a new lab
+   member is pointed at, and the numbering is cited elsewhere. Do not add to it.
+   Ongoing project write-ups go in EXTRAS below, which renders as a dropdown
+   after the chapters rather than extending the primer. */
 export const CHAPTERS = [
   { href: 'index.html', short: 'Start', title: 'A primer on classifying memory from EEG' },
   { href: 'task.html', short: '1 Task', title: 'The memory task' },
@@ -11,9 +15,22 @@ export const CHAPTERS = [
   { href: 'try-it.html', short: '5 Try it', title: 'Train one yourself, on real data' },
   { href: 'results.html', short: '6 Results', title: 'What we have found so far' },
   { href: 'open-question.html', short: '7 Open', title: 'The question we are trying to answer' },
-  { href: 'simulation.html', short: '8 How much data', title: 'How much data would it take?' },
-  { href: 'reading.html', short: '9 Reading', title: 'Where to go next' },
+  { href: 'reading.html', short: '8 Reading', title: 'Where to go next' },
 ];
+
+/* Live project write-ups. Unlike CHAPTERS these are expected to grow, and they
+   are not a reading sequence -- each stands alone. */
+export const EXTRAS = {
+  label: 'Projects',
+  items: [
+    { href: 'simulation.html', short: 'How much data', title: 'How much data would it take?',
+      blurb: 'The trial-count simulation: how many trials a memory classifier needs, and why our pipeline comparisons come out flat.' },
+    { href: 'lda.html', short: 'LDA deep dive', title: 'LDA, from the ground up',
+      blurb: 'Every weight, where its value comes from, and what the model assumes. Assumes no machine learning background.' },
+    { href: 'svm.html', short: 'SVM deep dive', title: 'SVM, from the ground up',
+      blurb: 'The same walkthrough for support vector machines, section by section, so the two can be compared.' },
+  ],
+};
 
 /* ---------- theme ---------- */
 
@@ -55,21 +72,55 @@ function currentPage() {
 
 export function initChrome() {
   const here = currentPage();
+  const inExtras = EXTRAS.items.some((c) => c.href === here);
+
   const bar = document.querySelector('.topbar');
   if (bar) {
     const nav = bar.querySelector('.topbar__nav');
     if (nav) {
-      nav.innerHTML = CHAPTERS.map((c) => {
+      const links = CHAPTERS.map((c) => {
         const cur = c.href === here ? ' aria-current="page"' : '';
         return `<a href="${c.href}"${cur}>${c.short}</a>`;
       }).join('');
+
+      /* The dropdown is a details/summary rather than a custom widget: it gets
+         keyboard support, Escape-to-close and focus handling from the browser,
+         and it still works with no JS at all. */
+      const items = EXTRAS.items.map((c) => {
+        const cur = c.href === here ? ' aria-current="page"' : '';
+        return `<a href="${c.href}"${cur}>
+            <span class="navmenu__ttl">${c.short}</span>
+            <span class="navmenu__sub">${c.blurb}</span>
+          </a>`;
+      }).join('');
+
+      nav.innerHTML = `${links}
+        <details class="navmenu"${inExtras ? ' data-current="1"' : ''}>
+          <summary>${EXTRAS.label}<span class="navmenu__caret" aria-hidden="true">▾</span></summary>
+          <div class="navmenu__panel">${items}</div>
+        </details>`;
+
+      const menu = nav.querySelector('.navmenu');
+      if (menu) {
+        document.addEventListener('click', (e) => {
+          if (!menu.contains(e.target)) menu.open = false;
+        });
+        menu.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') { menu.open = false; menu.querySelector('summary').focus(); }
+        });
+      }
     }
   }
+
+  /* Prev/next walks whichever sequence the page belongs to. The primer runs
+     index -> 8; a project page is not part of that sequence, so chapter 8 stays
+     the end of the primer and a project page gets no pager links of its own. */
   const pager = document.querySelector('.pager');
   if (pager) {
-    const i = CHAPTERS.findIndex((c) => c.href === here);
-    const prev = CHAPTERS[i - 1];
-    const next = CHAPTERS[i + 1];
+    const seq = inExtras ? EXTRAS.items : CHAPTERS;
+    const i = seq.findIndex((c) => c.href === here);
+    const prev = seq[i - 1];
+    const next = seq[i + 1];
     pager.innerHTML = [
       prev ? `<a href="${prev.href}"><div class="dir">← Previous</div><div class="ttl">${prev.title}</div></a>` : '<div></div>',
       next ? `<a class="next" href="${next.href}"><div class="dir">Next →</div><div class="ttl">${next.title}</div></a>` : '<div></div>',

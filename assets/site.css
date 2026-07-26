@@ -477,3 +477,98 @@ details.aside > *:not(summary) { margin-top: 0.7rem; }
   color: var(--text-muted);
 }
 .footer a { color: var(--text-secondary); }
+
+/* ---------- projects dropdown in the topbar ---------- */
+/* Sits after the chapter links. The primer's eight chapters stay a flat,
+   stable row; anything ongoing lives in here instead of extending them. */
+.navmenu { position: relative; flex: none; }
+
+.navmenu > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.navmenu > summary::-webkit-details-marker { display: none; }
+.navmenu > summary:hover { background: var(--border); color: var(--text-primary); }
+.navmenu[data-current] > summary { background: var(--accent-wash); color: var(--accent); font-weight: 600; }
+.navmenu__caret { font-size: 0.6em; opacity: 0.75; transition: transform 0.12s ease; }
+.navmenu[open] .navmenu__caret { transform: rotate(180deg); }
+
+.navmenu__panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 60;
+  min-width: 17rem;
+  max-width: min(22rem, calc(100vw - 2rem));
+  padding: 0.3rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+/* The panel overrides .topbar__nav a, which is laid out for a single inline row. */
+.topbar__nav .navmenu__panel a {
+  display: block;
+  white-space: normal;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-sm);
+}
+.navmenu__ttl { display: block; font-size: 0.85rem; color: var(--text-primary); font-weight: 560; }
+.navmenu__sub { display: block; font-size: 0.76rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.1rem; }
+.topbar__nav .navmenu__panel a:hover { background: var(--accent-wash); }
+.topbar__nav .navmenu__panel a:hover .navmenu__ttl { color: var(--accent); }
+.topbar__nav .navmenu__panel a[aria-current="page"] { background: var(--accent-wash); }
+.topbar__nav .navmenu__panel a[aria-current="page"] .navmenu__ttl { color: var(--accent); font-weight: 650; }
+
+/* The nav scrolls horizontally on narrow screens; an absolutely-positioned
+   panel would be clipped by that overflow, so the menu goes inline there. */
+@media (max-width: 640px) {
+  .navmenu__panel {
+    position: fixed;
+    top: auto;
+    left: 0.75rem;
+    right: 0.75rem;
+    max-width: none;
+  }
+}
+
+.nowrap { white-space: nowrap; }
+
+/* ---------- deep-dive pages: display formulas and step markers ---------- */
+.formula {
+  margin: 1.1rem 0;
+  padding: 0.85rem 1rem;
+  background: var(--surface-2, var(--accent-wash));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 1.02rem;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+.formula em { font-style: italic; }
+.formula .lbl { display: block; margin-top: 0.4rem; font-size: 0.78rem; color: var(--text-muted); }
+
+.steplabel {
+  display: inline-block;
+  margin-right: 0.5rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: 0.15em;
+}

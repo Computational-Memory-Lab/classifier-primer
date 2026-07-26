@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LDA, from the ground up | CML primer</title>
+<meta name="description" content="Linear discriminant analysis explained from no machine-learning background: what every weight is, where its value comes from, what the model assumes, and how it fails.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory Classifiers <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Deep dive · 1 of 2</p>
+      <h1>LDA, from the ground up</h1>
+      <p class="lede">
+        Linear discriminant analysis is the classifier this lab uses most, and it is
+        usually described in one sentence: it draws a line between two groups. That
+        sentence is true and almost useless. This page is the long version.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>No machine learning assumed.</strong> Every symbol is defined where
+          it first appears. The companion page,
+          <a href="svm.html">SVM, from the ground up</a>, has the
+          <em>same eleven sections in the same order</em>, so you can read them side
+          by side and see exactly where the two models agree and where they part.
+          Sections 1, 2 and 8 are deliberately near-identical between the two pages —
+          that shared ground is the point, not an oversight.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 0. THE SHORT VERSION ========================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">0</span>The short version</h2>
+      <p>
+        LDA assumes each of your two groups is a cloud of points with the same shape,
+        differing only in where its centre sits. Under that assumption there is a
+        provably best way to separate them, and LDA computes it directly — no search,
+        no iteration, no tuning. It takes the line joining the two centres and then
+        corrects it for the fact that some directions in the data are naturally noisy
+        and others are quiet. The correction is the entire method. Everything else on
+        this page is either what that correction is, or what goes wrong when you do
+        not have enough data to work it out.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 1. WHAT ONE TRIAL IS ========================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">1</span>What one trial looks like to the model</h2>
+      <p>
+        Start with what the classifier is handed, because none of the rest makes sense
+        without it.
+      </p>
+      <p>
+        A participant sees a word. We record voltage from electrodes on the scalp. For
+        our study-phase analysis we keep <strong>10 electrodes</strong> and chop the
+        second after word onset into <strong>12 time bins</strong>, averaging the
+        voltage inside each bin. That gives 10 × 12 = <strong>120 numbers</strong> for
+        that one word.
+      </p>
+      <p>
+        Those 120 numbers are the trial, as far as the model is concerned. The model
+        never sees a scalp, a waveform, or a word. It sees a list of 120 numbers. In
+        the notation everyone uses, that list is called <strong><em>x</em></strong>,
+        and the number of entries in it is called <strong><em>p</em></strong>, so here
+        <em>p</em> = 120.
+      </p>
+      <p>
+        Each trial also carries a <strong>label</strong>: was that word later
+        remembered, or later forgotten? Two possibilities, so we write the label as
+        <em>y</em> = 1 or <em>y</em> = 0. The participant studies 225 words, so we have
+        225 pairs of (list of 120 numbers, label).
+      </p>
+      <div class="keypoint">
+        <p>
+          A <strong>feature</strong> is one of those 120 numbers — one electrode at one
+          time bin. "Feature 47" means something concrete: the average voltage at, say,
+          electrode 4 during time bin 7. When this page says a model "puts weight on a
+          feature", it means it multiplies that one number by something.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 2. WHAT A WEIGHT IS =========================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">2</span>What a weight is</h2>
+      <p>
+        Both models on these two pages — LDA here, SVM on the other page — produce the
+        same kind of object at the end. They differ in how they choose it, not in what
+        it is. So it is worth being precise about what it is.
+      </p>
+      <p>
+        The model produces <strong>one number per feature</strong>. Those numbers are
+        the <strong>weights</strong>, written <em>w</em><sub>1</sub>,
+        <em>w</em><sub>2</sub>, … <em>w</em><sub>120</sub>. To classify a new trial,
+        multiply each feature by its weight, add them all up, and add one final
+        constant <em>b</em> called the <strong>bias</strong> or intercept:
+      </p>
+      <div class="formula">
+        score = <em>w</em><sub>1</sub><em>x</em><sub>1</sub>
+        + <em>w</em><sub>2</sub><em>x</em><sub>2</sub>
+        + … + <em>w</em><sub>120</sub><em>x</em><sub>120</sub> + <em>b</em>
+        <span class="lbl">written compactly as score = <em>w</em>ᵀ<em>x</em> + <em>b</em></span>
+      </div>
+      <p>
+        If the score comes out positive, predict "remembered". If negative, predict
+        "forgotten". That is the whole prediction rule. It is a weighted sum and a
+        comparison against zero.
+      </p>
+      <p>
+        So a weight is a <strong>multiplier applied to one feature</strong>, and the
+        set of 120 of them is the entire learned content of the model. When we say a
+        classifier was "trained", we mean: those 120 numbers plus <em>b</em> were
+        chosen. When we say it is "linear", we mean the score is a weighted sum with no
+        squares, products, or thresholds inside it.
+      </p>
+
+      <h3>The geometry, once, because it makes the rest readable</h3>
+      <p>
+        With 120 features you cannot picture this, so picture two. Each trial is a dot
+        on a page. The rule "<em>w</em><sub>1</sub><em>x</em><sub>1</sub> +
+        <em>w</em><sub>2</sub><em>x</em><sub>2</sub> + <em>b</em> = 0" is a straight
+        line across that page. Trials on one side score positive, trials on the other
+        score negative. The weights control the line's <em>direction</em>; the bias
+        <em>b</em> slides it back and forth without rotating it.
+      </p>
+      <p>
+        With 120 features the same thing happens in a 120-dimensional space, and the
+        dividing surface is a <strong>hyperplane</strong> — the flat thing one
+        dimension below whatever space you are in. Nothing about the arithmetic
+        changes. Only your ability to draw it does.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>One more reading of the weights, which will matter later.</strong>
+          The weight vector <em>w</em> also points in a direction — the direction
+          perpendicular to that dividing line. Moving along that direction changes the
+          score fastest. So "what the classifier learned" and "which direction through
+          the data separates the classes" are the same statement.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 3. THE OBJECTIVE ============================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">3</span>What LDA is trying to make true</h2>
+      <p>
+        Now the models diverge. LDA starts from an assumption about how the data were
+        <em>generated</em>, and then derives the best possible rule under that
+        assumption. This is worth emphasising because it is unusual: LDA is not
+        searching for a line that works well. It is computing the line that would be
+        provably optimal <em>if its assumptions held</em>.
+      </p>
+
+      <h3>The assumption</h3>
+      <p>Three parts, and each will come back later as a way the model can fail.</p>
+      <ol>
+        <li>
+          <strong>Each class is a Gaussian cloud.</strong> "Gaussian" (or "normal", or
+          "bell-shaped") means values pile up around a centre and thin out
+          symmetrically. In 120 dimensions it means the trials of one class form a
+          fuzzy ellipsoidal blob.
+        </li>
+        <li>
+          <strong>Both clouds have the same shape.</strong> They can sit in different
+          places, but they must be stretched and tilted identically. This is the
+          assumption that makes LDA <em>linear</em> — drop it and you get a curved
+          boundary instead (see §9).
+        </li>
+        <li>
+          <strong>We know that shape and those centres.</strong> We do not. We estimate
+          them from the data, and §8 is entirely about the damage that does.
+        </li>
+      </ol>
+
+      <h3>What "the shape of a cloud" means numerically</h3>
+      <p>
+        The shape is described by a table called the <strong>covariance matrix</strong>,
+        written <strong>Σ</strong>. It has one row and one column per feature, so for us
+        it is 120 × 120. Two kinds of entry:
+      </p>
+      <ul>
+        <li>
+          <strong>On the diagonal</strong> — how much feature <em>i</em> varies across
+          trials, on its own. A noisy electrode has a big number here.
+        </li>
+        <li>
+          <strong>Off the diagonal</strong> — whether features <em>i</em> and <em>j</em>
+          move together. Two neighbouring electrodes pick up much of the same activity,
+          so when one goes up the other usually does too: a large positive entry.
+          Adjacent time bins do the same thing.
+        </li>
+      </ul>
+      <p>
+        This matters enormously for EEG specifically. Neighbouring electrodes are not
+        independent measurements — the skull smears each underlying source across many
+        sensors, so a single source shows up on a dozen electrodes at once. The
+        off-diagonal entries of Σ are large, and any method that ignores them is
+        throwing away most of what it knows about the data.
+      </p>
+
+      <h3>The rule that follows</h3>
+      <p>
+        Given those assumptions, the mathematically optimal decision is: assign a trial
+        to whichever class it is more likely to have come from. Working that through
+        for two Gaussians with equal covariance — this is the derivation in Welch
+        (1939) — everything nonlinear cancels, and what survives is exactly the
+        weighted sum from §2, with weights
+      </p>
+      <div class="formula">
+        <em>w</em> = <strong>Σ</strong><sup>−1</sup> (<em>μ</em><sub>1</sub> − <em>μ</em><sub>0</sub>)
+        <span class="lbl">Blankertz et al. (2011), Eq. 9 — the whole of LDA in one line</span>
+      </div>
+      <p>
+        where <em>μ</em><sub>1</sub> and <em>μ</em><sub>0</sub> are the two class
+        centres — the average trial of each class — and
+        <strong>Σ</strong><sup>−1</sup> is the matrix inverse of the covariance. That
+        formula is the entire method. The next section is about what it means.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 4. HOW WEIGHTS GET VALUES ===================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">4</span>How each weight actually gets its value</h2>
+      <p>
+        Take that formula apart in the order a person would compute it.
+
+      </p>
+
+      <h3>Part 1 — the difference of means</h3>
+      <p>
+        Average all the remembered trials, feature by feature: 120 numbers. Average all
+        the forgotten trials: another 120. Subtract. You now have 120 numbers saying
+        <em>how much bigger this feature is, on average, when the word was later
+        remembered</em>.
+      </p>
+      <p>
+        If you stopped here and used those differences as the weights, you would have a
+        perfectly reasonable classifier. It has a name — the nearest-centroid or
+        Euclidean classifier — and it is the yellow line in the figure below. It says:
+        weight each feature by how much it differs between conditions.
+      </p>
+
+      <h3>Part 2 — why that is wrong, and what Σ<sup>−1</sup> fixes</h3>
+      <p>
+        The difference of means treats all 120 features as separate, independent pieces
+        of evidence. They are not. Suppose two adjacent electrodes both show the
+        remembered-minus-forgotten difference. Is that two independent votes for
+        "remembered"? Almost certainly not — it is more likely one underlying source
+        seen twice. Counting it twice overstates the evidence.
+      </p>
+      <p>
+        Multiplying by <strong>Σ</strong><sup>−1</sup> is the correction. It does two
+        things at once:
+      </p>
+      <ul>
+        <li>
+          <strong>It divides by noise.</strong> A difference of 1 µV along a direction
+          where trials naturally scatter by 10 µV is worthless. The same difference
+          along a direction where trials scatter by 0.5 µV is strong evidence. The
+          inverse covariance downweights the first and upweights the second.
+        </li>
+        <li>
+          <strong>It removes double-counting.</strong> Where features are redundant,
+          it discounts them so that correlated evidence is counted roughly once.
+        </li>
+      </ul>
+      <p>
+        A useful way to hold it: <strong>Σ</strong><sup>−1</sup> stretches the space
+        until all the noise is round and equal in every direction — a transformation
+        called <em>whitening</em> — finds the straightforward difference-of-means line
+        <em>in that stretched space</em>, then maps the answer back. In the stretched
+        space the naive rule is correct; the multiplication is what gets you there and
+        back.
+      </p>
+
+      <h3>Part 3 — so where does one individual weight come from?</h3>
+      <p>
+        This is the question that has an answer people find surprising, and it is worth
+        stating flatly:
+      </p>
+      <div class="keypoint">
+        <p>
+          <strong>A weight is not a measure of how informative its feature is.</strong>
+          A feature carrying no class information at all can receive a large weight —
+          and removing it can make the classifier substantially worse.
+        </p>
+      </div>
+      <p>
+        Blankertz et al. (2011) demonstrate this with a constructed example worth
+        walking through, because it makes the point concrete. Take two electrodes,
+        FCz and CPz, which both genuinely differ between the two classes. A classifier
+        on those two gets 15% error.
+      </p>
+      <p>
+        Now add a source of alpha rhythm at electrode Oz — activity that has
+        <em>nothing</em> to do with the task and is identical in both classes. Because
+        of volume conduction it leaks into the other two electrodes, at 0.4 into CPz
+        and 0.2 into FCz. Classification on FCz and CPz now degrades badly: the leaked
+        alpha is pure added noise.
+      </p>
+      <p>
+        Add Oz as a third feature and the error returns to its original level. Oz
+        alone is useless — it contains no class information whatsoever. But it contains
+        a <em>clean measurement of the contaminant</em>, so the classifier gives it a
+        weight whose job is to subtract the alpha back out of the other two channels.
+      </p>
+      <p>
+        This is what <strong>Σ</strong><sup>−1</sup> buys, and it is why a weight
+        cannot be read as importance. A weight is one coefficient in a
+        <strong>noise-cancelling recipe</strong>. Its value depends on every other
+        feature in the set. Change which features you include and every weight changes.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 5. WORKED EXAMPLE ============================= -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">5</span>A worked example you can check by hand</h2>
+      <p>
+        Two features, so it fits on a page. Suppose across many trials we measure:
+      </p>
+      <ul>
+        <li>Forgotten trials centre at <em>μ</em><sub>0</sub> = (0, 0).</li>
+        <li>Remembered trials centre at <em>μ</em><sub>1</sub> = (1, 1). So the difference of means is (1, 1) — both features shifted equally.</li>
+        <li>
+          Both features scatter with variance 1, and they are correlated at 0.9 —
+          they mostly move together. So
+          <strong>Σ</strong> = [[1, 0.9], [0.9, 1]].
+        </li>
+      </ul>
+      <p><strong>The naive answer</strong> weights both features equally: <em>w</em> = (1, 1).</p>
+      <p>
+        <strong>The LDA answer</strong> inverts Σ first. For a 2 × 2 matrix
+        [[a, b], [b, a]] the inverse is [[a, −b], [−b, a]] ÷ (a² − b²). Here
+        a² − b² = 1 − 0.81 = 0.19, so
+      </p>
+      <div class="formula">
+        <strong>Σ</strong><sup>−1</sup> = [[1, −0.9], [−0.9, 1]] ÷ 0.19
+        = [[5.26, −4.74], [−4.74, 5.26]]
+      </div>
+      <p>and multiplying by the difference of means (1, 1):</p>
+      <div class="formula">
+        <em>w</em> = (5.26 − 4.74, &nbsp; −4.74 + 5.26) = (0.53, 0.53)
+        <span class="lbl">same direction as the naive answer, but only 0.53 as large</span>
+      </div>
+      <p>
+        Here the direction happens to be unchanged, because the setup is symmetric —
+        but the <em>magnitude</em> collapsed to about half. That is LDA saying: these
+        two features are 90% redundant, so a difference showing up in both is worth
+        roughly one feature's worth of evidence, not two.
+      </p>
+      <p>
+        Now change one thing. Let the difference of means be <strong>(1, 0)</strong> —
+        feature 1 shifts, feature 2 does not — with the same correlated Σ. Then:
+      </p>
+      <div class="formula">
+        <em>w</em> = (5.26 × 1 + (−4.74) × 0, &nbsp; −4.74 × 1 + 5.26 × 0) = (5.26, −4.74)
+      </div>
+      <div class="keypoint">
+        <p>
+          <strong>Feature 2 shows zero difference between the classes and receives a
+          large negative weight.</strong> This is the Oz effect in miniature. Because
+          the two features move together, feature 2 is a good measurement of the shared
+          fluctuation, and subtracting it cleans up feature 1. The naive rule would have
+          given feature 2 a weight of exactly zero and thrown that away.
+        </p>
+      </div>
+      <p>
+        The figure below is this calculation, live. The yellow line is the naive
+        difference of means; the purple line is LDA. At zero correlation they coincide.
+        Push the correlation up and watch them separate.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">The two rules, and when they part company <em>· live</em></div>
+      <div class="figure__sub">
+        Build it up one step at a time, then raise the correlation.
+      </div>
+      <div class="controls">
+        <div class="segmented" id="lda-steps" role="group" aria-label="Build up">
+          <button class="btn" data-step="1">1 · difference of means</button>
+          <button class="btn" data-step="2">2 · shape of the noise</button>
+          <button class="btn btn--primary" data-step="3">3 · LDA</button>
+        </div>
+        <label class="field">
+          Correlation between features
+          <input type="range" id="lda-rho" min="0" max="95" value="75">
+          <output id="lda-rho-out"></output>
+        </label>
+        <label class="field">
+          Shrinkage &Gamma;
+          <input type="range" id="lda-gamma" min="0" max="100" value="0">
+          <output id="lda-gamma-out"></output>
+        </label>
+      </div>
+      <div id="lda-plot"></div>
+      <div class="stats" id="lda-out"></div>
+      <div class="figure__note">
+        Step 2 draws the dashed ellipses — the measured shape of each class. Step 3
+        divides by it. The &Gamma; slider is §6; leave it at 0 for now.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 6. THE KNOB =================================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">6</span>The knob: shrinkage, and why it exists</h2>
+      <p>
+        Everything so far assumed we know Σ. We do not — we estimate it from the
+        training trials, and that estimate is the weak point of the whole method.
+      </p>
+      <p>
+        Count what has to be estimated. A 120 × 120 covariance matrix is symmetric, so
+        the number of distinct quantities in it is 120 × 121 ÷ 2 =
+        <strong>7,260</strong>. We estimate all 7,260 from about
+        <strong>202 trials</strong>. That is not a shortage of data; it is a different
+        order of magnitude.
+      </p>
+
+      <h3>How the estimate fails — specifically</h3>
+      <p>
+        It does not fail by being randomly wrong in all directions. It fails in a
+        systematic, predictable way, and knowing the direction of the error is what
+        makes the fix possible.
+      </p>
+      <div class="keypoint">
+        <p>
+          With too few trials, the estimated covariance <strong>overstates the large
+          variances and understates the small ones</strong>. The estimated cloud looks
+          more elongated than the true one.
+        </p>
+      </div>
+      <p>
+        Why that is catastrophic here: LDA uses <strong>Σ</strong><sup>−1</sup>, and
+        inverting turns the small numbers into large ones. The directions estimated as
+        having very little variance become directions the inverse multiplies by an
+        enormous factor. If one of those small values is small mostly by accident, the
+        classifier will place huge weight on a direction that is pure noise. Blankertz
+        et al. show this directly: with 200 features, the estimated variance spectrum
+        from 50 samples is wildly too steep at both ends, and the fit only approaches
+        the truth around 500 samples.
+      </p>
+
+      <h3>The fix</h3>
+      <p>
+        <strong>Shrinkage.</strong> Rather than trusting the measured covariance, mix it
+        with a simple, stable stand-in — a perfectly round cloud whose size is the
+        average of the measured variances:
+      </p>
+      <div class="formula">
+        <strong>Σ</strong>(&Gamma;) = (1 − &Gamma;) × <strong>Σ</strong><sub>measured</sub>
+        + &Gamma; × <em>ν</em><strong>I</strong>
+        <span class="lbl">Blankertz et al. (2011), Eq. 12; <em>ν</em> is the average variance, <strong>I</strong> the round stand-in</span>
+      </div>
+      <p>
+        &Gamma; runs from 0 to 1 and is the only tuning parameter LDA has:
+      </p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>&Gamma;</th><th>what the model believes</th><th>the weights become</th></tr></thead>
+          <tbody>
+            <tr><td><strong>0</strong></td><td>the measured covariance, completely</td><td>a full noise-cancelling filter</td></tr>
+            <tr><td>between</td><td>partly — pulled toward round</td><td>a filter, damped</td></tr>
+            <tr><td><strong>1</strong></td><td>nothing; assume all features independent and equally noisy</td><td>exactly the difference of means</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        That last row is worth sitting with. <strong>&Gamma; = 1 throws away every
+        off-diagonal entry of Σ</strong> and collapses LDA back to the naive
+        difference-of-means rule from §4. Every noise-cancelling weight — every Oz —
+        goes to zero.
+      </p>
+      <p>
+        The elegant part is that the mixing weight can be computed rather than tuned.
+        Ledoit &amp; Wolf (2004), in the form given by Schäfer &amp; Strimmer (2005),
+        derive the &Gamma; that minimises expected error directly from the data, with
+        no cross-validation. That combination is what people mean by "shrinkage LDA".
+      </p>
+      <p class="small muted">
+        The idea is older than any of those. Fisher himself recommended, when the two
+        classes have different covariances but data are scarce, using a blend
+        <em>τ</em><strong>Σ</strong><sub>1</sub> + (1 − <em>τ</em>)<strong>Σ</strong><sub>2</sub>
+        rather than either alone — regularisation by mixing, in 1936. We have this
+        second-hand, from the opening pages of Cortes &amp; Vapnik (1995), rather than
+        from Fisher directly.
+      </p>
+      <div class="callout callout--warn">
+        <p>
+          <strong>Our pipeline runs &Gamma; = 1</strong> — the maximum, the row that
+          discards all covariance structure. In Blankertz et al.'s own sweep, &Gamma; =
+          1 was the <em>worst</em> setting they tried (36% error, against 18% at
+          &Gamma; = 0.05). We are not necessarily wrong to use it: at 1.7 trials per
+          weight there may be nothing trustworthy to keep, and Raudys &amp; Jain's
+          sample-size table says a means-only classifier needs about a third the data of
+          a full one. But it is a real choice with a real cost, and
+          <a href="simulation.html">the trial-count work</a> exists partly to price it.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 7. READING THE WEIGHTS ======================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">7</span>Reading the weights — the mistake almost everyone makes</h2>
+      <p>
+        You have a trained classifier. You have 120 weights. The natural next move is to
+        plot them on a scalp map and say where in the brain the memory effect lives.
+      </p>
+      <p><strong>That is invalid, and the reason is worth understanding properly.</strong></p>
+      <p>There are two different maps, and they answer different questions.</p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th></th><th>the pattern</th><th>the filter</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>what it is</strong></td>
+              <td>difference of means, <em>μ</em><sub>1</sub> − <em>μ</em><sub>0</sub></td>
+              <td>the classifier weights, <strong>Σ</strong><sup>−1</sup>(<em>μ</em><sub>1</sub> − <em>μ</em><sub>0</sub>)</td>
+            </tr>
+            <tr>
+              <td><strong>question it answers</strong></td>
+              <td>where does the signal show up?</td>
+              <td>how do I best extract it?</td>
+            </tr>
+            <tr>
+              <td><strong>safe to interpret?</strong></td>
+              <td>yes — this is the ERP map</td>
+              <td><strong>no</strong></td>
+            </tr>
+            <tr>
+              <td><strong>looks like</strong></td>
+              <td>smooth, one or two broad blobs</td>
+              <td>intricate, sign-flipping, large values in uninformative places</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The Oz example from §4 is exactly this: Oz gets a big weight in the filter and
+        is flat in the pattern. Reading the filter as a brain map would put a memory
+        effect in occipital cortex, when what is actually there is alpha rhythm being
+        subtracted out.
+      </p>
+      <p>
+        Haufe et al. (2014) — filed here as <code>papers/Haufe_Etal_2014.pdf</code> —
+        is the standard treatment, and it gives the conversion: to get an interpretable
+        map from a trained linear model, multiply the weights back by the covariance.
+        The general rule:
+      </p>
+      <div class="keypoint">
+        <p>
+          <strong>Interpret patterns. Evaluate filters.</strong> If you want to say
+          where in the brain something happens, plot the difference of means. If you
+          want to know whether the information is decodable at all, use the classifier's
+          accuracy. Never read the weight vector as anatomy.
+        </p>
+      </div>
+      <p>
+        A neat consequence: at &Gamma; = 1 the filter <em>is</em> the pattern, since all
+        the covariance correction has been removed. So the one setting whose weights are
+        safe to interpret is also the one that throws away the most information.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 8. SMALL SAMPLES ============================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">8</span>What breaks when trials are scarce</h2>
+      <p>
+        This section appears on both deep-dive pages, because the problem is shared and
+        the comparison is the interesting part.
+      </p>
+      <p>
+        The classifier has to pin down 120 weights from about 202 trials — fewer than
+        two examples per weight. What that does is not subtle. The learned direction is
+        the true direction plus estimation noise, and with <em>p</em> features and
+        <em>n</em> trials the noise grows like <em>p</em>/<em>n</em>.
+      </p>
+      <p>
+        Raudys &amp; Jain (1991) worked out the sample sizes needed to keep this under
+        control. To keep expected error within 50% of its best achievable value:
+      </p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>classifier</th><th>what it estimates</th><th>trials needed</th></tr></thead>
+          <tbody>
+            <tr><td>means only (&Gamma; = 1)</td><td>2 × 120 numbers</td><td>1.2 × features ≈ 144</td></tr>
+            <tr><td><strong>full LDA (&Gamma; = 0)</strong></td><td>+ 7,260 covariance numbers</td><td><strong>4.0 × features ≈ 480</strong></td></tr>
+            <tr><td>separate covariance per class</td><td>+ 7,260 more</td><td>10–32 × features</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        We train on 202. So full LDA is roughly a factor of 2.4 short, and even the
+        means-only version is marginal. That 1.2-versus-4.0 gap is the entire case for
+        shrinkage, derived analytically decades before we measured the same thing by
+        simulation.
+      </p>
+      <p>
+        The figure below shows the consequence directly: how far the learned direction
+        drifts from the true one as trials become scarce, for LDA and SVM together.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">How wrong the learned direction is <em>· live</em></div>
+      <div class="figure__sub">
+        Both models get the same data. The dashed line is the truth they are trying to
+        find; the error is the average angle they miss it by.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Trials per class
+          <input type="range" id="sn-n" min="6" max="200" value="20">
+          <output id="sn-n-out"></output>
+        </label>
+        <label class="field">
+          Correlation between features
+          <input type="range" id="sn-rho" min="0" max="95" value="60">
+          <output id="sn-rho-out"></output>
+        </label>
+      </div>
+      <div id="sn-plot"></div>
+      <div class="stats" id="sn-out"></div>
+      <div class="figure__note">
+        Drag trials down to 6–10 and both errors blow up. LDA suffers more as
+        correlation rises, because correlation is exactly what it is trying to estimate
+        and cannot.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 9. ASSUMPTIONS ================================ -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">9</span>Assumptions, variants, and failure modes</h2>
+
+      <h3>If the classes are not Gaussian</h3>
+      <p>
+        LDA is fairly forgiving here — it tends to work on non-Gaussian data because the
+        rule only depends on means and covariances, not the full shape. But it is
+        genuinely wrong when a class is <em>multi-modal</em>: if "remembered" is really
+        two different processes with two different signatures, their average is a
+        point between them that may describe no actual trial.
+      </p>
+      <p>
+        Worth flagging for our data specifically: our real EEG features are strongly
+        non-Gaussian. Measured kurtosis is about 23, where a Gaussian is 3 — meaning far
+        more extreme values than the model expects. That is a known gap between our
+        simulations and our data.
+      </p>
+
+      <h3>If the two classes have different shapes</h3>
+      <p>
+        Then the optimal boundary is curved, and the model for it is <strong>quadratic
+        discriminant analysis</strong> (QDA), which estimates a separate covariance per
+        class. It is more flexible and almost always worse in practice here, because it
+        doubles an estimation problem that is already hopeless — Raudys &amp; Jain put
+        it at 10–32 × features. Blankertz et al. checked the equal-shape assumption for
+        ERP data and found it approximately satisfied, which is the empirical
+        justification for staying with LDA.
+      </p>
+
+      <h3>If the classes are unbalanced</h3>
+      <p>
+        Our study-phase data is: many more remembered than forgotten words. LDA handles
+        this in the bias term <em>b</em>, which absorbs the prior probability of each
+        class. If you leave it alone the model will lean toward predicting the common
+        class. Since we score with AUC, which sweeps over every possible threshold, the
+        bias does not affect our reported numbers — but it does affect any single
+        accuracy figure, which is one reason accuracy is a poor measure here.
+      </p>
+
+      <h3>Things LDA is secretly the same as</h3>
+      <ul>
+        <li>
+          <strong>Fisher's discriminant.</strong> Fisher (1936) asked for the direction
+          maximising between-class separation over within-class spread, with no
+          probability model at all, and got the same answer. Two derivations, one
+          formula.
+        </li>
+        <li>
+          <strong>Least-squares regression on the labels.</strong> Regressing a 0/1
+          label on the features gives the same direction, up to scale.
+        </li>
+      </ul>
+
+      <h3>Practical notes</h3>
+      <ul>
+        <li>
+          <strong>Feature scaling does not matter.</strong> Σ<sup>−1</sup> already
+          normalises by variance, so rescaling a feature rescales its weight and leaves
+          the answer unchanged. This is not true of SVM (see the other page, §9).
+        </li>
+        <li>
+          <strong>It is deterministic.</strong> Same data, same answer, every time — no
+          random initialisation, no seed. Our committed LDA reference file has never
+          changed; the SVM one had to be regenerated.
+        </li>
+        <li>
+          <strong>It is fast, and one-shot.</strong> Compute two means, one covariance,
+          invert it. No iteration.
+        </li>
+        <li>
+          <strong>It gives calibrated probabilities</strong> under its assumptions,
+          which SVM does not.
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== 10. ON OUR DATA =============================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">10</span>What this looks like on our data</h2>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th></th><th>study phase (subsequent memory)</th><th>feedback task (Danyluik)</th></tr></thead>
+          <tbody>
+            <tr><td>trials per participant</td><td>225 (about 202 for training)</td><td>717</td></tr>
+            <tr><td>features</td><td>120</td><td>30</td></tr>
+            <tr><td>trials per weight</td><td><strong>1.7</strong></td><td>19</td></tr>
+            <tr><td>shrinkage used</td><td>&Gamma; = 1 (maximum)</td><td>&Gamma; = 0.5</td></tr>
+            <tr><td>AUC</td><td>0.531</td><td>0.722 (time–frequency features)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The two columns are the same model on two datasets, and the difference in
+        outcome is almost entirely the third row. Where there are 19 examples per
+        weight, LDA works and its published &Gamma; = 0.5 turns out to sit on the best
+        setting. Where there are 1.7, it does not, and the pipeline has been driven to
+        maximum shrinkage — which is to say, driven back to the naive rule of §4.
+      </p>
+      <p>
+        We also tested whether compressing 120 features down to ~10 before classifying
+        helps, which would attack the problem directly. On the study data it gave
+        +0.012, in the predicted shape, but with too little power to confirm. On the
+        feedback data — which has the power — it gave +0.0002, exactly as it should if
+        the mechanism is what we think it is: a remedy is inert where the disease is
+        absent. That reasoning is laid out on
+        <a href="simulation.html">the trial-count page</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 11. SOURCES =================================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2><span class="steplabel">11</span>Where all this comes from</h2>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>work</th><th>what it contributed</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Fisher (1936)</strong></td>
+              <td>The direction maximising between-class over within-class spread. No probability model — the criterion came first. <code>papers/FISHER_1936.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Welch (1939)</strong></td>
+              <td>The Bayes derivation: for two equal-covariance Gaussians the optimal rule is linear, with <em>w</em> = Σ<sup>−1</sup>(<em>μ</em><sub>1</sub> − <em>μ</em><sub>0</sub>). This is what software computes.</td>
+            </tr>
+            <tr>
+              <td><strong>Rao (1948)</strong></td>
+              <td>Generalisation beyond two classes.</td>
+            </tr>
+            <tr>
+              <td><strong>Friedman (1989)</strong></td>
+              <td>Regularized discriminant analysis — the &Gamma; of §6, and the name MATLAB uses.</td>
+            </tr>
+            <tr>
+              <td><strong>Raudys &amp; Jain (1991)</strong></td>
+              <td>The sample-size table in §8, and the analysis showing required trials scale linearly with features for a linear model. <code>papers/Raudys_Jain_1991.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Ledoit &amp; Wolf (2004)</strong></td>
+              <td>Computing the optimal &Gamma; analytically instead of by cross-validation — a well-conditioned covariance estimator for the case where features outnumber samples, which is ours. <code>papers/Ledoit_Wolf_2004.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Blankertz et al. (2011)</strong></td>
+              <td>All of this assembled for single-trial ERP: the filter-versus-pattern distinction, the Oz example, the eigenvalue bias, and the &Gamma; sweep. The closest published work to what we do. <code>papers/Blankertz_Etal_2011.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Haufe et al. (2014)</strong></td>
+              <td>Why weight vectors are not brain maps, and how to convert them into something interpretable. <code>papers/Haufe_Etal_2014.pdf</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small muted">
+        Fisher, Ledoit &amp; Wolf, Raudys &amp; Jain, Blankertz et al. and Haufe et al.
+        are all filed in this repository; of those, Raudys &amp; Jain and Blankertz
+        et al. have been read closely and are the sources for §6 and §8. The &Gamma; sweep
+        figures quoted in §6 are from Blankertz et al. Fig. 9, measured on their
+        attention-speller data rather than ours, so treat the specific percentages as
+        illustrative of the shape rather than as predictions for our pipeline.
+      </p>
+      <p>
+        Next: <a href="svm.html">the same eleven sections for the support vector
+        machine</a>, which reaches a similar-looking answer from an entirely different
+        starting point.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager" aria-label="Page navigation"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab · a working document, updated as the project runs.
+  </div>
+</footer>
+
+<script type="module">
+  import { initChrome } from './assets/site.js';
+  import { ldaMechanics, smallN } from './assets/simulation.js';
+
+  initChrome();
+
+  /* ---------- the two rules ---------- */
+  const lda = ldaMechanics(document.getElementById('lda-plot'), document.getElementById('lda-out'));
+  const ldaRho = document.getElementById('lda-rho');
+  const ldaGam = document.getElementById('lda-gamma');
+  const syncLda = () => {
+    lda.state.rho = +ldaRho.value / 100;
+    lda.state.gamma = +ldaGam.value / 100;
+    document.getElementById('lda-rho-out').textContent = lda.state.rho.toFixed(2);
+    document.getElementById('lda-gamma-out').textContent = lda.state.gamma.toFixed(2);
+    lda.refresh();
+  };
+  [ldaRho, ldaGam].forEach((s) => s.addEventListener('input', syncLda));
+  document.querySelectorAll('#lda-steps .btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      lda.state.step = +b.dataset.step;
+      document.querySelectorAll('#lda-steps .btn').forEach((o) => o.classList.toggle('btn--primary', o === b));
+      lda.refresh();
+    });
+  });
+  syncLda();
+
+  /* ---------- small-sample drift ---------- */
+  const sn = smallN(document.getElementById('sn-plot'), document.getElementById('sn-out'));
+  const snN = document.getElementById('sn-n');
+  const snRho = document.getElementById('sn-rho');
+  const syncSn = () => {
+    sn.state.n = +snN.value;
+    sn.state.rho = +snRho.value / 100;
+    document.getElementById('sn-n-out').textContent = sn.state.n;
+    document.getElementById('sn-rho-out').textContent = sn.state.rho.toFixed(2);
+    sn.refresh();
+  };
+  [snN, snRho].forEach((s) => s.addEventListener('input', syncSn));
+  syncSn();
+</script>
+
+</body>
+</html>
