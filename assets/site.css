@@ -479,77 +479,78 @@ details.aside > *:not(summary) { margin-top: 0.7rem; }
 .footer a { color: var(--text-secondary); }
 
 /* ---------- projects dropdown in the topbar ---------- */
-/* Sits after the chapter links. The primer's eight chapters stay a flat,
-   stable row; anything ongoing lives in here instead of extending them. */
+/* The <details> button sits in .topbar as a sibling of .topbar__nav; the panel
+   itself is parented to <body> and positioned by JS. Two properties of this bar
+   make anything else break -- see the long comment in site.js. */
 .navmenu { position: relative; flex: none; }
 
 .navmenu > summary {
   list-style: none;
   cursor: pointer;
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem 0.45rem 0.25rem 0.55rem;
   border-radius: var(--radius-sm);
   font-size: 0.82rem;
   color: var(--text-secondary);
   white-space: nowrap;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.35rem;
+  user-select: none;
 }
 .navmenu > summary::-webkit-details-marker { display: none; }
+.navmenu > summary::marker { content: ''; }
 .navmenu > summary:hover { background: var(--border); color: var(--text-primary); }
+.navmenu > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .navmenu[data-current] > summary { background: var(--accent-wash); color: var(--accent); font-weight: 600; }
-.navmenu__caret { font-size: 0.6em; opacity: 0.75; transition: transform 0.12s ease; }
+
+/* Drawn with borders rather than set as the "▾" glyph, which rendered at about
+   8px on this font stack however it was sized. */
+.navmenu__caret {
+  flex: none;
+  width: 0; height: 0;
+  font-size: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  transition: transform 0.14s ease;
+}
 .navmenu[open] .navmenu__caret { transform: rotate(180deg); }
 
 .navmenu__panel {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  right: 0;
-  z-index: 60;
-  min-width: 17rem;
-  max-width: min(22rem, calc(100vw - 2rem));
+  position: fixed;
+  top: 0; left: 0;
+  display: none;
+  z-index: 200;
+  width: 19rem;
+  max-width: calc(100vw - 1rem);
   padding: 0.3rem;
-  background: var(--surface);
+  background: var(--surface, var(--page));
   border: 1px solid var(--border);
   border-radius: var(--radius-md, 8px);
-  box-shadow: 0 8px 28px rgb(0 0 0 / 0.14);
-  display: flex;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
   flex-direction: column;
   gap: 0.1rem;
 }
-/* The panel overrides .topbar__nav a, which is laid out for a single inline row. */
-.topbar__nav .navmenu__panel a {
+.navmenu__panel[data-open] { display: flex; }
+.navmenu__panel a {
   display: block;
   white-space: normal;
-  padding: 0.45rem 0.55rem;
+  padding: 0.5rem 0.55rem;
   border-radius: var(--radius-sm);
+  text-decoration: none;
 }
 .navmenu__ttl { display: block; font-size: 0.85rem; color: var(--text-primary); font-weight: 560; }
-.navmenu__sub { display: block; font-size: 0.76rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.1rem; }
-.topbar__nav .navmenu__panel a:hover { background: var(--accent-wash); }
-.topbar__nav .navmenu__panel a:hover .navmenu__ttl { color: var(--accent); }
-.topbar__nav .navmenu__panel a[aria-current="page"] { background: var(--accent-wash); }
-.topbar__nav .navmenu__panel a[aria-current="page"] .navmenu__ttl { color: var(--accent); font-weight: 650; }
-
-/* The nav scrolls horizontally on narrow screens; an absolutely-positioned
-   panel would be clipped by that overflow, so the menu goes inline there. */
-@media (max-width: 640px) {
-  .navmenu__panel {
-    position: fixed;
-    top: auto;
-    left: 0.75rem;
-    right: 0.75rem;
-    max-width: none;
-  }
-}
-
-.nowrap { white-space: nowrap; }
+.navmenu__sub { display: block; font-size: 0.76rem; color: var(--text-muted); line-height: 1.35; margin-top: 0.12rem; }
+.navmenu__panel a:hover { background: var(--accent-wash); }
+.navmenu__panel a:hover .navmenu__ttl { color: var(--accent); }
+.navmenu__panel a[aria-current="page"] { background: var(--accent-wash); }
+.navmenu__panel a[aria-current="page"] .navmenu__ttl { color: var(--accent); font-weight: 650; }
 
 /* ---------- deep-dive pages: display formulas and step markers ---------- */
 .formula {
   margin: 1.1rem 0;
   padding: 0.85rem 1rem;
-  background: var(--surface-2, var(--accent-wash));
+  background: var(--accent-wash);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   text-align: center;
@@ -557,7 +558,6 @@ details.aside > *:not(summary) { margin-top: 0.7rem; }
   line-height: 1.7;
   overflow-x: auto;
 }
-.formula em { font-style: italic; }
 .formula .lbl { display: block; margin-top: 0.4rem; font-size: 0.78rem; color: var(--text-muted); }
 
 .steplabel {
@@ -569,6 +569,5 @@ details.aside > *:not(summary) { margin-top: 0.7rem; }
   color: var(--accent);
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
   vertical-align: 0.15em;
 }

@@ -83,9 +83,18 @@ export function initChrome() {
         return `<a href="${c.href}"${cur}>${c.short}</a>`;
       }).join('');
 
+      nav.innerHTML = links;
+
       /* The dropdown is a details/summary rather than a custom widget: it gets
          keyboard support, Escape-to-close and focus handling from the browser,
-         and it still works with no JS at all. */
+         and it still works with no JS at all.
+
+         It is inserted as a SIBLING of .topbar__nav, never inside it. That nav
+         sets overflow-x:auto so the chapter row can scroll on a phone, and per
+         spec an auto overflow-x forces overflow-y to compute to auto as well --
+         making the nav a scroll container that clips in BOTH axes. An
+         absolutely-positioned panel inside it is silently cropped to nothing,
+         which is exactly what happened the first time this shipped. */
       const items = EXTRAS.items.map((c) => {
         const cur = c.href === here ? ' aria-current="page"' : '';
         return `<a href="${c.href}"${cur}>
@@ -94,21 +103,52 @@ export function initChrome() {
           </a>`;
       }).join('');
 
-      nav.innerHTML = `${links}
-        <details class="navmenu"${inExtras ? ' data-current="1"' : ''}>
-          <summary>${EXTRAS.label}<span class="navmenu__caret" aria-hidden="true">▾</span></summary>
-          <div class="navmenu__panel">${items}</div>
-        </details>`;
+      const menu = document.createElement('details');
+      menu.className = 'navmenu';
+      if (inExtras) menu.setAttribute('data-current', '1');
+      menu.innerHTML = `<summary>${EXTRAS.label}<span class="navmenu__caret" aria-hidden="true">▾</span></summary>`;
+      nav.insertAdjacentElement('afterend', menu);
 
-      const menu = nav.querySelector('.navmenu');
-      if (menu) {
-        document.addEventListener('click', (e) => {
-          if (!menu.contains(e.target)) menu.open = false;
-        });
-        menu.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape') { menu.open = false; menu.querySelector('summary').focus(); }
-        });
-      }
+      /* The panel lives on <body>, not inside the <details>, and is positioned
+         with JS. Two separate things in this topbar would otherwise break it:
+
+           1. .topbar__nav sets overflow-x:auto, and per spec that forces
+              overflow-y to auto too -- so it clips in BOTH axes and an absolutely
+              positioned panel inside it is cropped to nothing. (This is the bug
+              that shipped.) Being a sibling of the nav fixes that one.
+           2. .topbar sets backdrop-filter, which makes it the containing block
+              for position:fixed descendants. So even a fixed panel would be
+              positioned against the topbar rather than the viewport.
+
+         Hanging the panel off <body> sidesteps both, and cannot be clipped by
+         any ancestor, so it survives future changes to the bar's styling. */
+      const panel = document.createElement('div');
+      panel.className = 'navmenu__panel';
+      panel.innerHTML = items;
+      document.body.appendChild(panel);
+
+      const place = () => {
+        const r = menu.getBoundingClientRect();
+        panel.style.top = `${r.bottom + 6}px`;
+        const w = panel.offsetWidth;
+        const left = Math.min(Math.max(8, r.right - w), innerWidth - w - 8);
+        panel.style.left = `${left}px`;
+      };
+      const setOpen = (on) => {
+        menu.open = on;
+        if (on) { panel.setAttribute('data-open', ''); place(); }
+        else panel.removeAttribute('data-open');
+      };
+
+      menu.addEventListener('toggle', () => setOpen(menu.open));
+      addEventListener('resize', () => { if (menu.open) place(); });
+      addEventListener('scroll', () => { if (menu.open) place(); }, true);
+      document.addEventListener('click', (e) => {
+        if (!menu.contains(e.target) && !panel.contains(e.target)) setOpen(false);
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && menu.open) { setOpen(false); menu.querySelector('summary').focus(); }
+      });
     }
   }
 
