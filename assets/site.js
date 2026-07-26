@@ -25,6 +25,8 @@ export const EXTRAS = {
   items: [
     { href: 'simulation.html', short: 'How much data', title: 'How much data would it take?',
       blurb: 'The trial-count simulation: how many trials a memory classifier needs, and why our pipeline comparisons come out flat.' },
+    { href: 'sereega.html', short: 'SEREEGA simulator', title: 'Simulating EEG you already know the answer to',
+      blurb: 'A rotatable 3D head with a draggable dipole, signal classes, and a live decode — plus what our own runs found.' },
     { href: 'lda.html', short: 'LDA deep dive', title: 'LDA, from the ground up',
       blurb: 'Every weight, where its value comes from, and what the model assumes. Assumes no machine learning background.' },
     { href: 'svm.html', short: 'SVM deep dive', title: 'SVM, from the ground up',

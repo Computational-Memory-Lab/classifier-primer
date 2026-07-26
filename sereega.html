@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEREEGA: simulating EEG you know the answer to | CML primer</title>
+<meta name="description" content="An interactive walkthrough of simulated event-related EEG: a rotatable 3D head with a draggable dipole, signal classes, trial-to-trial variability, and a live decode — plus what our own simulation runs found.">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar__home" href="index.html">Memory Classifiers <span>· CML primer</span></a>
+  <div class="topbar__spacer"></div>
+  <nav class="topbar__nav" aria-label="Chapters"></nav>
+  <button class="theme-toggle" type="button">☾</button>
+</header>
+
+<main class="wrap">
+  <section style="padding: 2.5rem 0 0;">
+    <div class="prose">
+      <p class="eyebrow">Project · interactive tool</p>
+      <h1>Simulating EEG you already know the answer to</h1>
+      <p class="lede">
+        Every number elsewhere on this site is an estimate of something we cannot
+        observe. Simulation inverts that: you decide what the brain is doing, generate
+        the recording it would produce, and then check whether your analysis can find
+        what you put there. If it cannot, the problem is the analysis.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>This page is a working model, not the toolbox.</strong> Everything
+          here runs live in your browser and reimplements the <em>shape</em> of what
+          SEREEGA does. It is not SEREEGA and does not use its lead fields — the
+          section <a href="#limits">what this demo is not</a> is specific about the
+          difference, and it matters.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== THE FORWARD PROBLEM =========================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>The one equation everything hangs off</h2>
+      <p>
+        Simulating EEG means answering: if some patch of cortex does something, what
+        appears at an electrode taped to the scalp? That is the
+        <strong>forward problem</strong>, and it has a compact form:
+      </p>
+      <div class="formula">
+        <em>x</em> &nbsp;=&nbsp; <strong>A</strong><em>s</em> &nbsp;+&nbsp; <em>ε</em>
+        <span class="lbl">what the electrodes record = (how sources reach the scalp) × (what the sources do) + noise</span>
+      </div>
+      <p>Three pieces, and you supply all three:</p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>piece</th><th>what it is</th><th>who decides it</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><em>s</em> — source activity</td>
+              <td>What each simulated generator does over time: an ERP peak, an oscillation, background noise.</td>
+              <td>You. This is the ground truth.</td>
+            </tr>
+            <tr>
+              <td><strong>A</strong> — the lead field</td>
+              <td>A table saying how strongly each source reaches each electrode. Physics: skull thickness, tissue conductivity, geometry.</td>
+              <td>A head model. SEREEGA ships several.</td>
+            </tr>
+            <tr>
+              <td><em>ε</em> — noise</td>
+              <td>Everything not modelled as a source.</td>
+              <td>You, by choosing its colour and size.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The reason this is worth doing: <strong>you know <em>s</em></strong>. When a
+        classifier reaches 0.53 on real data you cannot tell whether the effect is
+        weak, the pipeline is lossy, or there are too few trials. Here you set the
+        effect yourself, so every gap between what you planted and what came out is
+        attributable.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== 3D HEAD ======================================= -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>The head model: one source, and what the scalp sees</h2>
+      <p>
+        Start with a single generator — a <strong>current dipole</strong>, the standard
+        model of a small patch of cortex firing together. It has a position and a
+        direction, and both matter enormously.
+      </p>
+      <p>
+        Drag the head to rotate it. Move the dipole with the sliders and watch the
+        scalp pattern. Three things are worth deliberately trying:
+      </p>
+      <ul>
+        <li>
+          <strong>Point it straight out (elevation 90°) versus sideways (0°).</strong>
+          A dipole pointing at the scalp gives one compact blob. A dipole lying
+          tangential gives a <em>pair</em> of opposite-signed regions with nothing in
+          the middle — so the strongest signal appears where the source is not.
+        </li>
+        <li>
+          <strong>Push it deep.</strong> The pattern gets weaker and much broader. Deep
+          sources are hard to see and harder to localise.
+        </li>
+        <li>
+          <strong>Drop from 128 electrodes to 19.</strong> Watch the sampling get coarse
+          enough to miss structure that is plainly there in the surface.
+        </li>
+      </ul>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">One dipole, and the potential it puts on the scalp <em>· live</em></div>
+      <div class="figure__sub">
+        Blue is negative, orange positive. Rings are electrodes, filled with the value
+        they would record. Drag the head to rotate.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Left – right
+          <input type="range" id="hd-x" min="-60" max="60" value="0">
+          <output id="hd-x-out"></output>
+        </label>
+        <label class="field">
+          Back – front
+          <input type="range" id="hd-y" min="-60" max="60" value="-35">
+          <output id="hd-y-out"></output>
+        </label>
+        <label class="field">
+          Down – up
+          <input type="range" id="hd-z" min="-40" max="60" value="30">
+          <output id="hd-z-out"></output>
+        </label>
+        <label class="field">
+          Direction: elevation
+          <input type="range" id="hd-el" min="-90" max="90" value="90">
+          <output id="hd-el-out"></output>
+        </label>
+        <label class="field">
+          Direction: azimuth
+          <input type="range" id="hd-az" min="-180" max="180" value="0">
+          <output id="hd-az-out"></output>
+        </label>
+        <label class="field">
+          Electrodes
+          <select id="hd-ch">
+            <option value="19">19 (10–20)</option>
+            <option value="32">32</option>
+            <option value="64">64</option>
+            <option value="128">128</option>
+          </select>
+        </label>
+      </div>
+      <div id="hd-plot"></div>
+      <div class="stats" id="hd-out"></div>
+      <div class="figure__note">
+        The head is an ellipsoid and the physics is a dipole in a uniform conductor —
+        no skull, no boundary at the scalp. Real lead fields put a poorly-conducting
+        skull between source and sensor, which spreads and attenuates everything
+        further. The shapes here are right; the numbers are not.
+      </div>
+    </div>
+
+    <div class="prose">
+      <div class="keypoint">
+        <p>
+          <strong>This is why a scalp map is not a picture of the brain.</strong> A
+          single source can produce two opposite-signed patches, neither centred on it.
+          Two sources produce a sum that may resemble neither. Going from scalp back to
+          sources is the <em>inverse</em> problem, and it has no unique solution — which
+          is exactly why simulation is useful, since it is the one setting where you
+          know the answer.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SIGNAL CLASSES ================================ -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>What the source does: signal classes</h2>
+      <p>
+        Position and orientation fix <em>where</em> the signal lands. Now for
+        <em>what</em> it is. SEREEGA offers a small set of building blocks:
+      </p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>class</th><th>what it produces</th><th>parameters</th></tr></thead>
+          <tbody>
+            <tr><td><strong>ERP</strong></td><td>Smooth bumps time-locked to the event — the classic components.</td><td>latency, width, amplitude, per peak</td></tr>
+            <tr><td><strong>ERSP</strong></td><td>An oscillation, optionally bursting or amplitude-modulated.</td><td>frequency or band, modulation</td></tr>
+            <tr><td><strong>Noise</strong></td><td>Coloured background: white, pink, or brown.</td><td>colour exponent, amplitude</td></tr>
+            <tr><td><strong>Autoregressive</strong></td><td>Signals that depend on their own past, and on each other — connectivity.</td><td>coefficients, directions</td></tr>
+            <tr><td><strong>Data</strong></td><td>Any time series you hand it, including real EEG epochs.</td><td>the data</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>The part that makes it realistic: nothing repeats exactly</h3>
+      <p>
+        If every trial were identical, averaging would be pointless and classification
+        trivial. Real trials vary, and SEREEGA makes variability a first-class
+        parameter. Every value can carry:
+      </p>
+      <ul>
+        <li>a <strong>deviation</strong> — random spread from trial to trial;</li>
+        <li>a <strong>slope</strong> — systematic drift across the session, i.e. fatigue;</li>
+        <li>a <strong>probability of appearance</strong> — the component sometimes simply does not happen.</li>
+      </ul>
+      <p>
+        The figure below has the first two of those. Set the noise high and the trials
+        low, and the average is unreliable. Raise the trial count and it firms up — as
+        the square root, which is the whole reason ERP research averages.
+      </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Single trials, and the average that emerges <em>· live</em></div>
+      <div class="figure__sub">
+        Dashed blue is the truth you planted. Orange is the average of the noisy
+        trials. Grey is the individual trials a classifier actually sees.
+      </div>
+      <div class="controls">
+        <div class="segmented" id="sg-show" role="group" aria-label="What to show">
+          <button class="btn btn--primary" data-show="trials">show single trials</button>
+          <button class="btn" data-show="clean">truth vs average only</button>
+        </div>
+        <label class="field">
+          Late-component amplitude (µV)
+          <input type="range" id="sg-amp" min="0" max="200" value="80">
+          <output id="sg-amp-out"></output>
+        </label>
+        <label class="field">
+          Its latency (ms)
+          <input type="range" id="sg-lat" min="250" max="700" value="400">
+          <output id="sg-lat-out"></output>
+        </label>
+        <label class="field">
+          Noise amplitude (µV)
+          <input type="range" id="sg-noise" min="0" max="400" value="120">
+          <output id="sg-noise-out"></output>
+        </label>
+        <label class="field">
+          Noise colour
+          <select id="sg-colour">
+            <option value="0">white (flat)</option>
+            <option value="1" selected>pink (1/f)</option>
+            <option value="2">brown (1/f²)</option>
+          </select>
+        </label>
+        <label class="field">
+          Trials
+          <input type="range" id="sg-n" min="2" max="200" value="40">
+          <output id="sg-n-out"></output>
+        </label>
+        <label class="field">
+          Amplitude deviation
+          <input type="range" id="sg-dev" min="0" max="100" value="35">
+          <output id="sg-dev-out"></output>
+        </label>
+        <label class="field">
+          Latency jitter (ms)
+          <input type="range" id="sg-jit" min="0" max="120" value="25">
+          <output id="sg-jit-out"></output>
+        </label>
+      </div>
+      <div id="sg-plot"></div>
+      <div class="stats" id="sg-out"></div>
+      <div class="figure__note">
+        Watch the third statistic. Averaging improves signal-to-noise by the square
+        root of the trial count — 100 trials buys a factor of 10, and 400 buys 20. That
+        diminishing return is the same square-root wall that
+        <a href="simulation.html">the trial-count page</a> runs into from the
+        classification side.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== DECODE ======================================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>Now decode it</h2>
+      <p>
+        Put the two halves together. Two conditions differ in one thing only — the
+        amplitude of the late component — and everything else is shared noise. The
+        source is projected through the head model to every electrode, each channel is
+        reduced to windowed means exactly as our real pipeline does, and a classifier
+        is trained and tested on the result.
+      </p>
+      <p>
+        The classifier here is diagonal-covariance LDA, which is what
+        <a href="lda.html">&Gamma; = 1</a> reduces to — the setting our own study-phase
+        pipeline runs. It is fitted on half the trials and scored on the other half.
+        <strong>Nothing is precomputed; this really is classifying the simulated
+        data.</strong>
+      </p>
+      <p>Two things to try, because they are the whole argument of this project:</p>
+      <ol>
+        <li>
+          <strong>Raise the electrode count with everything else fixed.</strong> More
+          electrodes means more signal — and also more features to estimate. Watch which
+          wins.
+        </li>
+        <li>
+          <strong>Set the effect small and the trials low.</strong> The AUC collapses
+          toward 0.5 even though the effect is definitely there, because you put it
+          there. That is the entire study-phase problem in one control.
+        </li>
+      </ol>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">AUC against trials, on data generated in this page <em>· live</em></div>
+      <div class="figure__sub">
+        Each point trains and tests a classifier on that many simulated trials.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Effect size (µV difference)
+          <input type="range" id="dc-eff" min="0" max="60" value="15">
+          <output id="dc-eff-out"></output>
+        </label>
+        <label class="field">
+          Trials
+          <input type="range" id="dc-n" min="40" max="600" step="20" value="200">
+          <output id="dc-n-out"></output>
+        </label>
+        <label class="field">
+          Electrodes
+          <select id="dc-ch">
+            <option value="19" selected>19</option>
+            <option value="32">32</option>
+            <option value="64">64</option>
+          </select>
+        </label>
+        <label class="field">
+          Time bins per channel
+          <input type="range" id="dc-bins" min="2" max="24" value="12">
+          <output id="dc-bins-out"></output>
+        </label>
+        <label class="field">
+          Noise amplitude (µV)
+          <input type="range" id="dc-noise" min="10" max="400" value="120">
+          <output id="dc-noise-out"></output>
+        </label>
+      </div>
+      <div id="dc-plot"></div>
+      <div class="stats" id="dc-out"></div>
+      <div class="figure__note">
+        Set the effect to zero. The curve should sit <em>around</em> 0.5, scattering
+        more at low trial counts because the held-out half is small — across five seeds
+        this build averages 0.514, with individual runs between 0.48 and 0.57. If a
+        simulation cannot produce chance from no effect, nothing else it says is worth
+        anything. Our cluster runs pass the same check more tightly, at 0.497–0.507,
+        because they average over many more repetitions.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== THE TAUTOLOGY WARNING ========================= -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>The trap the authors warn about themselves</h2>
+      <p>
+        SEREEGA's own paper contains a caveat that anyone using it for classification
+        has to design around, and it is worth quoting exactly:
+      </p>
+      <blockquote class="callout callout--warn">
+        <p>
+          "when SEREEGA is used to model a linear effect, and a linear method is
+          subsequently used to again identify this effect, the obtained results could be
+          essentially tautological."
+        </p>
+        <p class="small muted">Krol et al. (2018), Discussion.</p>
+      </blockquote>
+      <p>
+        Which is precisely our situation. We plant an amplitude difference — a linear
+        effect — and decode it with LDA and linear SVM, which are linear methods. That
+        the classifier finds it is not evidence about the brain. It is evidence that
+        arithmetic works.
+      </p>
+      <div class="keypoint">
+        <p>
+          <strong>So what is a simulation like this legitimately for?</strong> Not for
+          showing an effect is decodable — that was assumed. It is for measuring
+          <em>how much of a known effect survives a given pipeline</em>: how AUC falls
+          with fewer trials, how much a montage costs, how much a preprocessing choice
+          throws away. The ground truth is a ruler, not a result.
+        </p>
+      </div>
+      <p>
+        It also sets a standard our project holds itself to: any claim that the pipeline
+        is adequate has to be tested against an effect that is <em>not</em> a linear
+        amplitude difference, since that is the one case a linear classifier is
+        guaranteed to handle.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== OUR RUNS ====================================== -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>What our own runs found</h2>
+      <p>
+        Everything above is a toy. The real runs used SEREEGA proper on the cluster —
+        a parietal dipole carrying a late-positive component, 64 brown-noise background
+        sources, a lead field built for our actual 257-channel geodesic net, and
+        SEREEGA's own multi-participant recipe (each participant's source moved within
+        20 mm and its orientation perturbed ±25%). Four results.
+      </p>
+
+      <h3>The montage is costing us, and our ten are still well chosen</h3>
+      <p>At a 4 µV effect and 900 trials, with LDA:</p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>electrode set</th><th>AUC</th></tr></thead>
+          <tbody>
+            <tr><td><strong>the repo's ten</strong></td><td><strong>0.823 ± 0.016</strong></td></tr>
+            <tr><td>random ten (three draws)</td><td>0.745 / 0.681 / 0.688</td></tr>
+            <tr><td>spread of 20</td><td>0.810 ± 0.015</td></tr>
+            <tr><td>spread of 32</td><td>0.828 ± 0.013</td></tr>
+            <tr><td>spread of 64</td><td>0.895 ± 0.015</td></tr>
+            <tr><td>all 339</td><td><strong>0.959 ± 0.010</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Two findings in one table. The repo's ten beat every random ten by 0.08–0.14, so
+        that choice is genuinely good rather than arbitrary. But 64 electrodes buys
+        +0.07 over them and the full set buys +0.14 — <strong>so ten is leaving real
+        AUC on the table</strong>, and more electrodes wins even though the feature
+        count grows from 120 to 4,068. Signal beats estimation burden here, which is not
+        what the trial-count argument alone would predict.
+      </p>
+      <div class="callout callout--warn">
+        <p>
+          <strong>One caveat, and it is a large one.</strong> Linear SVM does not follow
+          LDA up that axis — it flatlines near 0.56 while LDA climbs to 0.96. Any
+          conclusion about montage from this table is a conclusion about LDA
+          specifically.
+        </p>
+      </div>
+
+      <h3>A physically generated effect lands in the high-variance directions</h3>
+      <p>
+        In the abstract simulations we <em>chose</em> where the effect sat among the
+        features. Here physics chose: a parietal dipole projects to whatever scalp
+        topography it projects to. The result was that
+        <strong>51–70% of the effect's energy landed in the top 10% of covariance
+        directions</strong>, against the 0.10 a random orientation gives — a five- to
+        sevenfold enrichment.
+      </p>
+      <p>
+        That matters because the abstract work had shown a top-aligned effect recovers
+        91% of its ceiling at 1,800 trials while a randomly oriented one recovers 55%.
+        A real effect is not perfectly aligned — it still needs about 35 directions to
+        carry 90% of its energy — but it is much closer to the good end than the
+        random end.
+      </p>
+
+      <h3>The simulator does not reproduce real non-Gaussianity</h3>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th></th><th>mean |skewness|</th><th>mean kurtosis</th><th>effective dimension</th></tr></thead>
+          <tbody>
+            <tr><td>Gaussian reference</td><td>0</td><td>3</td><td>—</td></tr>
+            <tr><td><strong>simulated features</strong></td><td>0.09 ± 0.03</td><td>2.92 ± 0.04</td><td>12.0 ± 0.5</td></tr>
+            <tr><td><strong>real features (N = 48)</strong></td><td>1.74 ± 1.56</td><td><strong>23.0 ± 21.9</strong></td><td>9.5 ± 3.6</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Real study-phase features are wildly heavy-tailed — kurtosis 23 against the
+        Gaussian 3, with individual participants past 100. The forward model produces
+        features that are almost exactly Gaussian, and the reason is unavoidable: sum 64
+        brown-noise sources through a lead field and the central limit theorem gives you
+        a Gaussian.
+      </p>
+      <p>
+        <strong>Second-order structure reproduces well; higher-order structure does
+        not.</strong> Effective dimension matches closely (12.0 against 9.5), so the
+        covariance the classifier exploits is realistic. What is missing is the tails —
+        the artifacts, bursts and blinks that survive preprocessing. LDA and linear SVM
+        use only the first two moments, so the direct effect should be modest, but heavy
+        tails inflate covariance estimates through outliers. This is a standing caveat
+        on every simulated AUC we report.
+      </p>
+
+      <h3>Two traps, recorded so nobody rediscovers them</h3>
+      <ul>
+        <li>
+          <strong>EEGLAB ships a partial copy of FieldTrip</strong> that shadows the real
+          one and breaks lead-field reading. The paths have to be stripped after loading
+          EEGLAB and before initialising FieldTrip properly.
+        </li>
+        <li>
+          <strong>A FieldTrip lead field carries no default dipole orientations.</strong>
+          Our first run produced pure noise, silently, because every source had a zero
+          moment. It ran to completion and returned plausible-looking chance results. If
+          a simulation returns exactly chance, suspect the generator before the
+          classifier.
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== LIMITS ======================================== -->
+  <section class="chapter" id="limits">
+    <div class="prose">
+      <h2>What this demo is not</h2>
+      <p>
+        Stated plainly, because an interactive page is persuasive in a way that has
+        nothing to do with being right.
+      </p>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th></th><th>this page</th><th>SEREEGA proper</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>head model</strong></td>
+              <td>an ellipsoid; a dipole in a uniform conductor</td>
+              <td>lead fields from segmented MRI, with separate brain, skull and scalp conductivities</td>
+            </tr>
+            <tr>
+              <td><strong>source space</strong></td>
+              <td>one dipole you place by hand</td>
+              <td>~75,000 candidate locations, oriented perpendicular to the cortical surface</td>
+            </tr>
+            <tr>
+              <td><strong>channels</strong></td>
+              <td>approximate 10–20 positions, or a spiral standing in for a dense net</td>
+              <td>real montages up to 228 channels, or any montage via FieldTrip</td>
+            </tr>
+            <tr>
+              <td><strong>noise</strong></td>
+              <td>1/f<sup>n</sup> summed sinusoids at each channel</td>
+              <td>independently placed noise sources projected through the same lead field</td>
+            </tr>
+            <tr>
+              <td><strong>missing entirely</strong></td>
+              <td>skull attenuation, eye and muscle artifacts, connectivity between sources</td>
+              <td>connectivity yes; eye and muscle now available via HArtMuT</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The qualitative behaviour is faithful: dipolar topographies, the depth-versus-spread
+        relationship, radial against tangential orientation, averaging as the square root
+        of trials, and classification collapsing when trials run short. Absolute
+        amplitudes and fine spatial detail are not. Do not read a µV figure off this page
+        and use it for anything.
+      </p>
+      <p>
+        One more limitation shared with the real thing, from the section above: neither
+        this page nor our cluster runs reproduce the heavy tails of real EEG. Both are
+        more Gaussian than the data they stand in for.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== SOURCES ======================================= -->
+  <section class="chapter">
+    <div class="prose">
+      <h2>Sources</h2>
+      <div class="table-scroll">
+        <table class="data data--prose">
+          <thead><tr><th>work</th><th>what it contributed</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Krol, Pawlitzki, Lotte, Gramann &amp; Zander (2018)</strong></td>
+              <td>SEREEGA itself: the signal classes, the lead fields, the variability parameters, the multi-participant recipe, and the tautology warning quoted above. <code>papers/Krol_Etal_2018.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Harmening et al. (HArtMuT)</strong></td>
+              <td>Extends the source space to eye and muscle generators, which the original head models lacked — the artifacts that dominate real recordings.</td>
+            </tr>
+            <tr>
+              <td><strong>Schepers et al. (2025), UnfoldSim.jl</strong></td>
+              <td>The main alternative, in Julia, built around overlapping events and regression-based designs. <code>papers/Schepers_Etal_2025.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Barzegaran et al. (2019), EEGSourceSim</strong></td>
+              <td>A source-simulation package with a different emphasis, checked as a near-miss during the landscape review. <code>papers/Barzegaran_2019.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>Blankertz et al. (2011)</strong></td>
+              <td>Why the weight map from a classifier is a filter and not a picture of the source — the same point the head figure makes physically. <code>papers/Blankertz_Etal_2011.pdf</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small muted">
+        Numbers in "what our own runs found" are transcribed from
+        <code>projects/simulated_eeg/SIMULATED_EEG_PROJECT.md</code> §4.2, which records
+        the run configuration and the code that produced each figure.
+      </p>
+      <p>
+        Related: <a href="simulation.html">how many trials any of this would need</a>,
+        and the classifiers doing the decoding —
+        <a href="lda.html">LDA</a> and <a href="svm.html">SVM</a>.
+      </p>
+    </div>
+  </section>
+
+  <nav class="pager" aria-label="Page navigation"></nav>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    Computational Memory Lab · a working document, updated as the project runs.
+  </div>
+</footer>
+
+<script type="module">
+  import { initChrome } from './assets/site.js';
+  import { headView, signalView, decodeView } from './assets/sereega.js';
+
+  initChrome();
+
+  /* ---------- 3D head ---------- */
+  const hd = headView(document.getElementById('hd-plot'), document.getElementById('hd-out'));
+  const hdIds = ['hd-x', 'hd-y', 'hd-z', 'hd-el', 'hd-az'];
+  const syncHd = () => {
+    hd.state.dx = +document.getElementById('hd-x').value / 100;
+    hd.state.dy = +document.getElementById('hd-y').value / 100;
+    hd.state.dz = +document.getElementById('hd-z').value / 100;
+    hd.state.elv = +document.getElementById('hd-el').value;
+    hd.state.az = +document.getElementById('hd-az').value;
+    hd.state.nCh = +document.getElementById('hd-ch').value;
+    document.getElementById('hd-x-out').textContent = hd.state.dx.toFixed(2);
+    document.getElementById('hd-y-out').textContent = hd.state.dy.toFixed(2);
+    document.getElementById('hd-z-out').textContent = hd.state.dz.toFixed(2);
+    document.getElementById('hd-el-out').textContent = `${hd.state.elv}°`;
+    document.getElementById('hd-az-out').textContent = `${hd.state.az}°`;
+    hd.refresh();
+  };
+  hdIds.forEach((id) => document.getElementById(id).addEventListener('input', syncHd));
+  document.getElementById('hd-ch').addEventListener('change', syncHd);
+  syncHd();
+
+  /* ---------- signal classes ---------- */
+  const sg = signalView(document.getElementById('sg-plot'), document.getElementById('sg-out'));
+  const syncSg = () => {
+    sg.state.p3 = +document.getElementById('sg-amp').value / 10;
+    sg.state.l3 = +document.getElementById('sg-lat').value;
+    sg.state.noiseAmp = +document.getElementById('sg-noise').value / 10;
+    sg.state.noise = +document.getElementById('sg-colour').value;
+    sg.state.nTrials = +document.getElementById('sg-n').value;
+    sg.state.dev = +document.getElementById('sg-dev').value / 100;
+    sg.state.jitter = +document.getElementById('sg-jit').value;
+    document.getElementById('sg-amp-out').textContent = sg.state.p3.toFixed(1);
+    document.getElementById('sg-lat-out').textContent = sg.state.l3;
+    document.getElementById('sg-noise-out').textContent = sg.state.noiseAmp.toFixed(1);
+    document.getElementById('sg-n-out').textContent = sg.state.nTrials;
+    document.getElementById('sg-dev-out').textContent = sg.state.dev.toFixed(2);
+    document.getElementById('sg-jit-out').textContent = sg.state.jitter;
+    sg.refresh();
+  };
+  ['sg-amp', 'sg-lat', 'sg-noise', 'sg-n', 'sg-dev', 'sg-jit']
+    .forEach((id) => document.getElementById(id).addEventListener('input', syncSg));
+  document.getElementById('sg-colour').addEventListener('change', syncSg);
+  document.querySelectorAll('#sg-show .btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      sg.state.show = b.dataset.show;
+      document.querySelectorAll('#sg-show .btn').forEach((o) => o.classList.toggle('btn--primary', o === b));
+      sg.refresh();
+    });
+  });
+  syncSg();
+
+  /* ---------- decode ---------- */
+  const dc = decodeView(document.getElementById('dc-plot'), document.getElementById('dc-out'));
+  const syncDc = () => {
+    dc.state.effect = +document.getElementById('dc-eff').value / 10;
+    dc.state.nTrials = +document.getElementById('dc-n').value;
+    dc.state.nCh = +document.getElementById('dc-ch').value;
+    dc.state.nBins = +document.getElementById('dc-bins').value;
+    dc.state.noiseAmp = +document.getElementById('dc-noise').value / 10;
+    document.getElementById('dc-eff-out').textContent = dc.state.effect.toFixed(1);
+    document.getElementById('dc-n-out').textContent = dc.state.nTrials;
+    document.getElementById('dc-bins-out').textContent = dc.state.nBins;
+    document.getElementById('dc-noise-out').textContent = dc.state.noiseAmp.toFixed(1);
+    dc.refresh();
+  };
+  ['dc-eff', 'dc-n', 'dc-bins', 'dc-noise']
+    .forEach((id) => document.getElementById(id).addEventListener('input', syncDc));
+  document.getElementById('dc-ch').addEventListener('change', syncDc);
+  syncDc();
+</script>
+
+</body>
+</html>
