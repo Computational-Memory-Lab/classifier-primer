@@ -164,10 +164,10 @@
       <div class="stats" id="hd-out"></div>
       <div class="figure__note">
         <strong>The geometry is real; the physics is still an approximation.</strong>
-        The surface is the scalp boundary from EEGLAB's standard head model — the
-        Colin27 template, by way of FieldTrip — and the electrodes are actual 10-05
-        coordinates from the same model, so Cz really is at the vertex and the montage
-        really is a montage. What is <em>not</em> real is the conduction: this computes
+        The surface is <code>mheadnew.mat</code>, the head EEGLAB's own
+        <code>headplot()</code> draws, and the electrodes are actual 10-05 coordinates
+        co-registered onto it, so Cz really is at the vertex and the montage really is a
+        montage. What is <em>not</em> real is the conduction: this computes
         a dipole in a uniform medium, with no poorly-conducting skull between source and
         sensor. A real lead field would spread and attenuate everything further. Shapes
         and relationships are right; absolute numbers are not.
@@ -537,7 +537,7 @@
           <tbody>
             <tr>
               <td><strong>head geometry</strong></td>
-              <td><em>real</em> — the Colin27 scalp surface from EEGLAB's standard head model</td>
+              <td><em>real</em> — <code>mheadnew.mat</code>, the mesh EEGLAB's own <code>headplot()</code> draws</td>
               <td>the same family of template heads</td>
             </tr>
             <tr>
@@ -610,8 +610,8 @@
               <td>A source-simulation package with a different emphasis, checked as a near-miss during the landscape review. <code>papers/Barzegaran_2019.pdf</code></td>
             </tr>
             <tr>
-              <td><strong>EEGLAB — DIPFIT <code>standard_BEM</code></strong></td>
-              <td>The scalp surface and the 10-05 electrode coordinates this page draws, via <code>site/build_head.py</code>. Derived from the Colin27 / ICBM template head through FieldTrip and SPM, and redistributed here as decimated, smoothed display geometry.</td>
+              <td><strong>EEGLAB — <code>mheadnew.mat</code> and DIPFIT <code>standard_1005.elc</code></strong></td>
+              <td>The head this page draws is the one <code>headplot()</code> uses; the electrodes are real 10-05 coordinates, co-registered to it by a fitted similarity transform with a median residual of 3.4 mm. Built by <code>site/build_head.py</code>, which prints the fit and refuses to ship one worse than 6 mm.</td>
             </tr>
             <tr>
               <td><strong>Blankertz et al. (2011)</strong></td>

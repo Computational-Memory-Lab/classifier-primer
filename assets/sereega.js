@@ -201,6 +201,7 @@ export function headView(host, out) {
 
   let drag = null;
   host.addEventListener('pointerdown', (e) => {
+    e.preventDefault();          // otherwise the drag selects the surrounding text
     drag = { x: e.clientX, y: e.clientY, yaw: state.yaw, pitch: state.pitch };
     host.setPointerCapture(e.pointerId);
   });
@@ -215,6 +216,8 @@ export function headView(host, out) {
   host.addEventListener('pointercancel', end);
   host.style.touchAction = 'none';
   host.style.cursor = 'grab';
+  host.style.userSelect = 'none';
+  host.style.webkitUserSelect = 'none';
 
   /* Half-extents of the mesh, used to keep the dipole inside the skull. */
   let half = [0.8, 1, 0.85];
@@ -252,20 +255,38 @@ export function headView(host, out) {
     const pos = [state.dx * kk, state.dy * kk, state.dz * kk];
     const mom = moment(state.az, state.elv);
 
-    const cx = W / 2, cy = H / 2 + 6, sc = 175;
-    const { V, F, nF } = mesh;
+    const { V, F, N, nF } = mesh;
 
-    // Rotate every vertex once, and evaluate the potential there.
+    // Rotate every vertex and normal once, and evaluate the potential.
     const RV = new Float32Array(V.length);
+    const RN = new Float32Array(V.length);
     const PV = new Float32Array(V.length / 3);
     let maxAbs = 1e-9;
     for (let i = 0, j = 0; i < V.length; i += 3, j++) {
       const r = rotate([V[i], V[i + 1], V[i + 2]], state.yaw, state.pitch);
       RV[i] = r[0]; RV[i + 1] = r[1]; RV[i + 2] = r[2];
+      const q = rotate([N[i], N[i + 1], N[i + 2]], state.yaw, state.pitch);
+      RN[i] = q[0]; RN[i + 1] = q[1]; RN[i + 2] = q[2];
       const v = dipolePotential([V[i], V[i + 1], V[i + 2]], pos, mom);
       PV[j] = v;
       const a = Math.abs(v); if (a > maxAbs) maxAbs = a;
     }
+
+    /* Auto-fit rather than a fixed scale. The mesh is a whole head including
+       neck and shoulders, so its projected extent changes a lot with rotation
+       and any constant would either crop it or waste half the frame. Measure the
+       projection at unit scale, then scale and centre to fill the canvas. */
+    let lox = 1e9, hix = -1e9, loy = 1e9, hiy = -1e9;
+    for (let i = 0; i < RV.length; i += 3) {
+      const k = CAM / (CAM - RV[i + 2]);
+      const px = RV[i] * k, py = RV[i + 1] * k;
+      if (px < lox) lox = px; if (px > hix) hix = px;
+      if (py < loy) loy = py; if (py > hiy) hiy = py;
+    }
+    const PADPX = 14;
+    const sc = Math.min((W - 2 * PADPX) / (hix - lox), (H - 2 * PADPX) / (hiy - loy));
+    const cx = W / 2 - ((lox + hix) / 2) * sc;
+    const cy = H / 2 + ((loy + hiy) / 2) * sc;
 
     /* Painter's algorithm over real triangles. Lighting uses the true face
        normal -- with an actual scalp this matters, because the surface is not a
@@ -283,16 +304,20 @@ export function headView(host, out) {
       const ia = F[f * 3], ib = F[f * 3 + 1], ic = F[f * 3 + 2];
       const a = ia * 3, b = ib * 3, c = ic * 3;
       const ax = RV[a], ay = RV[a + 1], az2 = RV[a + 2];
-      const e1 = [RV[b] - ax, RV[b + 1] - ay, RV[b + 2] - az2];
-      const e2 = [RV[c] - ax, RV[c + 1] - ay, RV[c + 2] - az2];
-      let nx = e1[1] * e2[2] - e1[2] * e2[1];
-      let ny = e1[2] * e2[0] - e1[0] * e2[2];
-      let nz = e1[0] * e2[1] - e1[1] * e2[0];
+
+      /* Averaged VERTEX normals, so curvature reads smooth instead of faceted,
+         and back faces are skipped entirely. Culling is not just a speed win:
+         drawing the inside of the far wall and then painting over it left the
+         head looking like it had a second surface inside it. */
+      let nx = (RN[a] + RN[b] + RN[c]) / 3;
+      let ny = (RN[a + 1] + RN[b + 1] + RN[c + 1]) / 3;
+      let nz = (RN[a + 2] + RN[b + 2] + RN[c + 2]) / 3;
       const nl = Math.hypot(nx, ny, nz) || 1;
-      nz /= nl; nx /= nl; ny /= nl;
+      nx /= nl; ny /= nl; nz /= nl;
+      if (nz <= 0.02) continue;                       // faces away from the camera
       // Light slightly above and to the left of the camera.
-      const lam = Math.max(0, 0.35 * nx * -0.4 + 0.35 * ny * 0.5 + nz * 0.85);
-      const shade = 0.34 + 0.66 * lam;
+      const lam = Math.max(0, nx * -0.28 + ny * 0.34 + nz * 0.90);
+      const shade = 0.30 + 0.70 * lam;
 
       const pa = project([ax, ay, az2], cx, cy, sc);
       const pb = project([RV[b], RV[b + 1], RV[b + 2]], cx, cy, sc);

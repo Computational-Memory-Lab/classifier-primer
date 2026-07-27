@@ -1,10 +1,11 @@
 {
- "source": "EEGLAB dipfit standard_BEM/standard_vol.mat, outermost (scalp) boundary",
- "note": "Colin27/ICBM template head via FieldTrip/SPM. Subdivided once and Laplacian-smoothed for display; centred and scaled to unit half-extent.",
- "nVerts": 1994,
- "nFaces": 3984,
+ "source": "EEGLAB functions/supportfiles/mheadnew.mat -- the mesh headplot() draws",
+ "note": "Whole head with face, ears and neck. Electrodes from standard_BEM/elec/standard_1005.elc, co-registered by a fitted similarity transform (median residual 3.4 mm) and snapped to the surface. Centred on the head and scaled to about unit half-extent.",
+ "nVerts": 6114,
+ "nFaces": 11871,
  "layout": [
   "vertices float32 nVerts*3",
-  "faces uint16 nFaces*3"
+  "faces uint16 nFaces*3",
+  "vertex normals float32 nVerts*3"
  ]
 }
