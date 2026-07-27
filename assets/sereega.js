@@ -120,19 +120,36 @@ export function epochSource(t, peaks, dev, jitter, rand) {
 
 /* ============================ 3D plumbing =============================== */
 
+/**
+ * Head coordinates -> VIEW coordinates: [right, up, toward-viewer].
+ *
+ * The mesh is RAS -- x right, y ANTERIOR, z SUPERIOR. The renderer wants the
+ * superior axis pointing up the screen and the anterior axis pointing at the
+ * camera. This used to return them the other way round, so the vertical axis of
+ * the picture was front-to-back and the camera looked straight down the top of
+ * the head: Fpz projected to the top of the frame, Oz to the bottom, and Cz to
+ * the middle. Everything below the widest point was hidden behind the skull,
+ * which read as the bottom half of the head being cut off.
+ *
+ * A near-spherical ellipsoid hid this completely -- from any angle a ball looks
+ * like a ball. It only became visible once the mesh was a real head.
+ */
 function rotate(p, yaw, pitch) {
   const [x, y, z] = p;
-  const cy = Math.cos(yaw), sy = Math.sin(yaw);
-  const x1 = x * cy - y * sy, y1 = x * sy + y * cy;
+  const cw = Math.cos(yaw), sw = Math.sin(yaw);
+  const xr = x * cw - y * sw;
+  const ya = x * sw + y * cw;              // anterior, after spinning about the vertical
   const cp = Math.cos(pitch), sp = Math.sin(pitch);
-  return [x1, y1 * cp - z * sp, y1 * sp + z * cp];
+  const yt = ya * cp - z * sp;             // anterior, after tilting
+  const zt = ya * sp + z * cp;             // superior, after tilting
+  return [xr, zt, yt];
 }
 
 /* Weak perspective: far enough that the head does not distort, near enough to
    read as solid. */
 const CAM = 4.2;
 function project(p, cx, cy, s) {
-  const zz = p[2];                    // +z points at the viewer after rotation
+  const zz = p[2];                    // view coords: [2] points at the viewer
   const k = CAM / (CAM - zz);
   return [cx + p[0] * s * k, cy - p[1] * s * k, zz];
 }
@@ -176,7 +193,7 @@ export function headView(host, out) {
     dx: 0.0, dy: 0.30, dz: 0.30,     // dipole position, head coords
     az: 0, elv: 90,                   // dipole orientation, degrees
     nCh: 19,
-    yaw: -0.6, pitch: 0.25,
+    yaw: -0.62, pitch: 0.10,
   };
 
   const W = 520, H = 430;

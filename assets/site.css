@@ -414,7 +414,20 @@ table.data td.num { font-weight: 560; }
 
 /* ---------- svg chart primitives ---------- */
 
-svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
+/* A chart must never be taller than the screen it is read on.
+   width:100% + a fixed viewBox locks the aspect ratio, so height follows width
+   and a wide figure produced charts ~800px tall -- taller than a laptop viewport
+   before the title, controls, stats and note were added. Capping the height
+   makes the SVG scale down and centre itself (preserveAspectRatio is
+   xMidYMid meet), which is the one constraint that actually tracks the reader's
+   screen rather than guessing at a pixel width. */
+svg.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(42vh, 24rem);
+  overflow: visible;
+}
 svg.chart .grid { stroke: var(--gridline); stroke-width: 1; }
 svg.chart .axis { stroke: var(--baseline); stroke-width: 1; }
 svg.chart .tick { fill: var(--text-muted); font-size: 10px; }
@@ -577,4 +590,8 @@ details.aside > *:not(summary) { margin-top: 0.7rem; }
    .figure--wide (62rem) that renders about 957x815 px, so the figure alone was
    taller than a laptop viewport once its controls, stats and note were added.
    Capping the plot's width caps its height, since the aspect is fixed. */
-.plot--square { max-width: 32rem; margin-inline: auto; }
+.plot--square { max-width: 26rem; margin-inline: auto; }
+/* The head is the tallest figure on the site and carries six controls above it,
+   so it is capped tighter still -- it has to leave room for its own readout
+   without pushing the note off a laptop screen. */
+.plot--head { max-width: 23rem; margin-inline: auto; }
