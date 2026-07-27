@@ -45,10 +45,16 @@ export function loadHeadMesh() {
       loadJSON('data/head_mesh.json'),
       loadBin('data/head_mesh.bin'),
     ]).then(([meta, buf]) => {
+      /* Float blocks FIRST. A uint16 face block is not necessarily a multiple
+         of 4 bytes long -- 11,871 triangles is 71,226 bytes -- so putting it
+         between the two float32 blocks lands the normals on an odd byte offset,
+         where Float32Array refuses to construct at all and the whole mesh fails
+         to load. build_head.py writes them in this order for that reason. */
       const nV = meta.nVerts, nF = meta.nFaces;
       const V = new Float32Array(buf, 0, nV * 3);
-      const F = new Uint16Array(buf, nV * 3 * 4, nF * 3);
-      return { V, F, nV, nF, meta };
+      const N = new Float32Array(buf, nV * 3 * 4, nV * 3);
+      const F = new Uint16Array(buf, nV * 3 * 4 * 2, nF * 3);
+      return { V, F, N, nV, nF, meta };
     });
   }
   return meshPromise;
@@ -163,11 +169,22 @@ function divergingRGB(v, dark) {
   const pos = [235, 104, 52];
   const mid = dark ? [58, 58, 62] : [238, 238, 234];
   const target = c < 0 ? neg : pos;
-  const g = Math.pow(Math.abs(c), 0.75);
+  const g = Math.pow(Math.abs(c), 0.6);   // display curve: lifts mid-range detail
   return [0, 1, 2].map((i) => mid[i] + (target[i] - mid[i]) * g);
 }
 
 const rgbStr = (c) => `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
+
+/* A <g> clipped to the plot rectangle. svg.chart sets overflow:visible site-wide
+   so axis labels are not cut off, which also means a series that leaves its axes
+   draws over the page instead of being trimmed. */
+let clipSeq = 0;
+function clipped(svg, w, h, pad) {
+  const id = `seclip${++clipSeq}`;
+  const cp = el('clipPath', { id }, el('defs', {}, svg));
+  el('rect', { x: pad.l, y: pad.t, width: w - pad.l - pad.r, height: h - pad.t - pad.b }, cp);
+  return el('g', { 'clip-path': `url(#${id})` }, svg);
+}
 
 /**
  * Lambert shading, applied to the rendered colour and NOT to the value.
@@ -200,10 +217,17 @@ export function headView(host, out) {
   let mesh = null;
 
   let drag = null;
+  /* Suppressing selection during a drag needs more than one guard: the pointer
+     leaves the element while dragging, so whatever is underneath ends up owning
+     the selection unless <body> refuses one for the duration. */
+  const noSelect = (e) => e.preventDefault();
   host.addEventListener('pointerdown', (e) => {
-    e.preventDefault();          // otherwise the drag selects the surrounding text
+    e.preventDefault();
     drag = { x: e.clientX, y: e.clientY, yaw: state.yaw, pitch: state.pitch };
     host.setPointerCapture(e.pointerId);
+    document.addEventListener('selectstart', noSelect);
+    document.body.style.userSelect = 'none';
+    host.style.cursor = 'grabbing';
   });
   host.addEventListener('pointermove', (e) => {
     if (!drag) return;
@@ -211,7 +235,12 @@ export function headView(host, out) {
     state.pitch = Math.max(-1.2, Math.min(1.2, drag.pitch + (e.clientY - drag.y) * 0.009));
     draw();
   });
-  const end = () => { drag = null; };
+  const end = () => {
+    drag = null;
+    document.removeEventListener('selectstart', noSelect);
+    document.body.style.userSelect = '';
+    host.style.cursor = 'grab';
+  };
   host.addEventListener('pointerup', end);
   host.addEventListener('pointercancel', end);
   host.style.touchAction = 'none';
@@ -267,10 +296,18 @@ export function headView(host, out) {
       RV[i] = r[0]; RV[i + 1] = r[1]; RV[i + 2] = r[2];
       const q = rotate([N[i], N[i + 1], N[i + 2]], state.yaw, state.pitch);
       RN[i] = q[0]; RN[i + 1] = q[1]; RN[i + 2] = q[2];
-      const v = dipolePotential([V[i], V[i + 1], V[i + 2]], pos, mom);
-      PV[j] = v;
-      const a = Math.abs(v); if (a > maxAbs) maxAbs = a;
+      PV[j] = dipolePotential([V[i], V[i + 1], V[i + 2]], pos, mom);
     }
+
+    /* Scale the colour to a high percentile rather than the maximum. The field
+       falls off as one over distance squared, so a handful of vertices right
+       above the dipole take the peak and everything else collapses to neutral --
+       the topography, which is the whole point of the figure, becomes invisible.
+       Clipping the top few percent is what topographic plots normally do
+       (EEGLAB's maplimits does the same). The mapping stays monotonic in the
+       true value; only the top of the range is compressed. */
+    const mags = Float32Array.from(PV, Math.abs).sort();
+    maxAbs = Math.max(mags[Math.floor(mags.length * 0.97)], 1e-9);
 
     /* Auto-fit rather than a fixed scale. The mesh is a whole head including
        neck and shoulders, so its projected extent changes a lot with rotation
@@ -317,7 +354,7 @@ export function headView(host, out) {
       if (nz <= 0.02) continue;                       // faces away from the camera
       // Light slightly above and to the left of the camera.
       const lam = Math.max(0, nx * -0.28 + ny * 0.34 + nz * 0.90);
-      const shade = 0.30 + 0.70 * lam;
+      const shade = 0.46 + 0.54 * lam;
 
       const pa = project([ax, ay, az2], cx, cy, sc);
       const pb = project([RV[b], RV[b + 1], RV[b + 2]], cx, cy, sc);
@@ -371,8 +408,14 @@ export function headView(host, out) {
       ctx.stroke();
     }
 
-    el('text', { x: 12, y: H - 12, fill: token('--text-muted'), 'font-size': 11 }, svg)
-      .textContent = 'drag to rotate';
+    /* pointer-events:none so a drag starting on the hint does not try to select
+       it, and user-select:none so it cannot be highlighted at all. SVG <text> is
+       selectable like any other text, and this label sits right where people put
+       the pointer down. */
+    el('text', {
+      x: 12, y: H - 12, fill: token('--text-muted'), 'font-size': 11,
+      style: 'pointer-events:none;user-select:none;-webkit-user-select:none',
+    }, svg).textContent = 'drag to rotate';
 
     const vals = readings.map((c) => Math.abs(c.v));
     const peak = Math.max(...vals);
@@ -577,26 +620,33 @@ export function decodeView(host, out) {
     const measured = NS.map((n) => ({ n, a: fitScore(X.slice(0, n), y.slice(0, n)) }));
     const observed = fitScore(X.slice(0, state.nTrials), y.slice(0, state.nTrials));
 
+    /* The y-axis follows the data. It was pinned at 0.45 at the bottom, but a
+       weak effect at 40 trials lands near 0.38 -- genuinely below chance, because
+       a classifier fitted on 20 trials per class is noise -- and those points
+       were being drawn underneath the plot. */
+    const seen = measured.map((d) => d.a).concat(observed).filter(Number.isFinite);
+    const lo = Math.max(0.2, Math.min(0.45, Math.floor((Math.min(...seen) - 0.04) * 20) / 20));
     const xs = scale(Math.log10(30), Math.log10(2000), PAD.l, W - PAD.r);
-    const ys = scale(0.45, 1.0, H - PAD.b, PAD.t);
+    const ys = scale(lo, 1.0, H - PAD.b, PAD.t);
     frame(svg, W, H, PAD, (v) => xs(Math.log10(v)), ys,
       { xLabel: 'trials', yLabel: 'AUC', xTicks: [50, 100, 250, 500, 1000, 2000] });
 
     el('line', { x1: PAD.l, x2: W - PAD.r, y1: ys(0.5), y2: ys(0.5),
       stroke: token('--border'), 'stroke-width': 1.5, 'stroke-dasharray': '4 4' }, svg);
 
+    const clip = clipped(svg, W, H, PAD);
     el('path', {
       d: linePath(measured.map((d) => [xs(Math.log10(d.n)), ys(d.a)])),
       fill: 'none', stroke: token('--series-6') || '#eb6834', 'stroke-width': 2.4,
-    }, svg);
+    }, clip);
     for (const d of measured) {
       el('circle', { cx: xs(Math.log10(d.n)), cy: ys(d.a), r: 4.5,
-        fill: token('--page'), stroke: token('--series-6') || '#eb6834', 'stroke-width': 2 }, svg);
+        fill: token('--page'), stroke: token('--series-6') || '#eb6834', 'stroke-width': 2 }, clip);
     }
 
     // where the trials slider currently sits
     el('circle', { cx: xs(Math.log10(state.nTrials)), cy: ys(observed), r: 7,
-      fill: token('--series-7') || '#2a78d6', stroke: token('--page'), 'stroke-width': 2 }, svg);
+      fill: token('--series-7') || '#2a78d6', stroke: token('--page'), 'stroke-width': 2 }, clip);
     el('text', { x: xs(Math.log10(state.nTrials)), y: ys(observed) - 14,
       'text-anchor': 'middle', fill: token('--text-secondary'), 'font-size': 11 }, svg)
       .textContent = `your setting: ${observed.toFixed(3)}`;

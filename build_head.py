@@ -218,8 +218,12 @@ def main():
     os.makedirs(OUT, exist_ok=True)
 
     # --- the mesh: binary, loaded asynchronously by the page ----------------
-    blob = (V.astype('<f4').tobytes() + F.astype('<u2').tobytes()
-            + N.astype('<f4').tobytes())
+    # Order matters: both float32 blocks must start on a 4-byte boundary, and a
+    # uint16 face block of 11,871 triangles is 71,226 bytes -- not a multiple of
+    # 4 -- so putting faces in the middle pushed the normals to an odd offset and
+    # Float32Array refused to construct. Floats first, faces last.
+    blob = (V.astype('<f4').tobytes() + N.astype('<f4').tobytes()
+            + F.astype('<u2').tobytes())
     open(os.path.join(OUT, 'head_mesh.bin'), 'wb').write(blob)
     json.dump({
         'source': "EEGLAB functions/supportfiles/mheadnew.mat -- the mesh headplot() draws",
@@ -228,8 +232,8 @@ def main():
                  'similarity transform (median residual 3.4 mm) and snapped to the '
                  'surface. Centred on the head and scaled to about unit half-extent.'),
         'nVerts': int(len(V)), 'nFaces': int(len(F)),
-        'layout': ['vertices float32 nVerts*3', 'faces uint16 nFaces*3',
-                   'vertex normals float32 nVerts*3'],
+        'layout': ['vertices float32 nVerts*3', 'vertex normals float32 nVerts*3',
+                   'faces uint16 nFaces*3'],
     }, open(os.path.join(OUT, 'head_mesh.json'), 'w'), indent=1)
 
     # --- the electrodes: a JS module, so Node tests can import them ---------

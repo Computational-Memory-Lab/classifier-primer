@@ -5,7 +5,7 @@
  "nFaces": 11871,
  "layout": [
   "vertices float32 nVerts*3",
-  "faces uint16 nFaces*3",
-  "vertex normals float32 nVerts*3"
+  "vertex normals float32 nVerts*3",
+  "faces uint16 nFaces*3"
  ]
 }
