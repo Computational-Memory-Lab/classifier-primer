@@ -1,4 +1,6 @@
 {
+ "version": "a038ff0d7a",
+ "bytes": 217962,
  "source": "EEGLAB functions/supportfiles/mheadnew.mat -- the mesh headplot() draws",
  "note": "Whole head with face, ears and neck. Electrodes from standard_BEM/elec/standard_1005.elc, co-registered by a fitted similarity transform (median residual 3.4 mm) and snapped to the surface. Centred on the head and scaled to about unit half-extent.",
  "nVerts": 6114,

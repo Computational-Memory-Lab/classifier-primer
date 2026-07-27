@@ -43,7 +43,7 @@ Run:  python3 build_head.py            (needs scipy; reads EEGLAB from $EEGLAB
                                          or the default path below)
 """
 from __future__ import annotations
-import json, os, struct, sys
+import hashlib, json, os, struct, sys
 import numpy as np
 import scipy.io as sio
 
@@ -225,7 +225,14 @@ def main():
     blob = (V.astype('<f4').tobytes() + N.astype('<f4').tobytes()
             + F.astype('<u2').tobytes())
     open(os.path.join(OUT, 'head_mesh.bin'), 'wb').write(blob)
+    version = hashlib.sha1(blob).hexdigest()[:10]
     json.dump({
+        # The .bin keeps its filename across rebuilds, so a browser can hold a
+        # stale copy whose length no longer matches this metadata -- the typed
+        # array views then run off the end of the buffer and the mesh fails to
+        # load with nothing on screen to say why. The loader cache-busts on
+        # 'version' and checks 'bytes' before trusting the buffer.
+        'version': version, 'bytes': len(blob),
         'source': "EEGLAB functions/supportfiles/mheadnew.mat -- the mesh headplot() draws",
         'note': ('Whole head with face, ears and neck. Electrodes from '
                  'standard_BEM/elec/standard_1005.elc, co-registered by a fitted '

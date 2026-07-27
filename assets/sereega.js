@@ -41,10 +41,16 @@ export function montage(n) {
 let meshPromise = null;
 export function loadHeadMesh() {
   if (!meshPromise) {
-    meshPromise = Promise.all([
-      loadJSON('data/head_mesh.json'),
-      loadBin('data/head_mesh.bin'),
-    ]).then(([meta, buf]) => {
+    /* Fetch the metadata first and use its version to bust the cache on the
+       binary. The .bin keeps its name across rebuilds, so a browser can pair a
+       fresh .json with a stale .bin -- the views then run past the end of the
+       buffer and the mesh silently fails to appear. */
+    meshPromise = loadJSON('data/head_mesh.json').then((meta) =>
+      loadBin(`data/head_mesh.bin?v=${meta.version || '0'}`).then((buf) => {
+      if (meta.bytes && buf.byteLength !== meta.bytes) {
+        throw new Error(`head_mesh.bin is ${buf.byteLength} bytes, expected ${meta.bytes}`
+          + ' — a cached copy is stale; hard-reload the page');
+      }
       /* Float blocks FIRST. A uint16 face block is not necessarily a multiple
          of 4 bytes long -- 11,871 triangles is 71,226 bytes -- so putting it
          between the two float32 blocks lands the normals on an odd byte offset,
@@ -55,7 +61,7 @@ export function loadHeadMesh() {
       const N = new Float32Array(buf, nV * 3 * 4, nV * 3);
       const F = new Uint16Array(buf, nV * 3 * 4 * 2, nF * 3);
       return { V, F, N, nV, nF, meta };
-    });
+    }));
   }
   return meshPromise;
 }
@@ -215,6 +221,7 @@ export function headView(host, out) {
 
   const W = 520, H = 430;
   let mesh = null;
+  let meshError = null;
 
   let drag = null;
   /* Suppressing selection during a drag needs more than one guard: the pointer
@@ -267,9 +274,15 @@ export function headView(host, out) {
     const svg = svgRoot(host, W, H);
 
     if (!mesh) {
+      /* An error has to be rendered here, not written into host.innerHTML once:
+         draw() runs again on every resize and would paint "loading" back over
+         the top, which is how a hard failure spent a release looking like a slow
+         one. */
+      const msg = meshError ? `could not load the head model — ${meshError}` : 'loading head model…';
       el('text', {
-        x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: token('--text-muted'), 'font-size': 13,
-      }, svg).textContent = 'loading head model…';
+        x: W / 2, y: H / 2, 'text-anchor': 'middle',
+        fill: token(meshError ? '--text-secondary' : '--text-muted'), 'font-size': 12,
+      }, svg).textContent = msg;
       return;
     }
     const ctx = canvasOverlay(host, svg, W, H, { x: 0, y: 0, w: W, h: H }, 2);
@@ -429,10 +442,7 @@ export function headView(host, out) {
   }
 
   loadHeadMesh().then((m) => { mesh = m; measure(m.V); draw(); })
-    .catch((e) => {
-      host.innerHTML = `<p class="small muted" style="padding:2rem;text-align:center">`
-        + `could not load the head model (${e.message})</p>`;
-    });
+    .catch((e) => { meshError = e.message; console.error('head mesh:', e); draw(); });
   responsive(host, draw);
   return { state, refresh: draw };
 }
