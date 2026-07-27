@@ -183,7 +183,26 @@ const W = 470, H = 400;
 const PAD = { l: 46, r: 18, t: 16, b: 42 };
 
 /** A line through `mid` perpendicular to `vec`, with a label at one end. */
-function boundary(svg, xs, ys, mid, vec, colour, dash, label) {
+/**
+ * A <g> clipped to the plot rectangle.
+ *
+ * Needed because svg.chart sets `overflow: visible` site-wide -- deliberately,
+ * so direct labels near an axis are not cut off -- while boundary() draws a line
+ * 12 data units long through a window of about +/-4.6. Without this the decision
+ * lines ran out over the surrounding text. Labels stay OUTSIDE the clip so they
+ * keep the benefit of the global overflow rule.
+ */
+let clipSeq = 0;
+function clipped(svg, w, h, pad) {
+  const id = `plotclip${++clipSeq}`;
+  const cp = el('clipPath', { id }, el('defs', {}, svg));
+  el('rect', {
+    x: pad.l, y: pad.t, width: w - pad.l - pad.r, height: h - pad.t - pad.b,
+  }, cp);
+  return el('g', { 'clip-path': `url(#${id})` }, svg);
+}
+
+function boundary(svg, xs, ys, mid, vec, colour, dash, label, clip) {
   const n = Math.hypot(vec[0], vec[1]) || 1;
   const ux = -vec[1] / n, uy = vec[0] / n;
   const L = 12;
@@ -192,7 +211,7 @@ function boundary(svg, xs, ys, mid, vec, colour, dash, label) {
     x2: xs(mid[0] + ux * L), y2: ys(mid[1] + uy * L),
     stroke: colour, 'stroke-width': 2.6, 'stroke-dasharray': dash || null,
     'stroke-linecap': 'round',
-  }, svg);
+  }, clip || svg);
   if (label) {
     el('text', {
       x: xs(mid[0] + ux * 2.3) + 7, y: ys(mid[1] + uy * 2.3),
@@ -325,8 +344,9 @@ export function ldaMechanics(host, out) {
     }
 
     const mid = [(m[0][0] + m[1][0]) / 2, (m[0][1] + m[1][1]) / 2];
-    if (state.step >= 1) boundary(svg, xs, ys, mid, d, token('--series-4'), '5 4', 'difference of means');
-    if (state.step >= 3) boundary(svg, xs, ys, mid, w, token('--series-7'), null, 'LDA');
+    const clip = clipped(svg, W, H, PAD);
+    if (state.step >= 1) boundary(svg, xs, ys, mid, d, token('--series-4'), '5 4', 'difference of means', clip);
+    if (state.step >= 3) boundary(svg, xs, ys, mid, w, token('--series-7'), null, 'LDA', clip);
 
     let ang = Math.abs(Math.atan2(w[1], w[0]) - Math.atan2(d[1], d[0])) * 180 / Math.PI;
     if (ang > 180) ang = 360 - ang;
@@ -367,23 +387,24 @@ export function svmMargin(host, out) {
     const mg = Math.min(margin, 6);               // keep the band on screen
 
     const corner = (s, t) => [xs(cx + ux * s * L + px * t * mg), ys(cy + uy * s * L + py * t * mg)];
+    const clip = clipped(svg, W, H, PAD);
     el('polygon', {
       points: [corner(-1, 1), corner(1, 1), corner(1, -1), corner(-1, -1)]
         .map((q) => q.join(',')).join(' '),
       fill: token('--series-1'), 'fill-opacity': 0.10,
-    }, svg);
+    }, clip);
     for (const s of [1, -1]) {
       el('line', {
         x1: corner(-1, s)[0], y1: corner(-1, s)[1],
         x2: corner(1, s)[0], y2: corner(1, s)[1],
         stroke: token('--series-1'), 'stroke-width': 1.2, 'stroke-dasharray': '4 4',
-      }, svg);
+      }, clip);
     }
     el('line', {
       x1: xs(cx - ux * L), y1: ys(cy - uy * L),
       x2: xs(cx + ux * L), y2: ys(cy + uy * L),
       stroke: token('--series-1'), 'stroke-width': 2.8, 'stroke-linecap': 'round',
-    }, svg);
+    }, clip);
 
     /* Name the two things the figure exists to show. Without these the boundary
        and the margin band are distinguished only by line weight, which is not
@@ -445,13 +466,14 @@ export function smallN(host, out) {
        the one figure whose whole job is telling two models apart, and with five
        lines each a per-line label would be unreadable, so identity has to survive
        without relying on hue. A legend follows below. */
+    const clip = clipped(svg, W, H, PAD);
     for (let s = 0; s < 5; s++) {
       const samp = twoClouds({ n: state.n, sep: 1.5, rho: state.rho, seed: 101 + s * 7717 });
-      boundary(svg, xs, ys, origin, ldaWeights(samp, 0).w, token('--series-7'), null, null);
-      boundary(svg, xs, ys, origin, svmTrain(samp, 1, 1200).w, token('--series-6'), '2 3', null);
+      boundary(svg, xs, ys, origin, ldaWeights(samp, 0).w, token('--series-7'), null, null, clip);
+      boundary(svg, xs, ys, origin, svmTrain(samp, 1, 1200).w, token('--series-6'), '2 3', null, clip);
     }
     // Redraw the truth on top so it stays readable.
-    boundary(svg, xs, ys, origin, wTrue, token('--text-primary'), '7 4', null);
+    boundary(svg, xs, ys, origin, wTrue, token('--text-primary'), '7 4', null, clip);
 
     const key = [
       ['LDA', token('--series-7'), null],

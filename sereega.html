@@ -31,9 +31,11 @@
         <p>
           <strong>This page is a working model, not the toolbox.</strong> Everything
           here runs live in your browser and reimplements the <em>shape</em> of what
-          SEREEGA does. It is not SEREEGA and does not use its lead fields — the
-          section <a href="#limits">what this demo is not</a> is specific about the
-          difference, and it matters.
+          SEREEGA does. The head and the electrode positions are real — taken from
+          EEGLAB's own standard head model — but the conduction physics is simplified,
+          and it is not SEREEGA. The section
+          <a href="#limits">what this demo is not</a> is specific about the difference,
+          and it matters.
         </p>
       </div>
     </div>
@@ -161,10 +163,14 @@
       <div id="hd-plot"></div>
       <div class="stats" id="hd-out"></div>
       <div class="figure__note">
-        The head is an ellipsoid and the physics is a dipole in a uniform conductor —
-        no skull, no boundary at the scalp. Real lead fields put a poorly-conducting
-        skull between source and sensor, which spreads and attenuates everything
-        further. The shapes here are right; the numbers are not.
+        <strong>The geometry is real; the physics is still an approximation.</strong>
+        The surface is the scalp boundary from EEGLAB's standard head model — the
+        Colin27 template, by way of FieldTrip — and the electrodes are actual 10-05
+        coordinates from the same model, so Cz really is at the vertex and the montage
+        really is a montage. What is <em>not</em> real is the conduction: this computes
+        a dipole in a uniform medium, with no poorly-conducting skull between source and
+        sensor. A real lead field would spread and attenuate everything further. Shapes
+        and relationships are right; absolute numbers are not.
       </div>
     </div>
 
@@ -530,9 +536,14 @@
           <thead><tr><th></th><th>this page</th><th>SEREEGA proper</th></tr></thead>
           <tbody>
             <tr>
-              <td><strong>head model</strong></td>
-              <td>an ellipsoid; a dipole in a uniform conductor</td>
-              <td>lead fields from segmented MRI, with separate brain, skull and scalp conductivities</td>
+              <td><strong>head geometry</strong></td>
+              <td><em>real</em> — the Colin27 scalp surface from EEGLAB's standard head model</td>
+              <td>the same family of template heads</td>
+            </tr>
+            <tr>
+              <td><strong>conduction</strong></td>
+              <td>a dipole in a uniform medium: <strong>no skull</strong>, no tissue boundaries</td>
+              <td>boundary-element or finite-element lead fields with separate brain, skull and scalp conductivities</td>
             </tr>
             <tr>
               <td><strong>source space</strong></td>
@@ -541,7 +552,7 @@
             </tr>
             <tr>
               <td><strong>channels</strong></td>
-              <td>approximate 10–20 positions, or a spiral standing in for a dense net</td>
+              <td><em>real</em> 10-05 coordinates, 19 to 128 of them</td>
               <td>real montages up to 228 channels, or any montage via FieldTrip</td>
             </tr>
             <tr>
@@ -558,11 +569,13 @@
         </table>
       </div>
       <p>
-        The qualitative behaviour is faithful: dipolar topographies, the depth-versus-spread
-        relationship, radial against tangential orientation, averaging as the square root
-        of trials, and classification collapsing when trials run short. Absolute
-        amplitudes and fine spatial detail are not. Do not read a µV figure off this page
-        and use it for anything.
+        The qualitative behaviour is faithful: dipolar topographies, the
+        depth-versus-spread relationship, radial against tangential orientation,
+        averaging as the square root of trials, and classification collapsing when trials
+        run short. Absolute amplitudes are not — the missing skull is the main reason, and
+        it is a large one, since the skull is roughly eighty times less conductive than
+        the tissue either side of it. Do not read a µV figure off this page and use it for
+        anything.
       </p>
       <p>
         One more limitation shared with the real thing, from the section above: neither
@@ -595,6 +608,10 @@
             <tr>
               <td><strong>Barzegaran et al. (2019), EEGSourceSim</strong></td>
               <td>A source-simulation package with a different emphasis, checked as a near-miss during the landscape review. <code>papers/Barzegaran_2019.pdf</code></td>
+            </tr>
+            <tr>
+              <td><strong>EEGLAB — DIPFIT <code>standard_BEM</code></strong></td>
+              <td>The scalp surface and the 10-05 electrode coordinates this page draws, via <code>site/build_head.py</code>. Derived from the Colin27 / ICBM template head through FieldTrip and SPM, and redistributed here as decimated, smoothed display geometry.</td>
             </tr>
             <tr>
               <td><strong>Blankertz et al. (2011)</strong></td>

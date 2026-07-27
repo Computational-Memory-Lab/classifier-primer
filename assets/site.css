@@ -571,3 +571,10 @@ details.aside > *:not(summary) { margin-top: 0.7rem; }
   font-weight: 700;
   vertical-align: 0.15em;
 }
+
+/* ---------- square plots ---------- */
+/* The 2-D scatter figures use a 470x400 viewBox at width:100%. Inside a
+   .figure--wide (62rem) that renders about 957x815 px, so the figure alone was
+   taller than a laptop viewport once its controls, stats and note were added.
+   Capping the plot's width caps its height, since the aspect is fixed. */
+.plot--square { max-width: 32rem; margin-inline: auto; }

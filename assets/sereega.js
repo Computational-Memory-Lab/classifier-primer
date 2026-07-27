@@ -20,56 +20,38 @@
  * is a lat/long mesh, rotated by hand, depth-sorted, and filled on a canvas.
  */
 
-import { el, svgRoot, canvasOverlay, responsive, token, rng, gauss, auc, frame, scale, linePath } from './site.js';
+import { el, svgRoot, canvasOverlay, responsive, token, rng, gauss, auc, frame, scale, linePath,
+         loadJSON, loadBin } from './site.js';
+import { ELECTRODES, MONTAGES } from './electrodes.js';
 
 /* ============================ head geometry ============================== */
 
-/* Semi-axes in arbitrary units, roughly adult-head proportioned:
-   x = left-right, y = back-front, z = down-up. */
-export const HEAD = { rx: 0.80, ry: 0.94, rz: 0.88 };
+/* Real electrode coordinates, generated from EEGLAB by build_head.py. See the
+   header of assets/electrodes.js for provenance and for what they replaced. */
+export { ELECTRODES, MONTAGES } from './electrodes.js';
 
-const onHead = (az, el_) => {
-  // az: radians around z from +y (front). el_: radians up from the equator.
-  const ce = Math.cos(el_);
-  return [
-    HEAD.rx * ce * Math.sin(az),
-    HEAD.ry * ce * Math.cos(az),
-    HEAD.rz * Math.sin(el_),
-  ];
-};
-
-/* Approximate 10-20 positions, given as EEGLAB-style polar coordinates:
-   theta = degrees clockwise from the nose, radius = 0 at the vertex and 0.5 at
-   the equator. Converted to the ellipsoid below. Approximate on purpose -- the
-   point is the sampling geometry, not electrode-accurate placement. */
-const TEN_TWENTY = [
-  ['Fp1', -18, 0.511], ['Fp2', 18, 0.511],
-  ['F7', -54, 0.511], ['F3', -39, 0.333], ['Fz', 0, 0.256], ['F4', 39, 0.333], ['F8', 54, 0.511],
-  ['T7', -90, 0.511], ['C3', -90, 0.256], ['Cz', 0, 0.001], ['C4', 90, 0.256], ['T8', 90, 0.511],
-  ['P7', -126, 0.511], ['P3', -141, 0.333], ['Pz', 180, 0.256], ['P4', 141, 0.333], ['P8', 126, 0.511],
-  ['O1', -162, 0.511], ['O2', 162, 0.511],
-];
-
-function polarToHead(thetaDeg, r) {
-  const az = (thetaDeg * Math.PI) / 180;
-  const el_ = (0.5 - Math.min(r, 0.5) / 0.5) * (Math.PI / 2); // r=0 -> vertex
-  return onHead(az, el_);
+/** Positions for a montage of n electrodes, as [x,y,z] triples. */
+export function montage(n) {
+  const key = [19, 32, 64, 128].reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
+  return MONTAGES[key].map((i) => ({ name: ELECTRODES[i].name, pos: ELECTRODES[i].pos }));
 }
 
-/** Electrode montages. 19 is the named 10-20 set; larger counts are a
- *  quasi-uniform spiral over the upper head, standing in for a dense net. */
-export function montage(n) {
-  if (n <= 19) return TEN_TWENTY.map(([name, t, r]) => ({ name, pos: polarToHead(t, r) }));
-  const out = [];
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < n; i++) {
-    // Sample the cap from the vertex down to ~20 deg below the equator.
-    const f = i / (n - 1);
-    const el_ = (Math.PI / 2) * (1 - f * 1.22);
-    const az = i * golden;
-    out.push({ name: `E${i + 1}`, pos: onHead(az, el_) });
+/* The scalp mesh is bigger than a browser wants inline, so it loads as binary.
+   Cached: several redraws a second happen while dragging. */
+let meshPromise = null;
+export function loadHeadMesh() {
+  if (!meshPromise) {
+    meshPromise = Promise.all([
+      loadJSON('data/head_mesh.json'),
+      loadBin('data/head_mesh.bin'),
+    ]).then(([meta, buf]) => {
+      const nV = meta.nVerts, nF = meta.nFaces;
+      const V = new Float32Array(buf, 0, nV * 3);
+      const F = new Uint16Array(buf, nV * 3 * 4, nF * 3);
+      return { V, F, nV, nF, meta };
+    });
   }
-  return out;
+  return meshPromise;
 }
 
 /* ========================== the forward model =========================== */
@@ -191,17 +173,15 @@ function litColor(v, shade, dark) {
  */
 export function headView(host, out) {
   const state = {
-    dx: 0.0, dy: -0.35, dz: 0.30,   // dipole position
-    az: 0, elv: 90,                  // dipole orientation (deg); 90 = radial-ish
+    dx: 0.0, dy: 0.30, dz: 0.30,     // dipole position, head coords
+    az: 0, elv: 90,                   // dipole orientation, degrees
     nCh: 19,
-    yaw: -0.5, pitch: 0.32,
-    showElec: true,
+    yaw: -0.6, pitch: 0.25,
   };
 
-  const W = 520, H = 440;
-  let ctx = null;
+  const W = 520, H = 430;
+  let mesh = null;
 
-  // Drag to rotate.
   let drag = null;
   host.addEventListener('pointerdown', (e) => {
     drag = { x: e.clientX, y: e.clientY, yaw: state.yaw, pitch: state.pitch };
@@ -219,144 +199,155 @@ export function headView(host, out) {
   host.style.touchAction = 'none';
   host.style.cursor = 'grab';
 
+  /* Half-extents of the mesh, used to keep the dipole inside the skull. */
+  let half = [0.8, 1, 0.85];
+  function measure(V) {
+    const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (let i = 0; i < V.length; i += 3) {
+      for (let k = 0; k < 3; k++) {
+        lo[k] = Math.min(lo[k], V[i + k]); hi[k] = Math.max(hi[k], V[i + k]);
+      }
+    }
+    half = [0, 1, 2].map((k) => Math.max(Math.abs(lo[k]), Math.abs(hi[k])) || 1);
+  }
+
   function draw() {
     const dark = document.documentElement.getAttribute('data-theme') === 'dark'
       || (!document.documentElement.hasAttribute('data-theme')
           && matchMedia('(prefers-color-scheme: dark)').matches);
     const svg = svgRoot(host, W, H);
-    ctx = canvasOverlay(host, svg, W, H, { x: 0, y: 0, w: W, h: H }, 2);
+
+    if (!mesh) {
+      el('text', {
+        x: W / 2, y: H / 2, 'text-anchor': 'middle', fill: token('--text-muted'), 'font-size': 13,
+      }, svg).textContent = 'loading head model…';
+      return;
+    }
+    const ctx = canvasOverlay(host, svg, W, H, { x: 0, y: 0, w: W, h: H }, 2);
     ctx.clearRect(0, 0, W, H);
 
-    /* Keep the source inside the skull. The sliders reach a normalised radius of
-       1.20 at their corners -- a dipole 20% outside the head, which is not a
-       thing, and which made the depth readout go negative. Clamped to 0.92 so it
-       always sits in tissue, and the readout says when clamping is active rather
-       than silently ignoring the slider. */
-    const rNorm = Math.hypot(state.dx / HEAD.rx, state.dy / HEAD.ry, state.dz / HEAD.rz);
-    const clamped = rNorm > 0.92;
-    const k = clamped ? 0.92 / rNorm : 1;
-    const pos = [state.dx * k, state.dy * k, state.dz * k];
+    /* Keep the source inside the skull: clamp to 88% of the head's half-extent
+       along its own direction. Outside that it is not a physical configuration
+       and the topography is meaningless. */
+    const rNorm = Math.hypot(state.dx / half[0], state.dy / half[1], state.dz / half[2]);
+    const clamped = rNorm > 0.88;
+    const kk = clamped ? 0.88 / rNorm : 1;
+    const pos = [state.dx * kk, state.dy * kk, state.dz * kk];
     const mom = moment(state.az, state.elv);
-    const cx = W / 2, cy = H / 2 + 8, s = 150;
 
-    // --- mesh, with the potential evaluated per vertex --------------------
-    const NU = 52, NV = 30;
-    const grid = [];
+    const cx = W / 2, cy = H / 2 + 6, sc = 175;
+    const { V, F, nF } = mesh;
+
+    // Rotate every vertex once, and evaluate the potential there.
+    const RV = new Float32Array(V.length);
+    const PV = new Float32Array(V.length / 3);
     let maxAbs = 1e-9;
-    for (let j = 0; j <= NV; j++) {
-      const row = [];
-      const elv = -Math.PI / 2 + (j / NV) * Math.PI;
-      for (let i = 0; i <= NU; i++) {
-        const az = (i / NU) * Math.PI * 2;
-        const p = onHead(az, elv);
-        const v = dipolePotential(p, pos, mom);
-        maxAbs = Math.max(maxAbs, Math.abs(v));
-        row.push({ p, r: rotate(p, state.yaw, state.pitch), v });
-      }
-      grid.push(row);
+    for (let i = 0, j = 0; i < V.length; i += 3, j++) {
+      const r = rotate([V[i], V[i + 1], V[i + 2]], state.yaw, state.pitch);
+      RV[i] = r[0]; RV[i + 1] = r[1]; RV[i + 2] = r[2];
+      const v = dipolePotential([V[i], V[i + 1], V[i + 2]], pos, mom);
+      PV[j] = v;
+      const a = Math.abs(v); if (a > maxAbs) maxAbs = a;
     }
 
-    // --- quads, painter's algorithm ---------------------------------------
-    const quads = [];
-    for (let j = 0; j < NV; j++) {
-      for (let i = 0; i < NU; i++) {
-        const a = grid[j][i], b = grid[j][i + 1], c = grid[j + 1][i + 1], d = grid[j + 1][i];
-        const depth = (a.r[2] + b.r[2] + c.r[2] + d.r[2]) / 4;
-        const v = (a.v + b.v + c.v + d.v) / 4;
-        /* Crude Lambert term so the ellipsoid reads as solid. The `|| 1` guard
-           belongs OUTSIDE hypot -- inside it, a legitimate zero z-component was
-           being replaced by 1, tilting the shading of the equator. */
-        const rad = Math.hypot(a.r[0], a.r[1], a.r[2]) || 1;
-        const nz = depth / rad;
-        quads.push({ pts: [a.r, b.r, c.r, d.r], depth, v, shade: 0.62 + 0.38 * Math.max(0, nz) });
-      }
+    /* Painter's algorithm over real triangles. Lighting uses the true face
+       normal -- with an actual scalp this matters, because the surface is not a
+       sphere and a radial approximation would shade the temples wrongly. */
+    const order = new Array(nF);
+    const depth = new Float32Array(nF);
+    for (let f = 0; f < nF; f++) {
+      const a = F[f * 3] * 3, b = F[f * 3 + 1] * 3, c = F[f * 3 + 2] * 3;
+      depth[f] = (RV[a + 2] + RV[b + 2] + RV[c + 2]) / 3;
+      order[f] = f;
     }
-    quads.sort((p, q) => p.depth - q.depth);
+    order.sort((p, q) => depth[p] - depth[q]);
 
-    for (const q of quads) {
-      const scr = q.pts.map((p) => project(p, cx, cy, s));
+    for (const f of order) {
+      const ia = F[f * 3], ib = F[f * 3 + 1], ic = F[f * 3 + 2];
+      const a = ia * 3, b = ib * 3, c = ic * 3;
+      const ax = RV[a], ay = RV[a + 1], az2 = RV[a + 2];
+      const e1 = [RV[b] - ax, RV[b + 1] - ay, RV[b + 2] - az2];
+      const e2 = [RV[c] - ax, RV[c + 1] - ay, RV[c + 2] - az2];
+      let nx = e1[1] * e2[2] - e1[2] * e2[1];
+      let ny = e1[2] * e2[0] - e1[0] * e2[2];
+      let nz = e1[0] * e2[1] - e1[1] * e2[0];
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      nz /= nl; nx /= nl; ny /= nl;
+      // Light slightly above and to the left of the camera.
+      const lam = Math.max(0, 0.35 * nx * -0.4 + 0.35 * ny * 0.5 + nz * 0.85);
+      const shade = 0.34 + 0.66 * lam;
+
+      const pa = project([ax, ay, az2], cx, cy, sc);
+      const pb = project([RV[b], RV[b + 1], RV[b + 2]], cx, cy, sc);
+      const pc = project([RV[c], RV[c + 1], RV[c + 2]], cx, cy, sc);
+      const v = (PV[ia] + PV[ib] + PV[ic]) / 3;
+
       ctx.beginPath();
-      ctx.moveTo(scr[0][0], scr[0][1]);
-      for (let k = 1; k < 4; k++) ctx.lineTo(scr[k][0], scr[k][1]);
+      ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.lineTo(pc[0], pc[1]);
       ctx.closePath();
-      ctx.globalAlpha = q.depth > 0 ? 0.93 : 1;
-      ctx.fillStyle = litColor(q.v / maxAbs, q.shade, dark);
+      ctx.fillStyle = litColor(v / maxAbs, shade, dark);
       ctx.fill();
-      ctx.lineWidth = 0.35;
-      ctx.strokeStyle = ctx.fillStyle;
-      ctx.stroke();
+      // Hairline stroke in the same colour closes the seams between triangles.
+      ctx.lineWidth = 0.4; ctx.strokeStyle = ctx.fillStyle; ctx.stroke();
     }
-    ctx.globalAlpha = 1;
 
-    // --- the dipole itself, drawn over the back half ----------------------
-    const dRot = rotate(pos, state.yaw, state.pitch);
-    const tip = rotate([pos[0] + mom[0] * 0.34, pos[1] + mom[1] * 0.34, pos[2] + mom[2] * 0.34],
-      state.yaw, state.pitch);
-    const tail = rotate([pos[0] - mom[0] * 0.14, pos[1] - mom[1] * 0.14, pos[2] - mom[2] * 0.14],
-      state.yaw, state.pitch);
-    const P = (p) => project(p, cx, cy, s);
-    const [tx, ty] = P(tip), [bx, by] = P(tail), [mx, my] = P(dRot);
-
-    const ink = dark ? '#f4f4f2' : '#111';
-    ctx.strokeStyle = ink; ctx.lineWidth = 3.2; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx, ty); ctx.stroke();
-    // arrow head
-    const ang = Math.atan2(ty - by, tx - bx);
+    // --- the dipole, drawn over the head so it is always visible ------------
+    const P = (q) => project(rotate(q, state.yaw, state.pitch), cx, cy, sc);
+    const tip = P([pos[0] + mom[0] * 0.34, pos[1] + mom[1] * 0.34, pos[2] + mom[2] * 0.34]);
+    const tail = P([pos[0] - mom[0] * 0.14, pos[1] - mom[1] * 0.14, pos[2] - mom[2] * 0.14]);
+    const mid = P(pos);
+    const ink = dark ? '#f6f6f4' : '#101010';
+    const halo = dark ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.75)';
+    for (const [col, wid] of [[halo, 6.5], [ink, 3.2]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(tail[0], tail[1]); ctx.lineTo(tip[0], tip[1]); ctx.stroke();
+    }
+    const ang = Math.atan2(tip[1] - tail[1], tip[0] - tail[0]);
     ctx.beginPath();
-    ctx.moveTo(tx, ty);
-    ctx.lineTo(tx - 11 * Math.cos(ang - 0.4), ty - 11 * Math.sin(ang - 0.4));
-    ctx.lineTo(tx - 11 * Math.cos(ang + 0.4), ty - 11 * Math.sin(ang + 0.4));
+    ctx.moveTo(tip[0], tip[1]);
+    ctx.lineTo(tip[0] - 11 * Math.cos(ang - 0.4), tip[1] - 11 * Math.sin(ang - 0.4));
+    ctx.lineTo(tip[0] - 11 * Math.cos(ang + 0.4), tip[1] - 11 * Math.sin(ang + 0.4));
     ctx.closePath(); ctx.fillStyle = ink; ctx.fill();
-    ctx.beginPath(); ctx.arc(mx, my, 4.5, 0, 7); ctx.fillStyle = ink; ctx.fill();
+    ctx.beginPath(); ctx.arc(mid[0], mid[1], 4.5, 0, 7); ctx.fillStyle = ink; ctx.fill();
 
-    // --- electrodes, front-facing only ------------------------------------
+    // --- electrodes, front-facing only -------------------------------------
     const chans = montage(state.nCh);
     const readings = chans.map((c) => ({
       ...c,
       v: dipolePotential(c.pos, pos, mom),
       r: rotate(c.pos, state.yaw, state.pitch),
     }));
-    if (state.showElec) {
-      for (const c of readings) {
-        if (c.r[2] < -0.05) continue;
-        const [ex, ey] = P(c.r);
-        ctx.beginPath();
-        ctx.arc(ex, ey, state.nCh > 40 ? 2.6 : 5, 0, 7);
-        ctx.fillStyle = rgbStr(divergingRGB(c.v / maxAbs, dark));  // unshaded: this is the readout
-        ctx.fill();
-        ctx.lineWidth = 1.2;
-        ctx.strokeStyle = dark ? 'rgba(255,255,255,.75)' : 'rgba(0,0,0,.55)';
-        ctx.stroke();
-      }
+    const rad = state.nCh > 64 ? 2.8 : state.nCh > 32 ? 3.6 : 5;
+    for (const c of readings) {
+      if (c.r[2] < -0.02) continue;                    // on the far side
+      const [ex, ey] = project(c.r, cx, cy, sc);
+      ctx.beginPath(); ctx.arc(ex, ey, rad, 0, 7);
+      ctx.fillStyle = rgbStr(divergingRGB(c.v / maxAbs, dark));  // unshaded: the readout
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = dark ? 'rgba(255,255,255,.8)' : 'rgba(0,0,0,.6)';
+      ctx.stroke();
     }
 
-    // --- nose, so orientation is never ambiguous --------------------------
-    const noseBase = rotate(onHead(0, 0.12), state.yaw, state.pitch);
-    const noseTip = rotate([0, HEAD.ry * 1.13, HEAD.rz * 0.10], state.yaw, state.pitch);
-    if (noseTip[2] > -0.2) {
-      const [nx1, ny1] = P(noseBase), [nx2, ny2] = P(noseTip);
-      ctx.beginPath(); ctx.moveTo(nx1, ny1); ctx.lineTo(nx2, ny2);
-      ctx.strokeStyle = dark ? 'rgba(255,255,255,.5)' : 'rgba(0,0,0,.4)';
-      ctx.lineWidth = 2; ctx.stroke();
-    }
+    el('text', { x: 12, y: H - 12, fill: token('--text-muted'), 'font-size': 11 }, svg)
+      .textContent = 'drag to rotate';
 
-    el('text', {
-      x: 12, y: H - 12, fill: token('--text-muted'), 'font-size': 11,
-    }, svg).textContent = 'drag to rotate';
-
-    // --- readout ----------------------------------------------------------
     const vals = readings.map((c) => Math.abs(c.v));
     const peak = Math.max(...vals);
     const spread = vals.filter((v) => v > peak * 0.5).length;
-    const r = Math.hypot(pos[0] / HEAD.rx, pos[1] / HEAD.ry, pos[2] / HEAD.rz);
+    const r = Math.hypot(pos[0] / half[0], pos[1] / half[1], pos[2] / half[2]);
     out.innerHTML = [
-      ['position', `${(r * 100).toFixed(0)}%${clamped ? ' (at the limit)' : ''}`,
-        'centre → scalp'],
+      ['position', `${(r * 100).toFixed(0)}%${clamped ? ' (at the limit)' : ''}`, 'centre → scalp'],
       ['electrodes', state.nCh, 'sampling the surface'],
       ['above half-peak', `${spread} of ${state.nCh}`, 'how spread out it is'],
     ].map(([lab, v, sub]) => `<div class="stat"><div class="stat__value">${v}</div><div class="stat__label">${lab}<br><span class="muted">${sub}</span></div></div>`).join('');
   }
 
+  loadHeadMesh().then((m) => { mesh = m; measure(m.V); draw(); })
+    .catch((e) => {
+      host.innerHTML = `<p class="small muted" style="padding:2rem;text-align:center">`
+        + `could not load the head model (${e.message})</p>`;
+    });
   responsive(host, draw);
   return { state, refresh: draw };
 }

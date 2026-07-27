@@ -1,0 +1,10 @@
+{
+ "source": "EEGLAB dipfit standard_BEM/standard_vol.mat, outermost (scalp) boundary",
+ "note": "Colin27/ICBM template head via FieldTrip/SPM. Subdivided once and Laplacian-smoothed for display; centred and scaled to unit half-extent.",
+ "nVerts": 1994,
+ "nFaces": 3984,
+ "layout": [
+  "vertices float32 nVerts*3",
+  "faces uint16 nFaces*3"
+ ]
+}
