@@ -69,7 +69,8 @@
         time after word onset into <strong>12 time bins</strong>, averaging the
         voltage inside each. That gives 10 × 12 = <strong>120 numbers</strong> for each
         word. The model never sees a scalp or a waveform — it sees a list of 120
-        numbers per trial, called <strong><em>x</em></strong>, with the count of entries
+        numbers per trial, called <strong><em>x</em></strong>, whose individual entries
+        are <em>x</em><sub>1</sub> … <em>x</em><sub>120</sub>. How many there are is
         called <strong><em>p</em></strong> = 120.
       </p>
       <p>
@@ -101,7 +102,8 @@
         The model produces <strong>one number per feature</strong> — the
         <strong>weights</strong> <em>w</em><sub>1</sub> … <em>w</em><sub>120</sub> — plus
         one constant <em>b</em>, the <strong>bias</strong>. To classify a new trial,
-        multiply each feature by its weight, sum, add the bias:
+        multiply each feature (<em>x</em><sub>1</sub> … <em>x</em><sub>120</sub>) by its
+        weight (<em>w</em><sub>1</sub> … <em>w</em><sub>120</sub>), sum, add the bias:
       </p>
       <div class="formula">
         score = <em>w</em><sub>1</sub><em>x</em><sub>1</sub>

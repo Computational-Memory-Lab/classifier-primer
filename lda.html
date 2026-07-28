@@ -75,10 +75,11 @@
       <p>
         Those 120 numbers are the trial, as far as the model is concerned. The model
         never sees a scalp, a waveform, or a word. It sees a list of 120 numbers per
-        trial. In
-        the notation everyone uses, that list is called <strong><em>x</em></strong>,
-        and the number of entries in it is called <strong><em>p</em></strong>, so here
-        <em>p</em> = 120.
+        trial. In the notation everyone uses, the whole list is called
+        <strong><em>x</em></strong>, and the individual numbers in it are
+        <em>x</em><sub>1</sub>, <em>x</em><sub>2</sub>, … <em>x</em><sub>120</sub> — so
+        "feature 47" is <em>x</em><sub>47</sub>. How many of them there are is called
+        <strong><em>p</em></strong>, so here <em>p</em> = 120.
       </p>
       <p>
         Each trial also carries a <strong>label</strong>: was that word later
@@ -99,8 +100,9 @@
           A <strong>feature</strong> is one of those 120 numbers — one electrode at one
           time bin. "Feature 47" means something concrete: the average voltage at, say,
           electrode 4 during time bin 7. When this page says a model "puts weight on a
-          feature", it means it multiplies that one number by something. And
-          <em>p</em> is just the count of them: <em>p</em> = the number of features.
+          feature", it means it multiplies that one number by something. Each feature
+          is an <em>x</em> with a number on it, and <em>p</em> counts them rather than
+          naming one: <em>p</em> = the number of features = 120.
         </p>
       </div>
     </div>
@@ -130,8 +132,9 @@
         The model produces <strong>one number per feature</strong>. Those numbers are
         the <strong>weights</strong>, written <em>w</em><sub>1</sub>,
         <em>w</em><sub>2</sub>, … <em>w</em><sub>120</sub>. To classify a new trial,
-        multiply each feature by its weight, add them all up, and add one final
-        constant <em>b</em> called the <strong>bias</strong> or intercept:
+        multiply each feature (<em>x</em><sub>1</sub> … <em>x</em><sub>120</sub>) by its
+        weight (<em>w</em><sub>1</sub> … <em>w</em><sub>120</sub>), add them all up, and
+        add one final constant <em>b</em> called the <strong>bias</strong> or intercept:
       </p>
       <div class="formula">
         score = <em>w</em><sub>1</sub><em>x</em><sub>1</sub>
