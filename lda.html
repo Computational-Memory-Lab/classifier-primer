@@ -67,7 +67,7 @@
       </p>
       <p>
         A participant sees a word. We record voltage from electrodes on the scalp. For
-        our study-phase analysis we keep <strong>10 electrodes</strong> and chop the
+        our study-phase analysis we look at <strong>10 electrodes</strong> and chop the
         time after word onset into <strong>12 time bins</strong>, averaging the
         voltage inside each bin. That gives 10 × 12 = <strong>120 numbers</strong> for
         each word.
@@ -102,6 +102,17 @@
           feature", it means it multiplies that one number by something. And
           <em>p</em> is just the count of them: <em>p</em> = the number of features.
         </p>
+      </div>
+    </div>
+
+    <div class="figure" style="max-width: 44rem;">
+      <div class="figure__title">The shape of one participant's data</div>
+      <div id="design-matrix"></div>
+      <div class="figure__note">
+        Everything below happens inside this table. A weight is one number per
+        <em>column</em>; a prediction is made from one <em>row</em>. Cross-validation
+        holds some rows back, so only about 202 of them are ever trained on — and the
+        whole small-sample problem in §8 is that 202 rows have to pin down 120 weights.
       </div>
     </div>
   </section>
@@ -880,10 +891,95 @@
 </footer>
 
 <script type="module">
-  import { initChrome } from './assets/site.js';
+  import { initChrome, svgRoot, el, token, responsive } from './assets/site.js';
   import { ldaMechanics, smallN } from './assets/simulation.js';
 
   initChrome();
+
+  /* ---------- the design matrix ----------
+     The shape of what a classifier is handed: 225 trials x 120 features, beside
+     the 225 labels. Deliberately schematic -- the study-phase EEG has never been
+     located (docs/MISSING_FILES.md), so there are no real values to draw and
+     inventing some would be worse than drawing none. Column grouping is not
+     schematic: study_phase_feature_extractor.m fills the row electrode-outer,
+     bin-inner, so columns really do run in ten blocks of twelve.               */
+  {
+    const host = document.getElementById('design-matrix');
+    const NROW = 225, NCOL = 120, NELEC = 10, NBIN = 12;
+
+    responsive(host, () => {
+      const w = 620, h = 300;
+      const svg = svgRoot(host, w, h);
+      const ox = 126, oy = 56, bw = 300, bh = 168;
+      const lx = ox + bw + 16, lw = 22;          // the label column
+      const colW = bw / NCOL, rowH = bh / NROW;
+
+      const lab = (x, y, t, anchor = 'middle', weight = 600, size = 12, fill = '--text-primary') =>
+        el('text', { x, y, 'text-anchor': anchor, 'font-size': size, 'font-weight': weight,
+          fill: token(fill) }, svg).textContent = t;
+
+      // the table itself
+      el('rect', { x: ox, y: oy, width: bw, height: bh, fill: token('--series-1'),
+        opacity: 0.10 }, svg);
+
+      // 120 column hairlines, then the ten electrode boundaries over them
+      for (let c = 1; c < NCOL; c++) {
+        el('line', { x1: ox + c * colW, x2: ox + c * colW, y1: oy, y2: oy + bh,
+          stroke: token('--series-1'), 'stroke-width': 0.5, opacity: 0.22 }, svg);
+      }
+      for (let e = 1; e < NELEC; e++) {
+        el('line', { x1: ox + e * NBIN * colW, x2: ox + e * NBIN * colW, y1: oy, y2: oy + bh,
+          stroke: token('--border-strong'), 'stroke-width': 1, opacity: 0.75 }, svg);
+      }
+      // rows are 0.75px apart at this size, so suggest them every fifth
+      for (let r = 5; r < NROW; r += 5) {
+        el('line', { x1: ox, x2: ox + bw, y1: oy + r * rowH, y2: oy + r * rowH,
+          stroke: token('--series-1'), 'stroke-width': 0.5, opacity: 0.13 }, svg);
+      }
+      el('rect', { x: ox, y: oy, width: bw, height: bh, fill: 'none',
+        stroke: token('--border-strong') }, svg);
+
+      // electrode numbering, matching chapter 3's convention
+      for (let e = 0; e < NELEC; e++) {
+        el('text', { x: ox + (e + 0.5) * NBIN * colW, y: oy - 7, 'text-anchor': 'middle',
+          class: 'tick' }, svg).textContent = e + 1;
+      }
+      lab(ox + bw / 2, oy - 24, 'electrode', 'middle', 400, 10.5, '--text-muted');
+
+      // one trial, picked out. 7px tall so it can be seen at all -- a row is 0.75px.
+      const ry = oy + Math.round(78 * rowH) - 3;
+      el('rect', { x: ox, y: ry, width: bw, height: 7, fill: token('--series-6'),
+        opacity: 0.85 }, svg);
+      el('rect', { x: lx, y: ry, width: lw, height: 7, fill: token('--series-6'),
+        opacity: 0.85 }, svg);
+
+      // the label column
+      el('rect', { x: lx, y: oy, width: lw, height: bh, fill: token('--series-2'),
+        opacity: 0.16 }, svg);
+      el('rect', { x: lx, y: oy, width: lw, height: bh, fill: 'none',
+        stroke: token('--border-strong') }, svg);
+      lab(lx + lw / 2, oy - 7, 'y', 'middle', 700, 11.5, '--text-primary');
+      lab(lx + lw / 2, oy + bh + 14, 'label', 'middle', 400, 10, '--text-muted');
+      lab(lx + lw / 2, oy + bh + 25, '1 or 0', 'middle', 400, 10, '--text-muted');
+
+      // what the highlighted row is
+      const tx = lx + lw + 12;
+      lab(tx, ry + 1, 'one trial', 'start', 700, 11);
+      lab(tx, ry + 14, '120 numbers,', 'start', 400, 10, '--text-muted');
+      lab(tx, ry + 25, 'plus its label', 'start', 400, 10, '--text-muted');
+
+      // left-hand extent
+      lab(ox - 12, oy + bh / 2 - 4, '225 rows', 'end', 620);
+      lab(ox - 12, oy + bh / 2 + 11, 'one per studied word', 'end', 400, 10.5, '--text-muted');
+      lab(ox - 12, oy + bh / 2 + 24, 'n = 225', 'end', 400, 10.5, '--text-muted');
+
+      lab(ox + bw / 2, oy + bh + 22, '120 columns — 10 electrodes × 12 time bins each', 'middle', 620);
+      lab(ox + bw / 2, oy + bh + 37, 'p = 120', 'middle', 400, 10.5, '--text-muted');
+
+      el('text', { x: w / 2, y: h - 8, 'text-anchor': 'middle', class: 'tick' }, svg)
+        .textContent = '225 × 120 = 27,000 voltage values, beside a column of 225 labels';
+    });
+  }
 
   /* ---------- the two rules ---------- */
   const lda = ldaMechanics(document.getElementById('lda-plot'), document.getElementById('lda-out'));
