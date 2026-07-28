@@ -68,13 +68,14 @@
       <p>
         A participant sees a word. We record voltage from electrodes on the scalp. For
         our study-phase analysis we keep <strong>10 electrodes</strong> and chop the
-        second after word onset into <strong>12 time bins</strong>, averaging the
+        time after word onset into <strong>12 time bins</strong>, averaging the
         voltage inside each bin. That gives 10 × 12 = <strong>120 numbers</strong> for
-        that one word.
+        each word.
       </p>
       <p>
         Those 120 numbers are the trial, as far as the model is concerned. The model
-        never sees a scalp, a waveform, or a word. It sees a list of 120 numbers. In
+        never sees a scalp, a waveform, or a word. It sees a list of 120 numbers per
+        trial. In
         the notation everyone uses, that list is called <strong><em>x</em></strong>,
         and the number of entries in it is called <strong><em>p</em></strong>, so here
         <em>p</em> = 120.
@@ -82,15 +83,24 @@
       <p>
         Each trial also carries a <strong>label</strong>: was that word later
         remembered, or later forgotten? Two possibilities, so we write the label as
-        <em>y</em> = 1 or <em>y</em> = 0. The participant studies 225 words, so we have
-        225 pairs of (list of 120 numbers, label).
+        <em>y</em> = 1 or <em>y</em> = 0.
+      </p>
+      <p>
+        A participant studies 225 words, so that participant gives us 225 trials — and
+        a trial is an entire list of 120 numbers with one label attached, not a single
+        number. Laid out flat, one participant's data is a table of
+        <strong>225 rows × 120 columns</strong> — 27,000 voltage values — beside a
+        column of 225 labels. Every row is one studied word; every column is one
+        feature. The number of trials is written <strong><em>n</em></strong>, so here
+        <em>n</em> = 225 and <em>p</em> = 120.
       </p>
       <div class="keypoint">
         <p>
           A <strong>feature</strong> is one of those 120 numbers — one electrode at one
           time bin. "Feature 47" means something concrete: the average voltage at, say,
           electrode 4 during time bin 7. When this page says a model "puts weight on a
-          feature", it means it multiplies that one number by something.
+          feature", it means it multiplies that one number by something. And
+          <em>p</em> is just the count of them: <em>p</em> = the number of features.
         </p>
       </div>
     </div>

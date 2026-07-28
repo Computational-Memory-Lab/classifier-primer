@@ -66,11 +66,11 @@
       </p>
       <p>
         A participant sees a word. We keep <strong>10 electrodes</strong> and chop the
-        second after word onset into <strong>12 time bins</strong>, averaging the
-        voltage inside each. That gives 10 × 12 = <strong>120 numbers</strong> for that
+        time after word onset into <strong>12 time bins</strong>, averaging the
+        voltage inside each. That gives 10 × 12 = <strong>120 numbers</strong> for each
         word. The model never sees a scalp or a waveform — it sees a list of 120
-        numbers, called <strong><em>x</em></strong>, with the count of entries called
-        <strong><em>p</em></strong> = 120.
+        numbers per trial, called <strong><em>x</em></strong>, with the count of entries
+        called <strong><em>p</em></strong> = 120.
       </p>
       <p>
         Each trial carries a <strong>label</strong>: later remembered or later
@@ -83,9 +83,10 @@
       <div class="keypoint">
         <p>
           A <strong>feature</strong> is one of those 120 numbers — one electrode at one
-          time bin. The participant studies 225 words, so we have 225 pairs of (list of
-          120 numbers, label), of which about 202 are used for training on any given
-          fold.
+          time bin, so <em>p</em> = the number of features. A participant studies 225
+          words, so that participant's data is a table of 225 rows × 120 columns beside
+          a column of 225 labels — <em>n</em> = 225 trials, of which about 202 are used
+          for training on any given fold.
         </p>
       </div>
     </div>
