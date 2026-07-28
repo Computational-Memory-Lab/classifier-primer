@@ -154,6 +154,23 @@
         chosen. When we say it is "linear", we mean the score is a weighted sum with no
         squares, products, or thresholds inside it.
       </p>
+      <div class="callout">
+        <p>
+          <strong>Which axis the weights live on.</strong> There are 120 weights because
+          there are 120 features — one per electrode-and-time-bin — and the
+          <em>same</em> 120 are applied to every trial. There is no weight per trial.
+          Look back at the table in §1: a weight belongs to a <em>column</em>, and the
+          weighted sum collapses those columns into a single score for one
+          <em>row</em> at a time.
+        </p>
+        <p>
+          Trials are not absent from this; they enter differently. Every training trial
+          helps <em>estimate</em> each of the 120 weights — §4 does it by averaging
+          trials together, feature by feature — but what comes out is still indexed by
+          feature. Trials are what you learn from and what you later score one at a
+          time, never what the weights are counted in.
+        </p>
+      </div>
 
       <h3>The geometry, once, because it makes the rest readable</h3>
       <p>

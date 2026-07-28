@@ -116,6 +116,22 @@
         <strong>multiplier applied to one feature</strong>, and the set of them is the
         entire learned content of the model.
       </p>
+      <div class="callout">
+        <p>
+          <strong>Which axis the weights live on.</strong> There are 120 weights because
+          there are 120 features — one per electrode-and-time-bin — and the
+          <em>same</em> 120 are applied to every trial. There is no weight per trial. A
+          weight belongs to a column of the data table; the weighted sum collapses those
+          columns into one score for one row at a time.
+        </p>
+        <p>
+          Worth stating on this page in particular, because §5 produces a number that
+          <em>is</em> one per trial — the coefficient <em>α<sub>i</sub></em> — and the
+          two are easy to blur. The <em>α</em>'s are indexed by trial and most of them
+          are zero; the <em>w</em>'s are indexed by feature and there are always exactly
+          120. §5 is the recipe for building the second out of the first.
+        </p>
+      </div>
       <p>
         Geometrically: with two features each trial is a dot on a page and the rule
         "score = 0" is a straight line; with 120 it is a flat <strong>hyperplane</strong>
@@ -240,6 +256,12 @@
         weight <em>w</em><sub>47</sub> is: <em>take feature 47's value in each
         training trial, multiply by that trial's coefficient and label sign, and add
         them up.</em>
+      </p>
+      <p>
+        That sum is where the two axes of §2 meet. The <em>α</em>'s run over trials, one
+        each; the sum runs across all of them; and what drops out is a single number
+        attached to feature 47. However many trials you had, you end up with 120
+        weights.
       </p>
 
       <h3>And almost every coefficient is exactly zero</h3>

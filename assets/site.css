@@ -255,6 +255,10 @@ hr.rule { border: 0; border-top: 1px solid var(--border); margin: 3rem 0; }
   font-size: 0.94rem;
 }
 .callout strong { font-weight: 640; }
+/* Paragraph spacing comes from `.prose > * + *`, which only reaches direct
+   children of .prose -- so a callout or keypoint holding more than one
+   paragraph runs them together. Restore it inside the boxes themselves. */
+.callout > * + *, .keypoint > * + * { margin-top: 0.75em; }
 .callout--warn { border-left-color: var(--warning); background: color-mix(in srgb, var(--warning) 10%, transparent); }
 
 .keypoint {
