@@ -1346,7 +1346,7 @@
         const fy = ((ev.clientY - box.top) / box.height) * h;
         const j = Math.floor((fx - ox) / cell), i = Math.floor((fy - oy) / cell);
         if (i < 0 || i >= P || j < 0 || j >= P) return;
-        const nm = (k) => `electrode <b>${ELECS[k / NB | 0]}</b>, bin <b>${k % NB + 1}</b>`;
+        const nm = (k) => `electrode <b>${ELECS[k / NB | 0]}</b>, time bin <b>${k % NB + 1}</b>`;
         tip.show(
           `${nm(i)}<br>${nm(j)}<br>r = <b>${R[i * P + j].toFixed(2)}</b>`
           + (i === j ? '<br><span style="opacity:.6">on the diagonal</span>' : ''),
