@@ -187,23 +187,61 @@
         <em>b</em> slides it back and forth without rotating it.
       </p>
       <p>
+        Set them yourself and watch which does what.
+      </p>
+    </div>
+
+    <div class="figure" style="max-width: 40rem;">
+      <div class="figure__title">Two features, and a rule you build by hand <em>· live</em></div>
+      <div class="figure__sub">
+        Each dot is a trial. The shaded side is what the rule predicts there; a dot
+        ringed in white is one it gets wrong.
+      </div>
+      <div class="controls">
+        <label class="field">
+          <em>w</em><sub>1</sub> — weight on feature 1
+          <input type="range" id="wg-w1" min="-100" max="100" value="90">
+          <output id="wg-w1-out"></output>
+        </label>
+        <label class="field">
+          <em>w</em><sub>2</sub> — weight on feature 2
+          <input type="range" id="wg-w2" min="-100" max="100" value="45">
+          <output id="wg-w2-out"></output>
+        </label>
+        <label class="field">
+          <em>b</em> — the bias
+          <input type="range" id="wg-b" min="-300" max="300" value="0">
+          <output id="wg-b-out"></output>
+        </label>
+      </div>
+      <div id="wg-plot" class="plot--square"></div>
+      <div class="stats" id="wg-out"></div>
+      <div class="figure__note">
+        Move the two weights and the line turns. Move the bias and it slides without
+        turning — the same line, in a different place. That is the whole difference
+        between them. The arrow is <em>w</em> itself, and it stays perpendicular to the
+        line no matter what you do to it, which is the point made just below. Setting
+        both weights to zero leaves no rule at all: the score is <em>b</em> everywhere,
+        so every trial gets the same answer.
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
         With 120 features the same thing happens in a 120-dimensional space, and the
         dividing surface is a <strong>hyperplane</strong> — the flat thing one
         dimension below whatever space you are in. Nothing about the arithmetic
         changes. Only your ability to visualize it does.
       </p>
       <p>
-        One dimension below, and not by convention: it falls out of the equation. The
-        rule "score = 0" is a single equation, and imposing one equation on a space
-        removes exactly one degree of freedom from it. On a page (2 dimensions), fixing
-        <em>w</em><sub>1</sub><em>x</em><sub>1</sub> +
-        <em>w</em><sub>2</sub><em>x</em><sub>2</sub> + <em>b</em> = 0 leaves you free to
-        slide along one direction only, which traces a line — 1 dimension. In a room
-        (3 dimensions) the same single equation leaves two directions free, which sweeps
-        out a plane — 2 dimensions. In our 120, it leaves 119. The boundary is always
-        one short of the space it divides, because it takes exactly one equation to say
-        where the score changes sign, and a surface of the full 120 dimensions would not
-        divide anything — it would <em>be</em> the space.
+        Why exactly one dimension below: the boundary is one equation, and one equation
+        fixes one feature. Solve "score = 0" for the last feature and you get
+        <em>x</em><sub>120</sub> = −(<em>w</em><sub>1</sub><em>x</em><sub>1</sub> + … +
+        <em>w</em><sub>119</sub><em>x</em><sub>119</sub> + <em>b</em>) /
+        <em>w</em><sub>120</sub>. Choose the other 119 however you like and the last one
+        is then decided for you. 119 free choices is what makes it 119-dimensional. The
+        same count on a page: choose <em>x</em><sub>1</sub>, and
+        <em>x</em><sub>2</sub> is forced — one free choice, a line.
       </p>
       <div class="callout">
         <p>
@@ -985,7 +1023,7 @@
   import {
     initChrome, svgRoot, el, token, responsive, loadJSON, loadBin, tooltip,
   } from './assets/site.js';
-  import { ldaMechanics, smallN } from './assets/simulation.js';
+  import { ldaMechanics, smallN, weightGeometry } from './assets/simulation.js';
 
   initChrome();
 
@@ -1072,6 +1110,23 @@
       el('text', { x: w / 2, y: h - 8, 'text-anchor': 'middle', class: 'tick' }, svg)
         .textContent = '225 × 120 = 27,000 voltage values, beside a column of 225 labels';
     });
+  }
+
+  /* ---------- build the rule by hand ---------- */
+  {
+    const wg = weightGeometry(document.getElementById('wg-plot'),
+      document.getElementById('wg-out'));
+    const ids = [['wg-w1', 'w1', 100], ['wg-w2', 'w2', 100], ['wg-b', 'b', 100]];
+    const sync = () => {
+      for (const [id, key, div] of ids) {
+        const v = +document.getElementById(id).value / div;
+        wg.state[key] = v;
+        document.getElementById(`${id}-out`).textContent = v.toFixed(2);
+      }
+      wg.refresh();
+    };
+    for (const [id] of ids) document.getElementById(id).addEventListener('input', sync);
+    sync();
   }
 
   /* ---------- Sigma, measured ----------

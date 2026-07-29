@@ -360,6 +360,108 @@ export function ldaMechanics(host, out) {
   return { state, refresh: draw };
 }
 
+/* ========================= the weights, by hand ==========================
+
+   The one figure on the site where the reader sets the weights rather than
+   watching a solver set them. Its whole job is the two sentences it sits under:
+   the weights turn the line, the bias slides it without turning it. Nothing is
+   fitted here -- w1, w2 and b are exactly what the sliders say, so the picture
+   can be checked against the arithmetic by hand.
+
+   The half-planes are tinted with the colour of the class they predict, which
+   makes an error read as a dot sitting on the wrong background rather than as a
+   number in a readout.                                                        */
+
+export function weightGeometry(host, out) {
+  const state = { w1: 0.9, w2: 0.45, b: 0 };
+  const R = 4.6;
+  // blue/red rather than the Hit/Miss pair: this figure shows no real condition,
+  // and green at low opacity swamps a dark background while blue vanishes into it.
+  const CLS = ['--series-8', '--series-1'];
+  const pts = twoClouds({ n: 70, sep: 2.2, sx: 1, sy: 1, rho: 0.2, seed: 5 });
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    const xs = scale(-R, R, PAD.l, W - PAD.r);
+    const ys = scale(-R, R, H - PAD.b, PAD.t);
+    const { w1, w2, b } = state;
+
+    // Shade each side with the colour of the class it predicts. Drawn first, so
+    // the dots and the line sit on top of it.
+    const clip = clipped(svg, W, H, PAD);
+    const score = (x, y) => w1 * x + w2 * y + b;
+    const corner = [[-R, -R], [R, -R], [R, R], [-R, R]];
+    const pos = [], neg = [];
+    for (let i = 0; i < 4; i++) {
+      const a = corner[i], c = corner[(i + 1) % 4];
+      (score(...a) >= 0 ? pos : neg).push(a);
+      const sa = score(...a), sc = score(...c);
+      if ((sa >= 0) !== (sc >= 0)) {                 // edge crosses the boundary
+        const t = sa / (sa - sc);
+        const p = [a[0] + t * (c[0] - a[0]), a[1] + t * (c[1] - a[1])];
+        pos.push(p); neg.push(p);
+      }
+    }
+    for (const [poly, c] of [[pos, CLS[1]], [neg, CLS[0]]]) {
+      if (poly.length < 3) continue;
+      el('polygon', {
+        points: poly.map(([x, y]) => `${xs(x)},${ys(y)}`).join(' '),
+        fill: token(c), opacity: 0.13,
+      }, clip);
+    }
+
+    frame(svg, W, H, PAD, xs, ys, {
+      xTicks: [], yTicks: [],
+      xLabel: 'feature 1 — its value on this trial',
+      yLabel: 'feature 2',
+    });
+
+    let right = 0;
+    for (const p of pts) {
+      const predicted = score(p.x, p.y) >= 0 ? 1 : 0;
+      if (predicted === p.c) right++;
+      el('circle', {
+        cx: xs(p.x), cy: ys(p.y), r: 3.6,
+        fill: token(CLS[p.c]),
+        stroke: predicted === p.c ? 'none' : token('--text-primary'),
+        'stroke-width': predicted === p.c ? 0 : 1.2,
+        opacity: predicted === p.c ? 0.55 : 0.95,
+      }, svg);
+    }
+
+    // the boundary: every point where the score is exactly zero
+    if (Math.hypot(w1, w2) > 1e-6) {
+      const n2 = w1 * w1 + w2 * w2;
+      const foot = [-b * w1 / n2, -b * w2 / n2];      // closest point to the origin
+      boundary(svg, xs, ys, foot, [w1, w2], token('--text-primary'), null, null, clip);
+
+      // w itself, drawn from that point -- perpendicular, which is the callout below
+      const L = 1.9 / Math.hypot(w1, w2);
+      const tipx = foot[0] + w1 * L, tipy = foot[1] + w2 * L;
+      const ah = el('defs', {}, svg);
+      const mk = el('marker', { id: 'wg-arrow', viewBox: '0 0 10 10', refX: '8', refY: '5',
+        markerWidth: '5', markerHeight: '5', orient: 'auto-start-reverse' }, ah);
+      el('path', { d: 'M 0 1 L 9 5 L 0 9 z', fill: token('--text-primary') }, mk);
+      el('line', {
+        x1: xs(foot[0]), y1: ys(foot[1]), x2: xs(tipx), y2: ys(tipy),
+        stroke: token('--text-primary'), 'stroke-width': 2, 'marker-end': 'url(#wg-arrow)',
+      }, clip);
+      el('text', {
+        x: xs(tipx) + 7, y: ys(tipy) - 4, class: 'axis-label', fill: token('--text-primary'),
+      }, svg).textContent = 'w';
+    }
+
+    const sign = (v) => (v < 0 ? '−' : '+');
+    out.innerHTML = stat('the rule you have built',
+      `<span style="font-size:0.62em">${w1.toFixed(2)}·x₁ ${sign(w2)} ${Math.abs(w2).toFixed(2)}·x₂ `
+      + `${sign(b)} ${Math.abs(b).toFixed(2)}</span>`)
+      + stat('dots on the right side', `${(100 * right / pts.length).toFixed(0)}%`);
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
 /* ============================== figure 3 ================================= */
 
 export function svmMargin(host, out) {
