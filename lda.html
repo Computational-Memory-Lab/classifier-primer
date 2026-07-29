@@ -84,7 +84,11 @@
       <p>
         Each trial also carries a <strong>label</strong>: was that word later
         remembered, or later forgotten? Two possibilities, so we write the label as
-        <em>y</em> = 1 or <em>y</em> = 0.
+        <em>y</em> = 1 or <em>y</em> = 0. The two groups those labels carve the trials
+        into — all the remembered ones, all the forgotten ones — are the
+        <strong>classes</strong>. Classifying a trial means deciding which of the two it
+        belongs to, and every "class" on this page means one of those groups, nothing
+        more.
       </p>
       <p>
         A participant studies 225 words, so that participant gives us 225 trials — and
@@ -114,7 +118,7 @@
         Everything below happens inside this table. A weight is one number per
         <em>column</em>; a prediction is made from one <em>row</em>. Cross-validation
         holds some rows back, so only about 202 of them are ever trained on — and the
-        whole small-sample problem in §8 is that 202 rows have to pin down 120 weights.
+        whole small-sample problem is that 202 rows have to pin down 120 weights.
       </div>
     </div>
   </section>
@@ -150,7 +154,7 @@
       <p>
         So a weight is a <strong>multiplier applied to one feature</strong>, and the
         set of 120 of them is the entire learned content of the model. When we say a
-        classifier was "trained", we mean: those 120 numbers plus <em>b</em> were
+        classifier was "trained", we mean: those 120 weights plus <em>b</em> were
         chosen. When we say it is "linear", we mean the score is a weighted sum with no
         squares, products, or thresholds inside it.
       </p>
@@ -159,14 +163,15 @@
           <strong>Which axis the weights live on.</strong> There are 120 weights because
           there are 120 features — one per electrode-and-time-bin — and the
           <em>same</em> 120 are applied to every trial. There is no weight per trial.
-          Look back at the table in §1: a weight belongs to a <em>column</em>, and the
+          Look back at the table of one participant's data above: a weight belongs to a
+          <em>column</em>, and the
           weighted sum collapses those columns into a single score for one
           <em>row</em> at a time.
         </p>
         <p>
           Trials are not absent from this; they enter differently. Every training trial
-          helps <em>estimate</em> each of the 120 weights — §4 does it by averaging
-          trials together, feature by feature — but what comes out is still indexed by
+          helps <em>estimate</em> each of the 120 weights, by a procedure that averages
+          trials together feature by feature, but what comes out is still indexed by
           feature. Trials are what you learn from and what you later score one at a
           time, never what the weights are counted in.
         </p>
@@ -185,7 +190,20 @@
         With 120 features the same thing happens in a 120-dimensional space, and the
         dividing surface is a <strong>hyperplane</strong> — the flat thing one
         dimension below whatever space you are in. Nothing about the arithmetic
-        changes. Only your ability to draw it does.
+        changes. Only your ability to visualize it does.
+      </p>
+      <p>
+        One dimension below, and not by convention: it falls out of the equation. The
+        rule "score = 0" is a single equation, and imposing one equation on a space
+        removes exactly one degree of freedom from it. On a page (2 dimensions), fixing
+        <em>w</em><sub>1</sub><em>x</em><sub>1</sub> +
+        <em>w</em><sub>2</sub><em>x</em><sub>2</sub> + <em>b</em> = 0 leaves you free to
+        slide along one direction only, which traces a line — 1 dimension. In a room
+        (3 dimensions) the same single equation leaves two directions free, which sweeps
+        out a plane — 2 dimensions. In our 120, it leaves 119. The boundary is always
+        one short of the space it divides, because it takes exactly one equation to say
+        where the score changes sign, and a surface of the full 120 dimensions would not
+        divide anything — it would <em>be</em> the space.
       </p>
       <div class="callout">
         <p>
@@ -224,11 +242,13 @@
           <strong>Both clouds have the same shape.</strong> They can sit in different
           places, but they must be stretched and tilted identically. This is the
           assumption that makes LDA <em>linear</em> — drop it and you get a curved
-          boundary instead (see §9).
+          boundary instead — quadratic discriminant analysis, which comes up later under
+          assumptions and failure modes.
         </li>
         <li>
           <strong>We know that shape and those centres.</strong> We do not. We estimate
-          them from the data, and §8 is entirely about the damage that does.
+          them from the data, and the damage that does is large enough to have a section of
+          its own further down.
         </li>
       </ol>
 
@@ -236,7 +256,9 @@
       <p>
         The shape is described by a table called the <strong>covariance matrix</strong>,
         written <strong>Σ</strong>. It has one row and one column per feature, so for us
-        it is 120 × 120. Two kinds of entry:
+        it is 120 × 120. Where row <em>i</em> meets column <em>j</em> sits a single
+        number describing how features <em>i</em> and <em>j</em> vary. That number means
+        one of two things depending on where you look:
       </p>
       <ul>
         <li>
@@ -257,24 +279,70 @@
         off-diagonal entries of Σ are large, and any method that ignores them is
         throwing away most of what it knows about the data.
       </p>
+      <p>
+        That is a claim with a number attached, so here is the matrix itself, measured
+        on real trials rather than asserted.
+      </p>
+    </div>
 
+    <div class="figure" style="max-width: 44rem;">
+      <div class="figure__title">Σ for one participant, all 120 × 120 of it</div>
+      <div class="figure__sub" id="cov-sub"></div>
+      <div id="cov-plot"></div>
+      <div class="stats" id="cov-out"></div>
+      <div class="figure__note" id="cov-note"></div>
+    </div>
+
+    <div class="prose">
       <h3>The rule that follows</h3>
       <p>
         Given those assumptions, the mathematically optimal decision is: assign a trial
-        to whichever class it is more likely to have come from. Working that through
-        for two Gaussians with equal covariance — this is the derivation in Welch
-        (1939) — everything nonlinear cancels, and what survives is exactly the
-        weighted sum from §2, with weights
+        to whichever class it is more likely to have come from — remembered or
+        forgotten. Working that through for two Gaussians with equal covariance — this
+        is the derivation in Welch (1939) — everything nonlinear cancels, and what
+        survives is exactly the weighted sum this page started with, with weights
       </p>
       <div class="formula">
         <em>w</em> = <strong>Σ</strong><sup>−1</sup> (<em>μ</em><sub>1</sub> − <em>μ</em><sub>0</sub>)
         <span class="lbl">Blankertz et al. (2011), Eq. 9 — the whole of LDA in one line</span>
       </div>
       <p>
-        where <em>μ</em><sub>1</sub> and <em>μ</em><sub>0</sub> are the two class
-        centres — the average trial of each class — and
-        <strong>Σ</strong><sup>−1</sup> is the matrix inverse of the covariance. That
-        formula is the entire method. The next section is about what it means.
+        <strong>That <em>w</em> is the weights</strong> — the same ones from earlier, all
+        120 at once. The formula does not produce something weight-adjacent that then has
+        to be converted; hand it a set of trials and what comes back is
+        <em>w</em><sub>1</sub> … <em>w</em><sub>120</sub>, ready to drop straight into the
+        score. Writing it as a single letter is just shorthand for the whole list, the
+        way <em>x</em> was shorthand for one trial's 120 numbers.
+      </p>
+      <p>The two pieces it is built from are worth reading separately.</p>
+      <ul>
+        <li>
+          <strong><em>μ</em><sub>1</sub> − <em>μ</em><sub>0</sub> is the separation.</strong>
+          A <strong>class centre</strong> is the average trial of a class. Take every
+          remembered trial and average them feature by feature: the 120 numbers you get
+          back describe one imaginary typical remembered trial, and that is
+          <em>μ</em><sub>1</sub>. The forgotten trials give you <em>μ</em><sub>0</sub>.
+          Each is a point sitting in the same 120-dimensional space as a real trial —
+          just not a trial anybody recorded. Subtracting one from the other says, feature
+          by feature, <em>how far apart the two classes sit</em>.
+        </li>
+        <li>
+          <strong>Σ<sup>−1</sup> divides that by the noise.</strong> A gap between the
+          classes only counts for as much as the wobble it has to be seen against. With a
+          single feature no matrix is involved at all: Σ is that feature's variance
+          <em>σ</em><sup>2</sup>, Σ<sup>−1</sup> is 1/<em>σ</em><sup>2</sup>, and the
+          formula reads (<em>μ</em><sub>1</sub> − <em>μ</em><sub>0</sub>) ÷
+          <em>σ</em><sup>2</sup> — the gap, divided by how much that feature varies
+          anyway. The <strong>matrix inverse</strong> is what that division turns into
+          when there are 120 features that also vary <em>together</em>: the nearest thing
+          a matrix has to a reciprocal, defined so that multiplying by Σ and then by
+          Σ<sup>−1</sup> gets you back where you started.
+        </li>
+      </ul>
+      <p>
+        So the formula reads as <em>separation, divided by noise</em>. That is the entire
+        method. The next section takes each half apart in the order you would actually
+        compute it.
       </p>
     </div>
   </section>
@@ -463,7 +531,8 @@
       <div class="stats" id="lda-out"></div>
       <div class="figure__note">
         Step 2 draws the dashed ellipses — the measured shape of each class. Step 3
-        divides by it. The &Gamma; slider is §6; leave it at 0 for now.
+        divides by it. The &Gamma; slider belongs to the shrinkage section below; leave it
+        at 0 for now.
       </div>
     </div>
   </section>
@@ -623,7 +692,7 @@
         </table>
       </div>
       <p>
-        The Oz example from §4 is exactly this: Oz gets a big weight in the filter and
+        The Oz example earlier is exactly this: Oz gets a big weight in the filter and
         is flat in the pattern. Reading the filter as a brain map would put a memory
         effect in occipital cortex, when what is actually there is alpha rhythm being
         subtracted out.
@@ -788,7 +857,7 @@
         <li>
           <strong>Feature scaling does not matter.</strong> Σ<sup>−1</sup> already
           normalises by variance, so rescaling a feature rescales its weight and leaves
-          the answer unchanged. This is not true of SVM (see the other page, §9).
+          the answer unchanged. This is not true of SVM, whose assumptions section says why.
         </li>
         <li>
           <strong>It is deterministic.</strong> Same data, same answer, every time — no
@@ -828,7 +897,8 @@
         outcome is almost entirely the third row. Where there are 19 examples per
         weight, LDA works and its published &Gamma; = 0.5 turns out to sit on the best
         setting. Where there are 1.7, it does not, and the pipeline has been driven to
-        maximum shrinkage — which is to say, driven back to the naive rule of §4.
+        maximum shrinkage — which is to say, driven back to the naive difference-of-means
+        rule.
       </p>
       <p>
         We also tested whether compressing 120 features down to ~10 before classifying
@@ -864,11 +934,11 @@
             </tr>
             <tr>
               <td><strong>Friedman (1989)</strong></td>
-              <td>Regularized discriminant analysis — the &Gamma; of §6, and the name MATLAB uses.</td>
+              <td>Regularized discriminant analysis — the shrinkage &Gamma;, and the name MATLAB uses.</td>
             </tr>
             <tr>
               <td><strong>Raudys &amp; Jain (1991)</strong></td>
-              <td>The sample-size table in §8, and the analysis showing required trials scale linearly with features for a linear model. <code>papers/Raudys_Jain_1991.pdf</code></td>
+              <td>The sample-size table in the scarce-trials section, and the analysis showing required trials scale linearly with features for a linear model. <code>papers/Raudys_Jain_1991.pdf</code></td>
             </tr>
             <tr>
               <td><strong>Ledoit &amp; Wolf (2004)</strong></td>
@@ -888,8 +958,9 @@
       <p class="small muted">
         Fisher, Ledoit &amp; Wolf, Raudys &amp; Jain, Blankertz et al. and Haufe et al.
         are all filed in this repository; of those, Raudys &amp; Jain and Blankertz
-        et al. have been read closely and are the sources for §6 and §8. The &Gamma; sweep
-        figures quoted in §6 are from Blankertz et al. Fig. 9, measured on their
+        et al. have been read closely and are the sources for the shrinkage and
+        scarce-trials sections. The &Gamma; sweep
+        figures quoted there are from Blankertz et al. Fig. 9, measured on their
         attention-speller data rather than ours, so treat the specific percentages as
         illustrative of the shape rather than as predictions for our pipeline.
       </p>
@@ -911,7 +982,9 @@
 </footer>
 
 <script type="module">
-  import { initChrome, svgRoot, el, token, responsive } from './assets/site.js';
+  import {
+    initChrome, svgRoot, el, token, responsive, loadJSON, loadBin, tooltip,
+  } from './assets/site.js';
   import { ldaMechanics, smallN } from './assets/simulation.js';
 
   initChrome();
@@ -998,6 +1071,201 @@
 
       el('text', { x: w / 2, y: h - 8, 'text-anchor': 'middle', class: 'tick' }, svg)
         .textContent = '225 × 120 = 27,000 voltage values, beside a column of 225 labels';
+    });
+  }
+
+  /* ---------- Sigma, measured ----------
+     The page claims the off-diagonals of Sigma are large. This measures them
+     instead of asserting them, from participant 45's real trials.
+
+     Two things about the data it uses, both stated in the figure's own caption
+     rather than hidden here. It is the TEST phase: the study-phase EEG has never
+     been located (docs/MISSING_FILES.md), so a study-phase Sigma cannot be drawn
+     at all. And it is restricted to the first 12 bins of each electrode, which is
+     a real subset of real features, chosen so the matrix comes out at the same
+     120 x 120 the surrounding text describes.
+
+     Displayed as correlations rather than raw covariances: Sigma's entries carry
+     units of microvolts squared and span orders of magnitude, so one colour scale
+     cannot show them. Dividing each entry by the two features' SDs is the standard
+     normalisation and leaves the structure being argued about untouched.        */
+  {
+    const host = document.getElementById('cov-plot');
+    const NB = 12;                       // bins kept per electrode
+    const tip = tooltip();
+
+    const F = await loadJSON('data/features_45.json');
+    const raw = new Int16Array(await loadBin('data/features_45.bin'));
+    const [nTrials, nFeatAll] = F.shape;
+    const nBinAll = F.binStartMs.length;
+    const ELECS = F.electrodes;
+    const P = ELECS.length * NB;         // 120
+
+    // pull the 120 columns, in the same electrode-major order the pipeline uses
+    const cols = [];
+    for (let e = 0; e < ELECS.length; e++) for (let b = 0; b < NB; b++) cols.push(e * nBinAll + b);
+    const X = new Float64Array(nTrials * P);
+    for (let t = 0; t < nTrials; t++) {
+      for (let c = 0; c < P; c++) X[t * P + c] = raw[t * nFeatAll + cols[c]] * F.scale;
+    }
+
+    // Sigma is the WITHIN-class covariance -- the shape of one cloud, not the
+    // spread of the two together -- so centre each class on its own mean first.
+    // Labels: 1 Hit, 2 Miss (old) / 3 CR, 4 FA (new).
+    const isOld = F.labels.map((v) => v === 1 || v === 2);
+    for (const want of [true, false]) {
+      const rows = [];
+      for (let t = 0; t < nTrials; t++) if (isOld[t] === want) rows.push(t);
+      for (let c = 0; c < P; c++) {
+        let m = 0;
+        for (const t of rows) m += X[t * P + c];
+        m /= rows.length;
+        for (const t of rows) X[t * P + c] -= m;
+      }
+    }
+
+    const S = new Float64Array(P * P);
+    const dof = nTrials - 2;
+    for (let i = 0; i < P; i++) {
+      for (let j = i; j < P; j++) {
+        let s = 0;
+        for (let t = 0; t < nTrials; t++) s += X[t * P + i] * X[t * P + j];
+        s /= dof;
+        S[i * P + j] = s; S[j * P + i] = s;
+      }
+    }
+    const sd = new Float64Array(P);
+    for (let i = 0; i < P; i++) sd[i] = Math.sqrt(S[i * P + i]);
+    const R = new Float64Array(P * P);
+    for (let i = 0; i < P; i++) for (let j = 0; j < P; j++) R[i * P + j] = S[i * P + j] / (sd[i] * sd[j]);
+
+    // the numbers the surrounding paragraph is asserting
+    const med = (a) => { a.sort((x, y) => x - y); const h = a.length >> 1;
+      return a.length % 2 ? a[h] : (a[h - 1] + a[h]) / 2; };
+    const all = [], same = [], diff = [];
+    for (let i = 0; i < P; i++) {
+      for (let j = 0; j < P; j++) {
+        if (i === j) continue;
+        const v = Math.abs(R[i * P + j]);
+        all.push(v);
+        ((i / NB | 0) === (j / NB | 0) ? same : diff).push(v);
+      }
+    }
+    const mAll = med(all), mSame = med(same), mDiff = med(diff);
+    const big = all.filter((v) => v > 0.5).length / all.length;
+
+    document.getElementById('cov-sub').textContent =
+      `Participant 45, ${nTrials} trials. Correlation between every pair of the 120 `
+      + 'features, pooled within class.';
+    const stat = (label, value) =>
+      `<div class="stat"><div class="stat__label">${label}</div>`
+      + `<div class="stat__value">${value}</div></div>`;
+    document.getElementById('cov-out').innerHTML =
+      stat('median |r|, off-diagonal', mAll.toFixed(2))
+      + stat('same electrode, other bin', mSame.toFixed(2))
+      + stat('different electrode', mDiff.toFixed(2))
+      + stat('pairs above |r| = 0.5', `${(big * 100).toFixed(0)}%`);
+    document.getElementById('cov-note').innerHTML =
+      'Ten bright blocks on the diagonal: each electrode correlates with itself across '
+      + 'time, because the bins overlap by 60 ms and the signal is smooth. The claim '
+      + 'above is the rest of it — the off-block structure. Two <em>different</em> '
+      + `electrodes still share a median |r| of ${mDiff.toFixed(2)}, which is the skull `
+      + 'smearing one source across many sensors. A method that assumes the features are '
+      + 'independent is asserting this picture is blank away from the diagonal.<br>'
+      + 'Test-phase trials, since the study-phase EEG has never been located, and the '
+      + 'first 12 bins of each electrode so the matrix is the 120 × 120 described above. '
+      + 'Shown as correlations — Σ divided by each pair of standard deviations — because '
+      + 'raw covariances span too many orders of magnitude for one colour scale.';
+
+    responsive(host, () => {
+      const w = 620, h = 380;
+      const svg = svgRoot(host, w, h);
+      const ox = 118, oy = 30, S0 = 300;      // square plot
+      const cell = S0 / P;
+
+      // the matrix, painted to a canvas -- 14,400 cells is too many for SVG nodes
+      const cvs = document.createElement('canvas');
+      cvs.width = P; cvs.height = P;
+      const img = cvs.getContext('2d').createImageData(P, P);
+      for (let i = 0; i < P; i++) {
+        for (let j = 0; j < P; j++) {
+          const t = (Math.max(-1, Math.min(1, R[i * P + j])) + 1) / 2;
+          let Rr, Gg, Bb;
+          if (t < 0.5) { const u = t * 2;
+            Rr = 42 + (150 - 42) * u; Gg = 120 + (150 - 120) * u; Bb = 214 + (148 - 214) * u;
+          } else { const u = (t - 0.5) * 2;
+            Rr = 150 + (208 - 150) * u; Gg = 150 + (59 - 150) * u; Bb = 148 + (59 - 148) * u;
+          }
+          const o = (i * P + j) * 4;
+          img.data[o] = Rr; img.data[o + 1] = Gg; img.data[o + 2] = Bb; img.data[o + 3] = 255;
+        }
+      }
+      cvs.getContext('2d').putImageData(img, 0, 0);
+      // An <image> inside the SVG rather than canvasOverlay(): that helper places a
+      // real canvas as a percentage of the HOST box, which assumes the drawing fills
+      // the SVG element. `svg.chart` caps height at min(42vh, 24rem), so a tall
+      // viewBox gets letterboxed by xMidYMid meet and the canvas lands at a different
+      // scale from the axes. An <image> lives in viewBox units and cannot drift. The
+      // data-URL warning on canvasOverlay is about slider redraws racing the async
+      // decode; nothing here redraws except on resize.
+      el('image', { x: ox, y: oy, width: S0, height: S0, href: cvs.toDataURL(),
+        'image-rendering': 'pixelated', preserveAspectRatio: 'none' }, svg);
+      el('rect', { x: ox, y: oy, width: S0, height: S0, fill: 'none',
+        stroke: token('--border-strong') }, svg);
+
+      // electrode block boundaries, both axes
+      for (let e = 1; e < ELECS.length; e++) {
+        const d = e * NB * cell;
+        el('line', { x1: ox + d, x2: ox + d, y1: oy, y2: oy + S0,
+          stroke: token('--surface-1'), 'stroke-width': 0.75, opacity: 0.5 }, svg);
+        el('line', { x1: ox, x2: ox + S0, y1: oy + d, y2: oy + d,
+          stroke: token('--surface-1'), 'stroke-width': 0.75, opacity: 0.5 }, svg);
+      }
+      ELECS.forEach((e, i) => {
+        const d = (i + 0.5) * NB * cell;
+        el('text', { x: ox + d, y: oy - 6, 'text-anchor': 'middle', class: 'tick' }, svg)
+          .textContent = e;
+        el('text', { x: ox - 6, y: oy + d + 3.5, 'text-anchor': 'end', class: 'tick' }, svg)
+          .textContent = e;
+      });
+      el('text', { x: ox + S0 / 2, y: oy + S0 + 26, 'text-anchor': 'middle', class: 'axis-label' }, svg)
+        .textContent = '120 features — 10 electrodes × 12 bins';
+      el('text', { x: ox - 46, y: oy + S0 / 2, 'text-anchor': 'middle', class: 'axis-label',
+        transform: `rotate(-90 ${ox - 46} ${oy + S0 / 2})` }, svg)
+        .textContent = 'the same 120 features';
+
+      // colour key
+      const kx = ox + S0 + 30, kw = 13;
+      const defs = el('defs', {}, svg);
+      const g = el('linearGradient', { id: 'covg', x1: '0', y1: '0', x2: '0', y2: '1' }, defs);
+      el('stop', { offset: '0', 'stop-color': 'rgb(208,59,59)' }, g);
+      el('stop', { offset: '0.5', 'stop-color': 'rgb(150,150,148)' }, g);
+      el('stop', { offset: '1', 'stop-color': 'rgb(42,120,214)' }, g);
+      el('rect', { x: kx, y: oy, width: kw, height: S0, fill: 'url(#covg)',
+        stroke: token('--border-strong') }, svg);
+      [['+1', 0], ['0', S0 / 2], ['−1', S0]].forEach(([t, dy]) => {
+        el('text', { x: kx + kw + 5, y: oy + dy + 3.5, class: 'tick' }, svg).textContent = t;
+      });
+      el('text', { x: kx + kw / 2, y: oy + S0 + 26, 'text-anchor': 'middle', class: 'tick' }, svg)
+        .textContent = 'r';
+
+      // hover
+      const hit = el('rect', { x: ox, y: oy, width: S0, height: S0, fill: 'transparent',
+        style: 'cursor:crosshair' }, svg);
+      hit.addEventListener('pointermove', (ev) => {
+        const box = svg.getBoundingClientRect();
+        const fx = ((ev.clientX - box.left) / box.width) * w;
+        const fy = ((ev.clientY - box.top) / box.height) * h;
+        const j = Math.floor((fx - ox) / cell), i = Math.floor((fy - oy) / cell);
+        if (i < 0 || i >= P || j < 0 || j >= P) return;
+        const nm = (k) => `electrode <b>${ELECS[k / NB | 0]}</b>, bin <b>${k % NB + 1}</b>`;
+        tip.show(
+          `${nm(i)}<br>${nm(j)}<br>r = <b>${R[i * P + j].toFixed(2)}</b>`
+          + (i === j ? '<br><span style="opacity:.6">on the diagonal</span>' : ''),
+          ev.clientX, ev.clientY,
+        );
+      });
+      hit.addEventListener('pointerleave', () => tip.hide());
     });
   }
 
