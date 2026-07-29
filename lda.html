@@ -1029,9 +1029,11 @@
 
   /* ---------- the design matrix ----------
      The shape of what a classifier is handed: 225 trials x 120 features, beside
-     the 225 labels. Deliberately schematic -- the study-phase EEG has never been
-     located (docs/MISSING_FILES.md), so there are no real values to draw and
-     inventing some would be worse than drawing none. Column grouping is not
+     the 225 labels. Deliberately schematic -- the site's data bundle ships only
+     participant 45's TEST-phase features, so there are no study-phase values here
+     to draw and inventing some would be worse than drawing none. (The study-phase
+     EEG itself is not lost: docs/MISSING_FILES.md item 1 gives two copies. It is
+     just not part of what this site loads.) Column grouping is not
      schematic: study_phase_feature_extractor.m fills the row electrode-outer,
      bin-inner, so columns really do run in ten blocks of twelve.               */
   {
@@ -1134,11 +1136,12 @@
      instead of asserting them, from participant 45's real trials.
 
      Two things about the data it uses, both stated in the figure's own caption
-     rather than hidden here. It is the TEST phase: the study-phase EEG has never
-     been located (docs/MISSING_FILES.md), so a study-phase Sigma cannot be drawn
-     at all. And it is restricted to the first 12 bins of each electrode, which is
-     a real subset of real features, chosen so the matrix comes out at the same
-     120 x 120 the surrounding text describes.
+     rather than hidden here. It is the TEST phase, because that is the only
+     feature file this site ships -- NOT because the study-phase EEG is missing;
+     docs/MISSING_FILES.md item 1 records two copies of it. And it is restricted
+     to the first 12 bins of each electrode, which is a real subset of real
+     features, chosen so the matrix comes out at the same 120 x 120 the
+     surrounding text describes.
 
      Displayed as correlations rather than raw covariances: Sigma's entries carry
      units of microvolts squared and span orders of magnitude, so one colour scale
@@ -1209,33 +1212,60 @@
     const mAll = med(all), mSame = med(same), mDiff = med(diff);
     const big = all.filter((v) => v > 0.5).length / all.length;
 
+    // the structure inside a square: bins close in time, versus far apart
+    const lagSame = [], lagFar = [], crossSameBin = [];
+    for (let i = 0; i < P; i++) {
+      for (let j = 0; j < P; j++) {
+        if (i === j) continue;
+        const v = Math.abs(R[i * P + j]);
+        const sameElec = (i / NB | 0) === (j / NB | 0);
+        const lag = Math.abs((i % NB) - (j % NB));
+        if (sameElec && lag === 2) lagSame.push(v);
+        if (sameElec && lag === 10) lagFar.push(v);
+        if (!sameElec && lag === 0) crossSameBin.push(v);
+      }
+    }
+    const mNear = med(lagSame), mFarBin = med(lagFar), mCross0 = med(crossSameBin);
+
     document.getElementById('cov-sub').textContent =
-      `Participant 45, ${nTrials} trials. Correlation between every pair of the 120 `
-      + 'features, pooled within class.';
+      `Participant 45, ${nTrials} test-phase trials. Correlation between every pair of `
+      + 'the 120 features, pooled within class. Ten electrodes, each split into 12 time '
+      + 'bins, so the matrix reads as a 10 × 10 grid of squares.';
     const stat = (label, value) =>
       `<div class="stat"><div class="stat__label">${label}</div>`
       + `<div class="stat__value">${value}</div></div>`;
     document.getElementById('cov-out').innerHTML =
-      stat('median |r|, off-diagonal', mAll.toFixed(2))
-      + stat('same electrode, other bin', mSame.toFixed(2))
-      + stat('different electrode', mDiff.toFixed(2))
+      stat('median |r|, every pair', mAll.toFixed(2))
+      + stat('median |r|, on-diagonal squares', mSame.toFixed(2))
+      + stat('median |r|, off-diagonal squares', mDiff.toFixed(2))
       + stat('pairs above |r| = 0.5', `${(big * 100).toFixed(0)}%`);
     document.getElementById('cov-note').innerHTML =
-      'Ten bright blocks on the diagonal: each electrode correlates with itself across '
-      + 'time, because the bins overlap by 60 ms and the signal is smooth. The claim '
-      + 'above is the rest of it — the off-block structure. Two <em>different</em> '
-      + `electrodes still share a median |r| of ${mDiff.toFixed(2)}, which is the skull `
-      + 'smearing one source across many sensors. A method that assumes the features are '
-      + 'independent is asserting this picture is blank away from the diagonal.<br>'
-      + 'Test-phase trials, since the study-phase EEG has never been located, and the '
-      + 'first 12 bins of each electrode so the matrix is the 120 × 120 described above. '
+      '<ul>'
+      + '<li><b>The ten squares down the diagonal</b> are one electrode against itself, '
+      + `at different times. Median |r| = <b>${mSame.toFixed(2)}</b>.</li>`
+      + '<li><b>The ninety squares off the diagonal</b> are one electrode against a '
+      + `<em>different</em> one. Median |r| = <b>${mDiff.toFixed(2)}</b>, and `
+      + `<b>${mCross0.toFixed(2)}</b> when the two are read at the same instant. This is `
+      + 'the claim above: the skull spreads one source over many sensors, so two '
+      + 'electrodes are not two independent measurements.</li>'
+      + '<li><b>Inside any one square</b>, the 12 rows and columns are time bins. Every '
+      + 'square is brightest along its own diagonal and fades toward its corners, '
+      + 'because near-in-time bins overlap by 60 ms and the signal is smooth: within one '
+      + `electrode, |r| = <b>${mNear.toFixed(2)}</b> two bins apart but `
+      + `<b>${mFarBin.toFixed(2)}</b> ten bins apart.</li>`
+      + '</ul>'
+      + 'A method that treats the features as independent is asserting this picture is '
+      + 'blank everywhere except the single true diagonal.<br>'
+      + 'Test-phase trials, because that is the feature file this site ships — the '
+      + 'study-phase EEG is not missing, it is simply not part of the site bundle. The '
+      + 'first 12 bins of each electrode, so the matrix is the 120 × 120 described above. '
       + 'Shown as correlations — Σ divided by each pair of standard deviations — because '
       + 'raw covariances span too many orders of magnitude for one colour scale.';
 
     responsive(host, () => {
-      const w = 620, h = 380;
+      const w = 620, h = 396;
       const svg = svgRoot(host, w, h);
-      const ox = 118, oy = 30, S0 = 300;      // square plot
+      const ox = 118, oy = 46, S0 = 300;      // square plot
       const cell = S0 / P;
 
       // the matrix, painted to a canvas -- 14,400 cells is too many for SVG nodes
@@ -1283,12 +1313,15 @@
         el('text', { x: ox - 6, y: oy + d + 3.5, 'text-anchor': 'end', class: 'tick' }, svg)
           .textContent = e;
       });
-      el('text', { x: ox + S0 / 2, y: oy + S0 + 26, 'text-anchor': 'middle', class: 'axis-label' }, svg)
-        .textContent = '120 features — 10 electrodes × 12 bins';
+      // Say "electrodes" outright: ten bare numbers along an axis do not announce
+      // what they are, and the montage numbers (64, 194, ...) look like anything.
+      el('text', { x: ox + S0 / 2, y: oy - 22, 'text-anchor': 'middle', class: 'axis-label' }, svg)
+        .textContent = 'electrodes';
       el('text', { x: ox - 46, y: oy + S0 / 2, 'text-anchor': 'middle', class: 'axis-label',
         transform: `rotate(-90 ${ox - 46} ${oy + S0 / 2})` }, svg)
-        .textContent = 'the same 120 features';
-
+        .textContent = 'electrodes';
+      el('text', { x: ox + S0 / 2, y: oy + S0 + 26, 'text-anchor': 'middle', class: 'axis-label' }, svg)
+        .textContent = '120 features — 10 electrodes × 12 bins';
       // colour key
       const kx = ox + S0 + 30, kw = 13;
       const defs = el('defs', {}, svg);
