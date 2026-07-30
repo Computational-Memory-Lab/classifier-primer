@@ -14,7 +14,7 @@ private repo on a free plan. Anything you change here will be overwritten.
 
 To change the site, edit `site/` in Classifiers and run `./site/publish.sh`.
 
-Mirrored from Classifiers @ `16bb39f`.
+Mirrored from Classifiers @ `0e39718`.
 
 ## Running it locally
 
