@@ -61,9 +61,10 @@
       <h2><span class="steplabel">1</span>What one trial looks like to the model</h2>
       <p>
         A participant sees a word. We record voltage from electrodes on the scalp. For
-        our study-phase analysis we look at <strong>10 electrodes</strong> and chop the
-        time after word onset into <strong>12 time bins</strong>, averaging the
-        voltage inside each bin. That gives 10 × 12 = <strong>120 numbers</strong> for
+        our study-phase analysis we look at <strong>10 electrodes</strong> and cut the
+        <strong>1,200 ms</strong> after word onset into <strong>12 time bins</strong> of
+        100 ms each, averaging the voltage inside every bin. The bins run end to end and
+        do not overlap, so each one is a separate slice of the trial. That gives 10 × 12 = <strong>120 numbers</strong> for
         each word.
       </p>
       <p>
@@ -381,9 +382,13 @@
 
       <h3>Part 1 — the difference of means</h3>
       <p>
-        Average all the remembered trials, feature by feature: 120 numbers. Average all
-        the forgotten trials: another 120. Subtract. You now have 120 numbers saying
-        <em>how much bigger this feature is, on average, when the word was later
+        Average all the remembered trials, feature by feature: 120 numbers, one per
+        feature. Average all the forgotten trials the same way: another 120. Then subtract
+        them <em>feature by feature</em> — feature 1's remembered average minus feature
+        1's forgotten average, feature 2's minus feature 2's, and so on through feature
+        120. Each subtraction stays inside its own feature; nothing is ever compared
+        across electrodes or across time bins. You now have 120 numbers, each saying
+        <em>how much bigger this one feature is, on average, when the word was later
         remembered</em>.
       </p>
       <p>
@@ -413,8 +418,17 @@
           inverse covariance downweights the first and upweights the second.
         </li>
         <li>
-          <strong>It removes double-counting.</strong> Where features are redundant,
-          it discounts them so that correlated evidence is counted roughly once.
+          <strong>It removes double-counting.</strong> Two electrodes correlating at
+          0.9 are largely one measurement made twice. The difference of means gives each
+          its own weight, so that single piece of evidence enters the score twice at full
+          strength. Σ<sup>−1</sup> subtracts from each feature the part its correlated
+          neighbours already account for: with two features of equal variance and
+          correlation <em>r</em>, the weight on the first comes out proportional to
+          (<em>d</em><sub>1</sub> − <em>r</em>·<em>d</em><sub>2</sub>) instead of just
+          <em>d</em><sub>1</sub>, where the <em>d</em>'s are their two differences. Give
+          both features the same difference and set <em>r</em> = 0.9, and each weight
+          lands at about half what it would be if the two were independent — so the pair
+          contributes roughly what one feature alone would.
         </li>
       </ul>
       <p>
@@ -1009,89 +1023,117 @@
   } from './assets/site.js';
   import { ldaMechanics, smallN, weightGeometry } from './assets/simulation.js';
 
-  initChrome();
+  /* ---------- the data both figures below are drawn from ----------
+     Participant 58's study phase: 225 studied words, each 10 electrodes x 12
+     non-overlapping 100 ms bins spanning 0-1200 ms, which is the feature space
+     Chakravarty et al. (2020) describe and the one this page describes. Built by
+     replicating chak_extract_features.m (cfg.onsetSample 26, postLen 300,
+     nBins 12, cfg.elec.e10) and checked against that pipeline's own result for
+     this participant: LDA gamma=1 ten-fold gives AUC 0.582 here against 0.574
+     reported, the gap being fold assignment.
+
+     Participant 58 rather than 45, whose test-phase features the rest of the
+     site uses: 45 scores 0.495 on the study phase, so its figures would show a
+     classifier that does not work. 58 is 143 remembered / 82 forgotten -- one of
+     the better-balanced subjects -- and 0.574 sits in the typical range rather
+     than being an outlier, the group mean over 62 subjects being 0.531.        */
+  const F = await loadJSON('data/study_58.json');
+  const RAW = new Int16Array(await loadBin('data/study_58.bin'));
+  const [NTRIAL, NFEAT] = F.shape;
+  const NBIN = F.nBins, ELECS = F.electrodes, LABELS = F.labels;
+  const V = (t, c) => RAW[t * NFEAT + c] * F.scale;
+
+  /* Diverging blue -> neutral -> red, matching chapter 3's feature matrix. */
+  const diverge = (u) => {
+    const t = Math.max(0, Math.min(1, (u + 1) / 2));
+    if (t < 0.5) { const k = t * 2; return [42 + 108 * k, 120 + 30 * k, 214 - 66 * k]; }
+    const k = (t - 0.5) * 2; return [150 + 58 * k, 150 - 91 * k, 148 - 89 * k];
+  };
+  const paint = (w, h, valueAt) => {
+    const cvs = document.createElement('canvas');
+    cvs.width = w; cvs.height = h;
+    const ctx = cvs.getContext('2d'), img = ctx.createImageData(w, h);
+    for (let r = 0; r < h; r++) {
+      for (let c = 0; c < w; c++) {
+        const [R, G, B] = diverge(valueAt(r, c));
+        const o = (r * w + c) * 4;
+        img.data[o] = R; img.data[o + 1] = G; img.data[o + 2] = B; img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return cvs;
+  };
 
   /* ---------- the design matrix ----------
-     The shape of what a classifier is handed: 225 trials x 120 features, beside
-     the 225 labels. Deliberately schematic -- the site's data bundle ships only
-     participant 45's TEST-phase features, so there are no study-phase values here
-     to draw and inventing some would be worse than drawing none. (The study-phase
-     EEG itself is not lost: docs/MISSING_FILES.md item 1 gives two copies. It is
-     just not part of what this site loads.) Column grouping is not
-     schematic: study_phase_feature_extractor.m fills the row electrode-outer,
-     bin-inner, so columns really do run in ten blocks of twelve.               */
+     The shape of what a classifier is handed: 225 trials x 120 features beside
+     the 225 labels, drawn from the real values rather than sketched. Column
+     grouping is not decorative -- chak_extract_features.m fills each row
+     electrode-outer and bin-inner, so the columns really do run in ten blocks
+     of twelve.                                                                */
   {
     const host = document.getElementById('design-matrix');
-    const NROW = 225, NCOL = 120, NELEC = 10, NBIN = 12;
-
+    const lim = 12;                       // uV, clips the rare large excursion
     responsive(host, () => {
       const w = 620, h = 300;
       const svg = svgRoot(host, w, h);
       const ox = 126, oy = 56, bw = 300, bh = 168;
-      const lx = ox + bw + 16, lw = 22;          // the label column
-      const colW = bw / NCOL, rowH = bh / NROW;
+      const lx = ox + bw + 16, lw = 22;   // the label column
+      const rowH = bh / NTRIAL;
 
       const lab = (x, y, t, anchor = 'middle', weight = 600, size = 12, fill = '--text-primary') =>
         el('text', { x, y, 'text-anchor': anchor, 'font-size': size, 'font-weight': weight,
           fill: token(fill) }, svg).textContent = t;
 
-      // the table itself
-      el('rect', { x: ox, y: oy, width: bw, height: bh, fill: token('--series-1'),
-        opacity: 0.10 }, svg);
-
-      // 120 column hairlines, then the ten electrode boundaries over them
-      for (let c = 1; c < NCOL; c++) {
-        el('line', { x1: ox + c * colW, x2: ox + c * colW, y1: oy, y2: oy + bh,
-          stroke: token('--series-1'), 'stroke-width': 0.5, opacity: 0.22 }, svg);
-      }
-      for (let e = 1; e < NELEC; e++) {
-        el('line', { x1: ox + e * NBIN * colW, x2: ox + e * NBIN * colW, y1: oy, y2: oy + bh,
-          stroke: token('--border-strong'), 'stroke-width': 1, opacity: 0.75 }, svg);
-      }
-      // rows are 0.75px apart at this size, so suggest them every fifth
-      for (let r = 5; r < NROW; r += 5) {
-        el('line', { x1: ox, x2: ox + bw, y1: oy + r * rowH, y2: oy + r * rowH,
-          stroke: token('--series-1'), 'stroke-width': 0.5, opacity: 0.13 }, svg);
+      el('image', { x: ox, y: oy, width: bw, height: bh,
+        href: paint(NFEAT, NTRIAL, (r, c) => V(r, c) / lim).toDataURL(),
+        preserveAspectRatio: 'none' }, svg);
+      for (let e = 1; e < ELECS.length; e++) {
+        const x = ox + (e * NBIN / NFEAT) * bw;
+        el('line', { x1: x, x2: x, y1: oy, y2: oy + bh, stroke: token('--surface-1'),
+          'stroke-width': 0.75, opacity: 0.5 }, svg);
       }
       el('rect', { x: ox, y: oy, width: bw, height: bh, fill: 'none',
         stroke: token('--border-strong') }, svg);
-
-      // electrode numbering, matching chapter 3's convention
-      for (let e = 0; e < NELEC; e++) {
-        el('text', { x: ox + (e + 0.5) * NBIN * colW, y: oy - 7, 'text-anchor': 'middle',
-          class: 'tick' }, svg).textContent = e + 1;
+      for (let e = 0; e < ELECS.length; e++) {
+        el('text', { x: ox + (e + 0.5) * NBIN / NFEAT * bw, y: oy - 7,
+          'text-anchor': 'middle', class: 'tick' }, svg).textContent = ELECS[e];
       }
-      lab(ox + bw / 2, oy - 24, 'electrode', 'middle', 400, 10.5, '--text-muted');
+      lab(ox + bw / 2, oy - 24, 'electrodes', 'middle', 400, 10.5, '--text-muted');
 
-      // one trial, picked out. 7px tall so it can be seen at all -- a row is 0.75px.
-      const ry = oy + Math.round(78 * rowH) - 3;
-      el('rect', { x: ox, y: ry, width: bw, height: 7, fill: token('--series-6'),
-        opacity: 0.85 }, svg);
-      el('rect', { x: lx, y: ry, width: lw, height: 7, fill: token('--series-6'),
-        opacity: 0.85 }, svg);
-
-      // the label column
-      el('rect', { x: lx, y: oy, width: lw, height: bh, fill: token('--series-2'),
-        opacity: 0.16 }, svg);
+      // the labels, as a column: remembered against forgotten
+      const lc = document.createElement('canvas');
+      lc.width = 1; lc.height = NTRIAL;
+      const lctx = lc.getContext('2d'), limg = lctx.createImageData(1, NTRIAL);
+      for (let t = 0; t < NTRIAL; t++) {
+        const [R, G, B] = LABELS[t] === 1 ? [42, 120, 214] : [208, 59, 59];
+        limg.data[t * 4] = R; limg.data[t * 4 + 1] = G; limg.data[t * 4 + 2] = B;
+        limg.data[t * 4 + 3] = 255;
+      }
+      lctx.putImageData(limg, 0, 0);
+      el('image', { x: lx, y: oy, width: lw, height: bh, href: lc.toDataURL(),
+        preserveAspectRatio: 'none' }, svg);
       el('rect', { x: lx, y: oy, width: lw, height: bh, fill: 'none',
         stroke: token('--border-strong') }, svg);
       lab(lx + lw / 2, oy - 7, 'y', 'middle', 700, 11.5, '--text-primary');
-      lab(lx + lw / 2, oy + bh + 14, 'label', 'middle', 400, 10, '--text-muted');
-      lab(lx + lw / 2, oy + bh + 25, '1 or 0', 'middle', 400, 10, '--text-muted');
 
-      // what the highlighted row is
+      // one trial, picked out. 7px tall so it can be seen -- a row is 0.75px.
+      const pick = 78;
+      const ry = oy + Math.round(pick * rowH) - 3;
+      for (const x of [[ox, bw], [lx, lw]]) {
+        el('rect', { x: x[0], y: ry, width: x[1], height: 7, fill: 'none',
+          stroke: token('--text-primary'), 'stroke-width': 1.6 }, svg);
+      }
       const tx = lx + lw + 12;
       lab(tx, ry + 1, 'one trial', 'start', 700, 11);
       lab(tx, ry + 14, '120 numbers,', 'start', 400, 10, '--text-muted');
       lab(tx, ry + 25, 'plus its label', 'start', 400, 10, '--text-muted');
 
-      // left-hand extent
       lab(ox - 12, oy + bh / 2 - 4, '225 rows', 'end', 620);
       lab(ox - 12, oy + bh / 2 + 11, 'one per studied word', 'end', 400, 10.5, '--text-muted');
       lab(ox - 12, oy + bh / 2 + 24, 'n = 225', 'end', 400, 10.5, '--text-muted');
-
       lab(ox + bw / 2, oy + bh + 22, '120 columns — 10 electrodes × 12 time bins each', 'middle', 620);
       lab(ox + bw / 2, oy + bh + 37, 'p = 120', 'middle', 400, 10.5, '--text-muted');
+      lab(lx + lw / 2, oy + bh + 14, 'label', 'middle', 400, 10, '--text-muted');
 
       el('text', { x: w / 2, y: h - 8, 'text-anchor': 'middle', class: 'tick' }, svg)
         .textContent = '225 × 120 = 27,000 voltage values, beside a column of 225 labels';
@@ -1116,48 +1158,32 @@
   }
 
   /* ---------- Sigma, measured ----------
-     The page claims the off-diagonals of Sigma are large. This measures them
-     instead of asserting them, from participant 45's real trials.
-
-     Two things about the data it uses, both stated in the figure's own caption
-     rather than hidden here. It is the TEST phase, because that is the only
-     feature file this site ships -- NOT because the study-phase EEG is missing;
-     docs/MISSING_FILES.md item 1 records two copies of it. And it is restricted
-     to the first 12 bins of each electrode, which is a real subset of real
-     features, chosen so the matrix comes out at the same 120 x 120 the
-     surrounding text describes.
+     The page claims the off-diagonals of Sigma are large. This measures them.
+     Sigma is the WITHIN-class covariance -- the shape of one cloud, not the
+     spread of the two together -- so each class is centred on its own mean
+     before pooling.
 
      Displayed as correlations rather than raw covariances: Sigma's entries carry
-     units of microvolts squared and span orders of magnitude, so one colour scale
-     cannot show them. Dividing each entry by the two features' SDs is the standard
-     normalisation and leaves the structure being argued about untouched.        */
+     units of microvolts squared and span orders of magnitude, so one colour
+     scale cannot show them. Dividing each entry by the two features' SDs is the
+     standard normalisation and leaves the structure being argued about intact.
+
+     An <image> in viewBox units rather than canvasOverlay(): that helper places a
+     canvas as a percentage of the HOST box, which assumes the drawing fills the
+     SVG element, but `svg.chart` caps height at min(42vh, 24rem), so a tall
+     viewBox is letterboxed by xMidYMid meet and the canvas lands at a different
+     scale from the axes.                                                       */
   {
     const host = document.getElementById('cov-plot');
-    const NB = 12;                       // bins kept per electrode
     const tip = tooltip();
+    const P = NFEAT;
 
-    const F = await loadJSON('data/features_45.json');
-    const raw = new Int16Array(await loadBin('data/features_45.bin'));
-    const [nTrials, nFeatAll] = F.shape;
-    const nBinAll = F.binStartMs.length;
-    const ELECS = F.electrodes;
-    const P = ELECS.length * NB;         // 120
-
-    // pull the 120 columns, in the same electrode-major order the pipeline uses
-    const cols = [];
-    for (let e = 0; e < ELECS.length; e++) for (let b = 0; b < NB; b++) cols.push(e * nBinAll + b);
-    const X = new Float64Array(nTrials * P);
-    for (let t = 0; t < nTrials; t++) {
-      for (let c = 0; c < P; c++) X[t * P + c] = raw[t * nFeatAll + cols[c]] * F.scale;
-    }
-
-    // Sigma is the WITHIN-class covariance -- the shape of one cloud, not the
-    // spread of the two together -- so centre each class on its own mean first.
-    // Labels: 1 Hit, 2 Miss (old) / 3 CR, 4 FA (new).
-    const isOld = F.labels.map((v) => v === 1 || v === 2);
-    for (const want of [true, false]) {
+    // centre each class on its own mean, then pool
+    const X = new Float64Array(NTRIAL * P);
+    for (let t = 0; t < NTRIAL; t++) for (let c = 0; c < P; c++) X[t * P + c] = V(t, c);
+    for (const want of [1, 0]) {
       const rows = [];
-      for (let t = 0; t < nTrials; t++) if (isOld[t] === want) rows.push(t);
+      for (let t = 0; t < NTRIAL; t++) if (LABELS[t] === want) rows.push(t);
       for (let c = 0; c < P; c++) {
         let m = 0;
         for (const t of rows) m += X[t * P + c];
@@ -1165,15 +1191,12 @@
         for (const t of rows) X[t * P + c] -= m;
       }
     }
-
-    const S = new Float64Array(P * P);
-    const dof = nTrials - 2;
+    const S = new Float64Array(P * P), dof = NTRIAL - 2;
     for (let i = 0; i < P; i++) {
       for (let j = i; j < P; j++) {
         let s = 0;
-        for (let t = 0; t < nTrials; t++) s += X[t * P + i] * X[t * P + j];
-        s /= dof;
-        S[i * P + j] = s; S[j * P + i] = s;
+        for (let t = 0; t < NTRIAL; t++) s += X[t * P + i] * X[t * P + j];
+        s /= dof; S[i * P + j] = s; S[j * P + i] = s;
       }
     }
     const sd = new Float64Array(P);
@@ -1181,40 +1204,29 @@
     const R = new Float64Array(P * P);
     for (let i = 0; i < P; i++) for (let j = 0; j < P; j++) R[i * P + j] = S[i * P + j] / (sd[i] * sd[j]);
 
-    // the numbers the surrounding paragraph is asserting
     const med = (a) => { a.sort((x, y) => x - y); const h = a.length >> 1;
       return a.length % 2 ? a[h] : (a[h - 1] + a[h]) / 2; };
-    const all = [], same = [], diff = [];
+    const all = [], same = [], diff = [], cross0 = [], adj = [], far = [];
     for (let i = 0; i < P; i++) {
       for (let j = 0; j < P; j++) {
         if (i === j) continue;
         const v = Math.abs(R[i * P + j]);
-        all.push(v);
-        ((i / NB | 0) === (j / NB | 0) ? same : diff).push(v);
+        const sameElec = (i / NBIN | 0) === (j / NBIN | 0);
+        const lag = Math.abs((i % NBIN) - (j % NBIN));
+        all.push(v); (sameElec ? same : diff).push(v);
+        if (!sameElec && lag === 0) cross0.push(v);
+        if (sameElec && lag === 1) adj.push(v);
+        if (sameElec && lag === NBIN - 1) far.push(v);
       }
     }
     const mAll = med(all), mSame = med(same), mDiff = med(diff);
+    const mCross0 = med(cross0), mAdj = med(adj), mFar = med(far);
     const big = all.filter((v) => v > 0.5).length / all.length;
 
-    // the structure inside a square: bins close in time, versus far apart
-    const lagSame = [], lagFar = [], crossSameBin = [];
-    for (let i = 0; i < P; i++) {
-      for (let j = 0; j < P; j++) {
-        if (i === j) continue;
-        const v = Math.abs(R[i * P + j]);
-        const sameElec = (i / NB | 0) === (j / NB | 0);
-        const lag = Math.abs((i % NB) - (j % NB));
-        if (sameElec && lag === 2) lagSame.push(v);
-        if (sameElec && lag === 10) lagFar.push(v);
-        if (!sameElec && lag === 0) crossSameBin.push(v);
-      }
-    }
-    const mNear = med(lagSame), mFarBin = med(lagFar), mCross0 = med(crossSameBin);
-
     document.getElementById('cov-sub').textContent =
-      `Participant 45, ${nTrials} test-phase trials. Correlation between every pair of `
-      + 'the 120 features, pooled within class. Ten electrodes, each split into 12 time '
-      + 'bins, so the matrix reads as a 10 × 10 grid of squares.';
+      `Participant ${F.participant}, ${NTRIAL} studied words. Correlation between every `
+      + 'pair of the 120 features, pooled within class. Ten electrodes, each split into '
+      + '12 time bins, so the matrix reads as a 10 × 10 grid of squares.';
     const stat = (label, value) =>
       `<div class="stat"><div class="stat__label">${label}</div>`
       + `<div class="stat__value">${value}</div></div>`;
@@ -1229,84 +1241,54 @@
       + `at different times. Median |r| = <b>${mSame.toFixed(2)}</b>.</li>`
       + '<li><b>The ninety squares off the diagonal</b> are one electrode against a '
       + `<em>different</em> one. Median |r| = <b>${mDiff.toFixed(2)}</b>, and `
-      + `<b>${mCross0.toFixed(2)}</b> when the two are read at the same instant. This is `
-      + 'the claim above: the skull spreads one source over many sensors, so two '
+      + `<b>${mCross0.toFixed(2)}</b> when the two are read in the same 100 ms bin. This `
+      + 'is the claim above: the skull spreads one source over many sensors, so two '
       + 'electrodes are not two independent measurements.</li>'
-      + '<li><b>Inside any one square</b>, the 12 rows and columns are time bins. Every '
-      + 'square is brightest along its own diagonal and fades toward its corners, '
-      + 'because near-in-time bins overlap by 60 ms and the signal is smooth: within one '
-      + `electrode, |r| = <b>${mNear.toFixed(2)}</b> two bins apart but `
-      + `<b>${mFarBin.toFixed(2)}</b> ten bins apart.</li>`
+      + '<li><b>Inside any one square</b>, the 12 rows and columns are consecutive time '
+      + 'bins. Every square is brightest along its own diagonal and fades toward its '
+      + 'corners, because the signal drifts slowly relative to 100 ms: within one '
+      + `electrode, |r| = <b>${mAdj.toFixed(2)}</b> for bins 100 ms apart but `
+      + `<b>${mFar.toFixed(2)}</b> for the bins at either end of the window.</li>`
       + '</ul>'
       + 'A method that treats the features as independent is asserting this picture is '
       + 'blank everywhere except the single true diagonal.<br>'
-      + 'Test-phase trials, because that is the feature file this site ships — the '
-      + 'study-phase EEG is not missing, it is simply not part of the site bundle. The '
-      + 'first 12 bins of each electrode, so the matrix is the 120 × 120 described above. '
-      + 'Shown as correlations — Σ divided by each pair of standard deviations — because '
-      + 'raw covariances span too many orders of magnitude for one colour scale.';
+      + 'The bins do not overlap, so none of this correlation is an artefact of one bin '
+      + 'reusing another one's samples. Shown as correlations — Σ divided by each '
+      + 'pair of standard deviations — because raw covariances span too many orders of '
+      + 'magnitude for one colour scale.';
 
     responsive(host, () => {
       const w = 620, h = 396;
       const svg = svgRoot(host, w, h);
-      const ox = 118, oy = 46, S0 = 300;      // square plot
+      const ox = 118, oy = 46, S0 = 300;
       const cell = S0 / P;
 
-      // the matrix, painted to a canvas -- 14,400 cells is too many for SVG nodes
-      const cvs = document.createElement('canvas');
-      cvs.width = P; cvs.height = P;
-      const img = cvs.getContext('2d').createImageData(P, P);
-      for (let i = 0; i < P; i++) {
-        for (let j = 0; j < P; j++) {
-          const t = (Math.max(-1, Math.min(1, R[i * P + j])) + 1) / 2;
-          let Rr, Gg, Bb;
-          if (t < 0.5) { const u = t * 2;
-            Rr = 42 + (150 - 42) * u; Gg = 120 + (150 - 120) * u; Bb = 214 + (148 - 214) * u;
-          } else { const u = (t - 0.5) * 2;
-            Rr = 150 + (208 - 150) * u; Gg = 150 + (59 - 150) * u; Bb = 148 + (59 - 148) * u;
-          }
-          const o = (i * P + j) * 4;
-          img.data[o] = Rr; img.data[o + 1] = Gg; img.data[o + 2] = Bb; img.data[o + 3] = 255;
-        }
-      }
-      cvs.getContext('2d').putImageData(img, 0, 0);
-      // An <image> inside the SVG rather than canvasOverlay(): that helper places a
-      // real canvas as a percentage of the HOST box, which assumes the drawing fills
-      // the SVG element. `svg.chart` caps height at min(42vh, 24rem), so a tall
-      // viewBox gets letterboxed by xMidYMid meet and the canvas lands at a different
-      // scale from the axes. An <image> lives in viewBox units and cannot drift. The
-      // data-URL warning on canvasOverlay is about slider redraws racing the async
-      // decode; nothing here redraws except on resize.
-      el('image', { x: ox, y: oy, width: S0, height: S0, href: cvs.toDataURL(),
+      el('image', { x: ox, y: oy, width: S0, height: S0,
+        href: paint(P, P, (i, j) => R[i * P + j]).toDataURL(),
         'image-rendering': 'pixelated', preserveAspectRatio: 'none' }, svg);
-      el('rect', { x: ox, y: oy, width: S0, height: S0, fill: 'none',
-        stroke: token('--border-strong') }, svg);
-
-      // electrode block boundaries, both axes
       for (let e = 1; e < ELECS.length; e++) {
-        const d = e * NB * cell;
+        const d = e * NBIN * cell;
         el('line', { x1: ox + d, x2: ox + d, y1: oy, y2: oy + S0,
           stroke: token('--surface-1'), 'stroke-width': 0.75, opacity: 0.5 }, svg);
         el('line', { x1: ox, x2: ox + S0, y1: oy + d, y2: oy + d,
           stroke: token('--surface-1'), 'stroke-width': 0.75, opacity: 0.5 }, svg);
       }
+      el('rect', { x: ox, y: oy, width: S0, height: S0, fill: 'none',
+        stroke: token('--border-strong') }, svg);
       ELECS.forEach((e, i) => {
-        const d = (i + 0.5) * NB * cell;
+        const d = (i + 0.5) * NBIN * cell;
         el('text', { x: ox + d, y: oy - 6, 'text-anchor': 'middle', class: 'tick' }, svg)
           .textContent = e;
         el('text', { x: ox - 6, y: oy + d + 3.5, 'text-anchor': 'end', class: 'tick' }, svg)
           .textContent = e;
       });
-      // Say "electrodes" outright: ten bare numbers along an axis do not announce
-      // what they are, and the montage numbers (64, 194, ...) look like anything.
       el('text', { x: ox + S0 / 2, y: oy - 22, 'text-anchor': 'middle', class: 'axis-label' }, svg)
         .textContent = 'electrodes';
       el('text', { x: ox - 46, y: oy + S0 / 2, 'text-anchor': 'middle', class: 'axis-label',
-        transform: `rotate(-90 ${ox - 46} ${oy + S0 / 2})` }, svg)
-        .textContent = 'electrodes';
+        transform: `rotate(-90 ${ox - 46} ${oy + S0 / 2})` }, svg).textContent = 'electrodes';
       el('text', { x: ox + S0 / 2, y: oy + S0 + 26, 'text-anchor': 'middle', class: 'axis-label' }, svg)
         .textContent = '120 features — 10 electrodes × 12 time bins';
-      // colour key
+
       const kx = ox + S0 + 30, kw = 13;
       const defs = el('defs', {}, svg);
       const g = el('linearGradient', { id: 'covg', x1: '0', y1: '0', x2: '0', y2: '1' }, defs);
@@ -1321,7 +1303,6 @@
       el('text', { x: kx + kw / 2, y: oy + S0 + 26, 'text-anchor': 'middle', class: 'tick' }, svg)
         .textContent = 'r';
 
-      // hover
       const hit = el('rect', { x: ox, y: oy, width: S0, height: S0, fill: 'transparent',
         style: 'cursor:crosshair' }, svg);
       hit.addEventListener('pointermove', (ev) => {
@@ -1330,12 +1311,11 @@
         const fy = ((ev.clientY - box.top) / box.height) * h;
         const j = Math.floor((fx - ox) / cell), i = Math.floor((fy - oy) / cell);
         if (i < 0 || i >= P || j < 0 || j >= P) return;
-        const nm = (k) => `electrode <b>${ELECS[k / NB | 0]}</b>, time bin <b>${k % NB + 1}</b>`;
-        tip.show(
-          `${nm(i)}<br>${nm(j)}<br>r = <b>${R[i * P + j].toFixed(2)}</b>`
+        const nm = (k) => `electrode <b>${ELECS[k / NBIN | 0]}</b>, `
+          + `<b>${F.binStartMs[k % NBIN]}–${F.binStartMs[k % NBIN] + F.binWidthMs} ms</b>`;
+        tip.show(`${nm(i)}<br>${nm(j)}<br>r = <b>${R[i * P + j].toFixed(2)}</b>`
           + (i === j ? '<br><span style="opacity:.6">on the diagonal</span>' : ''),
-          ev.clientX, ev.clientY,
-        );
+          ev.clientX, ev.clientY);
       });
       hit.addEventListener('pointerleave', () => tip.hide());
     });
