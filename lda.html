@@ -109,7 +109,7 @@
       <div class="figure__title">The shape of one participant's data</div>
       <div id="design-matrix"></div>
       <div class="figure__note" id="dm-note">
-        Everything below happens inside this table. A weight is one number per
+        A weight is one number per
         <em>column</em>; a prediction is made from one <em>row</em>. Cross-validation
         holds some rows back, so only about 202 of them are ever trained on — and the
         whole small-sample problem is that 202 rows have to pin down 120 weights.
@@ -507,10 +507,10 @@
         The dashed ellipses are the measured noise. Whitening is finished when they are
         circles, and that is exactly when the yellow and purple lines coincide — the
         naive rule and LDA agree in a space with no correlation left to exploit, because
-        with the redundancy gone there is no longer any double-counting to undo. Nothing
-        here is arranged: at every slider position the points are transformed, both
-        classes are re-measured from the transformed points, and both rules are derived
-        there. Set the correlation to 0 and the slider does nothing, because the space
+        with the redundancy gone there is no longer any double-counting to undo. At every
+        slider position the points are transformed and both classes re-measured from the
+        transformed points, so both rules are derived in whatever space you have dragged
+        them into. Set the correlation to 0 and the slider does nothing, because the space
         was already white.
       </div>
     </div>
@@ -690,8 +690,7 @@
       <div class="stats" id="lda-out"></div>
       <div class="figure__note">
         The dashed ellipses are the measured shape of each class; LDA is the yellow
-        rule divided by them. The &Gamma; slider belongs to the shrinkage section below;
-        leave it at 0 for now.
+        rule divided by them. Leave the &Gamma; slider at 0 for now.
       </div>
     </div>
   </section>
@@ -1403,8 +1402,8 @@
     });
     document.getElementById('dm-note').insertAdjacentHTML('beforeend',
       ` Red is a positive voltage and blue a negative one, saturating at `
-      + `±${lim.toFixed(1)} µV so that the middle of the range is not all one grey; `
-      + 'the largest tenth of the excursions clip. Blue and red in the label column are '
+      + `±${lim.toFixed(1)} µV, so the largest tenth of the excursions clip. Blue and `
+      + 'red in the label column are '
       + 'the two classes, remembered and forgotten.');
   }
 
@@ -1542,8 +1541,7 @@
       + 'blank everywhere except the single true diagonal.<br>'
       + 'The bins do not overlap, so none of this correlation is an artefact of one bin '
       + 'reusing another bin&rsquo;s samples. Shown as correlations — Σ divided by each '
-      + 'pair of standard deviations — because raw covariances span too many orders of '
-      + 'magnitude for one colour scale.';
+      + 'pair of standard deviations, rather than as raw covariances.';
 
     responsive(host, () => {
       // Margins are kept tight and the viewBox square-ish on purpose: the drawn
@@ -1604,8 +1602,14 @@
         if (i < 0 || i >= P || j < 0 || j >= P) return;
         const nm = (k) => `electrode <b>${ELECS[k / NBIN | 0]}</b>, `
           + `<b>${F.binStartMs[k % NBIN]}–${F.binStartMs[k % NBIN] + F.binWidthMs} ms</b>`;
+        const sameElec = (i / NBIN | 0) === (j / NBIN | 0);
+        const where = i === j
+          ? 'on the diagonal — this feature against itself'
+          : sameElec
+            ? 'off the diagonal, inside a diagonal square — one electrode at two times'
+            : 'off the diagonal — two different electrodes';
         tip.show(`${nm(i)}<br>${nm(j)}<br>r = <b>${R[i * P + j].toFixed(2)}</b>`
-          + (i === j ? '<br><span style="opacity:.6">on the diagonal</span>' : ''),
+          + `<br><span style="opacity:.6">${where}</span>`,
           ev.clientX, ev.clientY);
       });
       hit.addEventListener('pointerleave', () => tip.hide());
