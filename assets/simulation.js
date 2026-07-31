@@ -691,8 +691,8 @@ export function smallN(host, out) {
     boundary(svg, xs, ys, origin, wTrue, token('--text-primary'), '7 4', null, clip);
 
     const key = [
-      ['LDA', token('--series-7'), null],
-      ['SVM', token('--series-6'), '2 3'],
+      ['LDA — 5 samples', token('--series-7'), null],
+      ['SVM — 5 samples', token('--series-6'), '2 3'],
       ['the truth', token('--text-primary'), '7 4'],
     ];
     key.forEach(([name, colour, dash], i) => {

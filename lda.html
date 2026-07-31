@@ -352,7 +352,10 @@
           by feature, <em>how far apart the two classes sit</em>.
         </li>
         <li>
-          <strong>Σ<sup>−1</sup> divides that by the noise.</strong> A gap between the
+          <strong>Σ<sup>−1</sup> divides that by the noise.</strong> The raised −1 means
+          <strong>inverse</strong>, and an inverse is a reciprocal: for an ordinary
+          number, 4<sup>−1</sup> is ¼, and multiplying by ¼ is the same as dividing by 4.
+          So Σ<sup>−1</sup> is how you divide by Σ. A gap between the
           classes only counts for as much as the noise it has to be seen against. With a
           single feature no matrix is involved at all: Σ is that feature's variance
           <em>σ</em><sup>2</sup>, Σ<sup>−1</sup> is 1/<em>σ</em><sup>2</sup>, and the
@@ -366,8 +369,40 @@
       </ul>
       <p>
         So the formula reads as <em>separation, divided by noise</em>. That is the entire
-        method.
+        method for the 120 weights.
       </p>
+      <h3>Where <em>b</em> comes from</h3>
+      <p>
+        The weights set the boundary's direction and leave it free to sit anywhere. The
+        bias <em>b</em> is the single number that decides where along that direction it
+        actually sits, and it is built from two pieces added together.
+      </p>
+      <div class="formula">
+        <em>b</em> = −<em>w</em>ᵀ(<em>μ</em><sub>1</sub> + <em>μ</em><sub>0</sub>)/2
+        &nbsp;+&nbsp; ln(<em>π</em><sub>1</sub>/<em>π</em><sub>0</sub>)
+        <span class="lbl">put the boundary between the two centres, then shift it for how common each class is</span>
+      </div>
+      <ul>
+        <li>
+          <strong>The first piece centres it.</strong>
+          (<em>μ</em><sub>1</sub> + <em>μ</em><sub>0</sub>)/2 is the midpoint between the
+          two class centres. Scoring that midpoint and subtracting the answer puts the
+          boundary exactly there, so a trial sitting halfway between the two classes
+          scores zero. Without it the boundary would pass through the origin, which is
+          wherever the recording equipment happened to put zero volts.
+        </li>
+        <li>
+          <strong>The second piece accounts for how common each class is.</strong>
+          <em>π</em><sub>1</sub> and <em>π</em><sub>0</sub> are the
+          <strong>prior probabilities</strong> — the chance a trial belongs to each class
+          <em>before you look at the EEG at all</em>, which is just how often each one
+          occurs. For participant 58 that is 143 remembered against 82 forgotten, so
+          <em>π</em><sub>1</sub> = 0.64 and <em>π</em><sub>0</sub> = 0.36, and the term
+          comes to ln(0.64/0.36) = <strong>+0.56</strong>. It is positive, which nudges
+          every score toward "remembered" — correctly, because a trial you know nothing
+          about is more likely to be a remembered one.
+        </li>
+      </ul>
     </div>
   </section>
 
@@ -673,6 +708,21 @@
         <strong>202 trials</strong>. That is not a shortage of data; it is a different
         order of magnitude.
       </p>
+      <p>
+        To see what that does, take the easiest case there is. Suppose the truth were a
+        perfectly round cloud: every feature with variance 1, every pair uncorrelated —
+        120 numbers to get right and 7,140 zeros. Draw 202 trials from exactly that and
+        measure the covariance. Along the direction that comes out quietest, the measured
+        variance averages <strong>0.06</strong>; along the loudest, <strong>3.1</strong>.
+        The true answer is 1.0 in every direction.
+      </p>
+      <p>
+        The total is not wrong — average the measured variance across all directions and
+        you get 1.00, as you should. What the estimate invents is the <em>spread</em>: a
+        cloud that is genuinely a sphere is measured as fifty times longer in one
+        direction than another. And 202 trials cannot tell that invented spread from a
+        real one, because a real elongation would leave exactly the same evidence.
+      </p>
 
       <h3>How the estimate fails — specifically</h3>
       <p>
@@ -687,6 +737,16 @@
           more elongated than the true one.
         </p>
       </div>
+      <p>
+        That happens because those directions are not handed to you — they are
+        <em>found</em>, by searching the sample for the direction along which the trials
+        happen to spread most. A search over many candidates lands on one that got lucky,
+        so the winner's measured variance is larger than any true variance. Run the search
+        for the smallest and it lands on one that got unlucky. Roll 120 dice: the highest
+        beats the average and the lowest trails it, not because any die is loaded but
+        because you went looking for the extremes. Every individual number is fine on
+        average, which is why the total comes out right. It is the spread across
+        directions that is manufactured, and the spread is the shape.
       <p>
         Why that is catastrophic here: LDA uses <strong>Σ</strong><sup>−1</sup>, and
         inverting turns the small numbers into large ones. The directions estimated as
@@ -726,9 +786,22 @@
         <strong>&Gamma; = 1 throws away every
         off-diagonal entry of Σ.</strong> What survives is each feature's difference
         scaled by how noisy that feature is on its own — a sensible rule, and one that
-        is <em>blind to every relationship between features</em>. Every noise-cancelling
-        weight, every Oz, goes to zero, because cancelling noise requires knowing that
-        two features share it.
+        is <em>blind to every relationship between features</em>.
+      </p>
+      <p>
+        The reason every Oz-style weight collapses to zero is mechanical. Strip the
+        off-diagonal entries and Σ is left with nothing but variances down its diagonal,
+        and the inverse of such a matrix is just the reciprocal of each variance, in
+        place. Multiplying by it therefore does one thing per feature and never mixes
+        two: weight <em>i</em> becomes <em>d<sub>i</sub></em> ÷
+        <em>σ<sub>i</sub></em><sup>2</sup>, its own difference over its own variance.
+        A feature whose two classes have identical means has <em>d<sub>i</sub></em> = 0,
+        so its weight is 0 ÷ something, which is 0 — however useful it would have been
+        for cleaning up a different feature. Oz earned its weight entirely by correlating
+        with FCz and CPz, and a correlation between two features is recorded nowhere
+        except the off-diagonal entry that has just been deleted. The rule cannot
+        subtract Oz from CPz because it can no longer represent the idea that the two
+        share anything.
       </p>
       <div class="callout">
         <p>
@@ -740,9 +813,20 @@
           <code>fitcdiscr</code>, which is what our pipeline runs, shrinks the
           <em>correlation</em> matrix toward the identity and keeps each feature's own
           variance.</strong> So our &Gamma; = 1 gives difference-of-means
-          <em>divided by variance</em>, not the raw difference. Both discard all
-          cross-feature structure, which is the point that matters here; they differ in
-          whether the surviving weights are still scaled per feature. The live figure
+          <em>divided by variance</em>, not the raw difference.
+        </p>
+        <p>
+          Which invites a fair objection: dividing the difference by the noise is what
+          LDA was doing all along, so what has been lost? Σ<sup>−1</sup> was doing two
+          jobs, and only one survives. Dividing each feature by its own variance is the
+          first, and it handles <em>this electrode is noisy</em>. Discounting evidence
+          that two features share is the second, and it handles <em>these two electrodes
+          are the same measurement twice</em>. &Gamma; = 1 keeps the first and destroys
+          the second. Both rules can honestly be called "difference divided by noise";
+          they differ in what noise is taken to mean — one feature's own scatter, or the
+          joint structure across all 120. Both conventions discard all cross-feature
+          structure, which is the point that matters here; they differ only in whether
+          the surviving weights are still scaled per feature. The live figure
           above follows MATLAB's convention, so it matches our pipeline.
         </p>
       </div>
@@ -787,7 +871,10 @@
       <p>There are two different maps, and they answer different questions.</p>
       <div class="table-scroll">
         <table class="data data--prose">
-          <thead><tr><th></th><th>the pattern</th><th>the filter</th></tr></thead>
+          <thead><tr><th></th>
+            <th>where the signal is<br>(called the <em>pattern</em>)</th>
+            <th>what the classifier multiplies by<br>(called the <em>filter</em>)</th>
+          </tr></thead>
           <tbody>
             <tr>
               <td><strong>what it is</strong></td>
@@ -819,10 +906,30 @@
         subtracted out.
       </p>
       <p>
-        Haufe et al. (2014) — filed here as <code>papers/Haufe_Etal_2014.pdf</code> —
-        is the standard treatment, and it gives the conversion: to get an interpretable
-        map from a trained linear model, multiply the weights back by the covariance.
-        The general rule:
+        Haufe et al. (2014) is the standard treatment, and it gives a conversion between
+        the two columns: multiply a trained model's weights by the covariance and what
+        comes back is the interpretable map.
+      </p>
+      <div class="formula">
+        pattern = <strong>Σ</strong> <em>w</em>
+        <span class="lbl">Haufe et al. (2014) — the map you are allowed to read</span>
+      </div>
+      <p>
+        For LDA it is worth seeing why that works, because it is one line. The weights
+        are <em>w</em> = <strong>Σ</strong><sup>−1</sup>(<em>μ</em><sub>1</sub> −
+        <em>μ</em><sub>0</sub>). Multiply by Σ and the Σ meets the Σ<sup>−1</sup> and the
+        two cancel, exactly as multiplying by 4 cancels a division by 4 — leaving
+        <em>μ</em><sub>1</sub> − <em>μ</em><sub>0</sub>, the difference of means.
+        Multiplying the weights back by the covariance <em>undoes the division that
+        made them uninterpretable</em>, and hands back the ERP map you started from.
+      </p>
+      <p>
+        Which raises the obvious question of why anyone needs the formula, since for LDA
+        it returns something you already had. The answer is that most linear models do
+        not hand you a difference of means. Logistic regression, a linear SVM, the last
+        layer of a network — all produce weights and nothing else, and for those there is
+        no map lying around to fall back on. Σ<em>w</em> is how you get one, and it is
+        the same Σ estimated from the training data. The general rule:
       </p>
       <div class="keypoint">
         <p>
@@ -851,14 +958,39 @@
     <div class="prose">
       <h2><span class="steplabel">8</span>What breaks when trials are scarce</h2>
       <p>
-        This section appears on both deep-dive pages, because the problem is shared and
-        the comparison is the interesting part.
+        The classifier has to pin down 120 weights from about 202 trials — fewer than
+        two trials per weight.
       </p>
       <p>
-        The classifier has to pin down 120 weights from about 202 trials — fewer than
-        two examples per weight. What that does is not subtle. The learned direction is
-        the true direction plus estimation noise, and with <em>p</em> features and
-        <em>n</em> trials the noise grows like <em>p</em>/<em>n</em>.
+        That ratio invites an immediate objection, and the objection is correct: every
+        weight <em>is</em> computed from all 202 trials, and the data is not being
+        divided up between them. The ratio measures something else — how much room the
+        model has to bend. 202 trials are 202 constraints; 120 weights are 120 numbers
+        free to take any value at all. What is left over after the fitting, 82 trials'
+        worth, is the only thing standing between a rule that has found a pattern and a
+        rule that has memorised this particular sample.
+      </p>
+      <p>
+        How little that is has a sharp statement. In 120 dimensions, any 121 points can
+        be split perfectly by some hyperplane, <em>whatever</em> labels you attach to
+        them — including labels you produced by flipping a coin. A rule with 120 weights
+        can separate 121 arbitrary trials into two groups with zero training errors and
+        have learned exactly nothing. We have 202, which is not far above 121. Fitting
+        the training data is therefore weak evidence of anything, which is why every
+        number on this page comes from held-out trials.
+      </p>
+      <p>
+        What that leaves is a learned direction that is the true direction plus
+        estimation noise, and with <em>p</em> features and <em>n</em> trials the noise
+        grows like <em>p</em>/<em>n</em>. The shape of that expression is worth a
+        sentence, because both halves are doing something. Each weight is estimated from
+        <em>n</em> trials, so each one carries an error that shrinks like 1/<em>n</em> —
+        the ordinary rule that averaging more data helps. But there are <em>p</em>
+        weights, and the direction they define is wrong if <em>any</em> of them is wrong.
+        The errors accumulate across all <em>p</em> of them, so the total squared error
+        in the direction is <em>p</em> individual errors each of size 1/<em>n</em>:
+        <em>p</em>/<em>n</em>. Adding a feature adds signal, but it also adds one more
+        number to get wrong, and the second effect is the one that scales.
       </p>
       <p>
         Raudys &amp; Jain (1991) worked out the sample sizes needed to keep this under
@@ -871,7 +1003,7 @@
             <tr><td>Euclidean — means only</td><td>2 × 120 numbers</td><td>1.2 × features ≈ 144</td></tr>
             <tr><td>our &Gamma; = 1 — means + one variance each</td><td>+ 120 numbers</td><td>between the two</td></tr>
             <tr><td><strong>full LDA (&Gamma; = 0)</strong></td><td>+ 7,260 covariance numbers</td><td><strong>4.0 × features ≈ 480</strong></td></tr>
-            <tr><td>separate covariance per class</td><td>+ 7,260 more</td><td>10–32 × features</td></tr>
+            <tr><td>separate covariance per class</td><td>+ 7,260 more</td><td>10 to 32 × features ≈ 1,200–3,840</td></tr>
           </tbody>
         </table>
       </div>
@@ -893,8 +1025,11 @@
     <div class="figure figure--wide">
       <div class="figure__title">How wrong the learned direction is <em>· live</em></div>
       <div class="figure__sub">
-        Both models get the same data. The dashed line is the truth they are trying to
-        find; the error is the average angle they miss it by.
+        <strong>Each model is fitted five times, to five separate samples drawn from the
+        same population</strong> — so there are five purple lines and five orange ones,
+        not one each. The spread between them is the point: it is how much the answer
+        moves when nothing changes but which trials you happened to collect. The white
+        line is the truth all ten are trying to find.
       </div>
       <div class="controls">
         <label class="field">
@@ -911,9 +1046,12 @@
       <div id="sn-plot" class="plot--square"></div>
       <div class="stats" id="sn-out"></div>
       <div class="figure__note">
-        Drag trials down to 6–10 and both errors blow up. LDA suffers more as
-        correlation rises, because correlation is exactly what it is trying to estimate
-        and cannot.
+        Drag trials down to 6–10 and both errors blow up. LDA suffers more as correlation
+        rises, because correlation is exactly what it is trying to estimate and cannot.
+        Drag trials up and the fan closes: with enough data every sample gives nearly the
+        same answer, which is what it looks like when an estimate can be trusted. The two
+        reported errors come from 20 samples rather than the 5 drawn, since 5 lines make a
+        picture but not an average.
       </div>
     </div>
   </section>
@@ -943,21 +1081,48 @@
         Then the optimal boundary is curved, and the model for it is <strong>quadratic
         discriminant analysis</strong> (QDA), which estimates a separate covariance per
         class. It is more flexible and almost always worse in practice here, because it
-        doubles an estimation problem that is already hopeless — Raudys &amp; Jain put
-        it at 10–32 × features. Blankertz et al. checked the equal-shape assumption for
+        doubles an estimation problem that is already hopeless. Raudys &amp; Jain put its
+        appetite at between 10 and 32 times the number of features — for our 120, somewhere
+        between 1,200 and 3,840 trials, against the 202 we have. Blankertz et al. checked the equal-shape assumption for
         ERP data and found it approximately satisfied, which is the empirical
         justification for staying with LDA.
       </p>
 
       <h3>If the classes are unbalanced</h3>
       <p>
-        Our study-phase data is: many more remembered than forgotten words. LDA handles
-        this in the bias term <em>b</em>, which absorbs the prior probability of each
-        class. If you leave it alone the model will lean toward predicting the common
-        class. Since we score with AUC, which sweeps over every possible threshold, the
-        bias does not affect our reported numbers — but it does affect any single
-        accuracy figure, which is one reason accuracy is a poor measure here.
+        Our study-phase data is: 143 remembered against 82 forgotten for participant 58,
+        and lopsided in the same direction for nearly everyone. That imbalance goes into
+        the prior term of <em>b</em>, which is exactly what that term is for. Left to
+        itself the model leans toward predicting the common class, and it is right to:
+        guessing "remembered" every time would be correct 64% of the time.
       </p>
+      <p>
+        AUC is unaffected by <em>b</em>, and the reason is worth being exact about,
+        because it is a narrower claim than it looks. AUC is computed from the
+        <em>order</em> the trials are ranked in, and adding the same constant to every
+        score cannot reorder anything. So no value of <em>b</em> changes AUC at all —
+        while a single accuracy figure moves a great deal with it, which is one reason
+        accuracy is a poor measure here.
+      </p>
+      <div class="callout callout--warn">
+        <p>
+          <strong>That does not make the imbalance harmless.</strong> <em>b</em> is not
+          the only thing it touches. The minority class has 82 trials to estimate its
+          centre from rather than 143, so that centre is the noisier of the two, and the
+          direction <em>w</em> inherits the error. Cross-validation makes it worse: split
+          82 trials ten ways and some folds carry eight examples of the class you are
+          trying to detect.
+        </p>
+        <p>
+          That is what SMOTE is for — it synthesises extra minority trials so training
+          sees a balanced set — and it addresses the estimate of <em>w</em>, not the
+          invariance of AUC to <em>b</em>. Whether it helps is a separate question from
+          whether it is well motivated, and on our own 62-subject replication of this
+          dataset it does not: mean AUC goes from <strong>0.531 to 0.526</strong> for LDA
+          and 0.520 to 0.521 for SVM. At this effect size, resampling the training set
+          neither rescues the classifier nor damages it.
+        </p>
+      </div>
 
       <h3>Things LDA is secretly the same as</h3>
       <ul>
@@ -1003,7 +1168,7 @@
       <h2><span class="steplabel">10</span>What this looks like on our data</h2>
       <div class="table-scroll">
         <table class="data data--prose">
-          <thead><tr><th></th><th>study phase (subsequent memory)</th><th>feedback task (Danyluik)</th></tr></thead>
+          <thead><tr><th></th><th>item recognition (Chakravarty 2020)</th><th>feedback task (Danyluik)</th></tr></thead>
           <tbody>
             <tr><td>trials per participant</td><td>225 (about 202 for training)</td><td>717</td></tr>
             <tr><td>features</td><td>120</td><td>30</td></tr>
@@ -1025,9 +1190,9 @@
         We also tested whether compressing 120 features down to ~10 before classifying
         helps, which would attack the problem directly. On the study data it gave
         +0.012, in the predicted shape, but with too little power to confirm. On the
-        feedback data — which has the power — it gave +0.0002, exactly as it should if
-        the mechanism is what we think it is: a remedy is inert where the disease is
-        absent. That reasoning is laid out on
+        feedback data — which has the power — it gave +0.0002, which is what the mechanism
+        predicts. That dataset has 19 trials per weight, so there is no estimation
+        problem there for a compression to fix, and compressing changed nothing. That reasoning is laid out on
         <a href="simulation.html">the trial-count page</a>.
       </p>
     </div>
@@ -1036,14 +1201,14 @@
   <!-- ===================== 11. SOURCES =================================== -->
   <section class="chapter">
     <div class="prose">
-      <h2><span class="steplabel">11</span>Where all this comes from</h2>
+      <h2><span class="steplabel">11</span>References</h2>
       <div class="table-scroll">
         <table class="data data--prose">
           <thead><tr><th>work</th><th>what it contributed</th></tr></thead>
           <tbody>
             <tr>
               <td><strong>Fisher (1936)</strong></td>
-              <td>The direction maximising between-class over within-class spread. No probability model — the criterion came first. <code>papers/FISHER_1936.pdf</code></td>
+              <td>The direction maximising between-class over within-class spread. No probability model — the criterion came first.</td>
             </tr>
             <tr>
               <td><strong>Welch (1939)</strong></td>
@@ -1059,19 +1224,19 @@
             </tr>
             <tr>
               <td><strong>Raudys &amp; Jain (1991)</strong></td>
-              <td>The sample-size table in the scarce-trials section, and the analysis showing required trials scale linearly with features for a linear model. <code>papers/Raudys_Jain_1991.pdf</code></td>
+              <td>The sample-size table in the scarce-trials section, and the analysis showing required trials scale linearly with features for a linear model.</td>
             </tr>
             <tr>
               <td><strong>Ledoit &amp; Wolf (2004)</strong></td>
-              <td>Computing the optimal &Gamma; analytically instead of by cross-validation — a well-conditioned covariance estimator for the case where features outnumber samples, which is ours. <code>papers/Ledoit_Wolf_2004.pdf</code></td>
+              <td>Computing the optimal &Gamma; analytically instead of by cross-validation — a well-conditioned covariance estimator for the case where features outnumber samples, which is ours.</td>
             </tr>
             <tr>
               <td><strong>Blankertz et al. (2011)</strong></td>
-              <td>All of this assembled for single-trial ERP: the filter-versus-pattern distinction, the Oz example, the eigenvalue bias, and the &Gamma; sweep. The closest published work to what we do. <code>papers/Blankertz_Etal_2011.pdf</code></td>
+              <td>All of this assembled for single-trial ERP: the filter-versus-pattern distinction, the Oz example, the eigenvalue bias, and the &Gamma; sweep. The closest published work to what we do.</td>
             </tr>
             <tr>
               <td><strong>Haufe et al. (2014)</strong></td>
-              <td>Why weight vectors are not brain maps, and how to convert them into something interpretable. <code>papers/Haufe_Etal_2014.pdf</code></td>
+              <td>Why weight vectors are not brain maps, and how to convert them into something interpretable.</td>
             </tr>
           </tbody>
         </table>
