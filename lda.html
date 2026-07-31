@@ -342,7 +342,7 @@
         score. Writing it as a single letter is just shorthand for the whole list, the
         way <em>x</em> was shorthand for one trial's 120 numbers.
       </p>
-      <p>The two pieces it is built from are worth reading separately.</p>
+      <p>It is built from two pieces.</p>
       <ul>
         <li>
           <strong><em>μ</em><sub>1</sub> − <em>μ</em><sub>0</sub> is the separation.</strong>
@@ -398,10 +398,16 @@
           <strong>The second piece accounts for how common each class is.</strong>
           <em>π</em><sub>1</sub> and <em>π</em><sub>0</sub> are the
           <strong>prior probabilities</strong> — the chance a trial belongs to each class
-          <em>before you look at the EEG at all</em>, which is just how often each one
-          occurs. For participant 58 that is 143 remembered against 82 forgotten, so
-          <em>π</em><sub>1</sub> = 0.64 and <em>π</em><sub>0</sub> = 0.36, and the term
-          comes to ln(0.64/0.36) = <strong>+0.56</strong>. It is positive, which nudges
+          <em>before you look at the EEG at all</em>. That is each class's share of the
+          trials, so it comes from counting and dividing. Participant 58 has 143
+          remembered and 82 forgotten, 225 in total, so
+          <em>π</em><sub>1</sub> = 143 ÷ 225 = <strong>0.64</strong> and
+          <em>π</em><sub>0</sub> = 82 ÷ 225 = <strong>0.36</strong>. Being two shares of
+          the same 225 trials they add to 1. The term is then ln(0.64 ÷ 0.36) =
+          <strong>+0.56</strong>, where ln is the natural logarithm — what it contributes
+          here is a number that is 0 when the two classes are equally common, positive
+          when class 1 is the commoner one, and further from 0 the more lopsided the split
+          gets. It is positive, which nudges
           every score toward "remembered" — correctly, because a trial you know nothing
           about is more likely to be a remembered one.
         </li>
@@ -807,8 +813,7 @@
       </p>
       <div class="callout">
         <p>
-          <strong>Two different things get called &Gamma; = 1, and the difference is
-          worth pinning down.</strong> The formula above shrinks the covariance toward
+          <strong>Two different things get called &Gamma; = 1.</strong> The formula above shrinks the covariance toward
           <em>ν</em><strong>I</strong> — a sphere — so at &Gamma; = 1 every feature is
           treated as equally noisy and the weights become the raw difference of means.
           That is Blankertz et al.'s convention. <strong>MATLAB's
@@ -917,7 +922,7 @@
         <span class="lbl">Haufe et al. (2014) — the map you are allowed to read</span>
       </div>
       <p>
-        For LDA it is worth seeing why that works, because it is one line. The weights
+        For LDA it is one line. The weights
         are <em>w</em> = <strong>Σ</strong><sup>−1</sup>(<em>μ</em><sub>1</sub> −
         <em>μ</em><sub>0</sub>). Multiply by Σ and the Σ meets the Σ<sup>−1</sup> and the
         two cancel, exactly as multiplying by 4 cancels a division by 4 — leaving
@@ -984,8 +989,8 @@
       <p>
         What that leaves is a learned direction that is the true direction plus
         estimation noise, and with <em>p</em> features and <em>n</em> trials the noise
-        grows like <em>p</em>/<em>n</em>. The shape of that expression is worth a
-        sentence, because both halves are doing something. Each weight is estimated from
+        grows like <em>p</em>/<em>n</em>. Both halves of that expression
+        are doing something. Each weight is estimated from
         <em>n</em> trials, so each one carries an error that shrinks like 1/<em>n</em> —
         the ordinary rule that averaging more data helps. But there are <em>p</em>
         weights, and the direction they define is wrong if <em>any</em> of them is wrong.
@@ -1072,7 +1077,7 @@
         point between them that may describe no actual trial.
       </p>
       <p>
-        Worth flagging for our data specifically: our real EEG features are strongly
+        For our data specifically: our real EEG features are strongly
         non-Gaussian. Measured kurtosis is about 23, where a Gaussian is 3 — meaning far
         more extreme values than the model expects. That is a known gap between our
         simulations and our data.
@@ -1099,8 +1104,8 @@
         guessing "remembered" every time would be correct 64% of the time.
       </p>
       <p>
-        AUC is unaffected by <em>b</em>, and the reason is worth being exact about,
-        because it is a narrower claim than it looks. AUC is computed from the
+        AUC is unaffected by <em>b</em>, though the claim is narrower than it sounds. AUC
+        is computed from the
         <em>order</em> the trials are ranked in, and adding the same constant to every
         score cannot reorder anything. So no value of <em>b</em> changes AUC at all —
         while a single accuracy figure moves a great deal with it, which is one reason
@@ -1274,6 +1279,10 @@
     initChrome, svgRoot, el, token, responsive, loadJSON, loadBin, tooltip, clientToViewBox,
   } from './assets/site.js';
   import { ldaMechanics, smallN, weightGeometry, whitening } from './assets/simulation.js';
+
+  // Chapter nav and the theme toggle. Must run before the first `await` below:
+  // a top-level await suspends the module, and anything after it is wired late.
+  initChrome();
 
   /* ---------- the data both figures below are drawn from ----------
      Participant 58's study phase: 225 studied words, each 10 electrodes x 12
