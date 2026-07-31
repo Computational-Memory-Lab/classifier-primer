@@ -432,6 +432,13 @@ svg.chart {
   max-height: min(42vh, 24rem);
   overflow: visible;
 }
+
+/* A square chart is a different case from the wide ones the cap above was
+   written for. Its height is set by how big the reader needs the cells to be,
+   not by a wide plot area dragging the height up, and at 42vh the 120x120
+   correlation matrix renders its cells at about two pixels. Still bounded by
+   the viewport, which is the point of the rule. */
+svg.chart--square { max-height: min(64vh, 33rem); }
 svg.chart .grid { stroke: var(--gridline); stroke-width: 1; }
 svg.chart .axis { stroke: var(--baseline); stroke-width: 1; }
 svg.chart .tick { fill: var(--text-muted); font-size: 10px; }

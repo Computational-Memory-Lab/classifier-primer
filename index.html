@@ -157,7 +157,7 @@
 <script type="module">
 import {
   initChrome, CHAPTERS, loadJSON, svgRoot, frame, scale, linePath, el,
-  responsive, token, tooltip, tTest, mean,
+  responsive, token, tooltip, tTest, mean, clientToViewBox,
 } from './assets/site.js';
 
 initChrome();
@@ -298,8 +298,7 @@ responsive(host, () => {
   const cross = el('line', { y1: pad.t, y2: h - pad.b, stroke: token('--text-muted'), 'stroke-width': 1, opacity: 0 }, svg);
   const hit = el('rect', { x: pad.l, y: pad.t, width: w - pad.l - pad.r, height: h - pad.t - pad.b, fill: 'transparent' }, svg);
   hit.addEventListener('pointermove', (ev) => {
-    const box = svg.getBoundingClientRect();
-    const px = ((ev.clientX - box.left) / box.width) * w;
+    const px = clientToViewBox(svg, ev).x;
     const t = xs.invert(px);
     let i = 0, best = Infinity;
     G.times.forEach((v, k) => { const d = Math.abs(v - t); if (d < best) { best = d; i = k; } });

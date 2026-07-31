@@ -550,7 +550,7 @@
 <script type="module">
 import {
   initChrome, svgRoot, frame, scale, linePath, el, responsive, token, tooltip,
-  rng, gauss, mean, auc, roc, fmtAuc,
+  rng, gauss, mean, auc, roc, fmtAuc, clientToViewBox,
 } from './assets/site.js';
 
 initChrome();
@@ -731,11 +731,8 @@ const tip = tooltip();
 
     // dragging
     const toData = (ev) => {
-      const box = svg.getBoundingClientRect();
-      return {
-        x: xs.invert(((ev.clientX - box.left) / box.width) * w),
-        y: ys.invert(((ev.clientY - box.top) / box.height) * h),
-      };
+      const p = clientToViewBox(svg, ev);
+      return { x: xs.invert(p.x), y: ys.invert(p.y) };
     };
     svg.style.touchAction = 'none';
     svg.addEventListener('pointerdown', (ev) => {

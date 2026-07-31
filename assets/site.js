@@ -460,6 +460,31 @@ export function token(name) {
 }
 
 /** Re-run a draw function whenever the theme or size changes. */
+/**
+ * Mouse coordinates -> viewBox units.
+ *
+ * The obvious version -- `(ev.clientX - rect.left) / rect.width * viewBoxWidth`
+ * -- is wrong on this site, and silently. `svg.chart` caps height at
+ * min(42vh, 24rem), so any viewBox tall enough to hit that cap gets scaled down
+ * and centred by preserveAspectRatio="xMidYMid meet". The drawing then occupies
+ * only part of the element box, with letterbox bars either side, and arithmetic
+ * on the bounding box maps the bars onto real data: every reading comes out
+ * displaced, by an amount that changes with the window size.
+ *
+ * getScreenCTM() is the transform the browser actually used, letterboxing
+ * included, so inverting it is exact wherever the SVG ends up. Use this for
+ * every pointer handler rather than measuring the element.
+ */
+export function clientToViewBox(svg, ev) {
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return { x: NaN, y: NaN };
+  const pt = svg.createSVGPoint();
+  pt.x = ev.clientX;
+  pt.y = ev.clientY;
+  const p = pt.matrixTransform(ctm.inverse());
+  return { x: p.x, y: p.y };
+}
+
 export function responsive(host, draw) {
   let raf = null;
   const go = () => {

@@ -1019,7 +1019,7 @@
 
 <script type="module">
   import {
-    initChrome, svgRoot, el, token, responsive, loadJSON, loadBin, tooltip,
+    initChrome, svgRoot, el, token, responsive, loadJSON, loadBin, tooltip, clientToViewBox,
   } from './assets/site.js';
   import { ldaMechanics, smallN, weightGeometry } from './assets/simulation.js';
 
@@ -1258,9 +1258,14 @@
       + 'magnitude for one colour scale.';
 
     responsive(host, () => {
-      const w = 620, h = 396;
+      // Margins are kept tight and the viewBox square-ish on purpose: the drawn
+      // size is min(containerWidth/vbW, maxHeight/vbH) x S0, so every unit of
+      // margin shrinks the matrix. chart--square lifts the height cap that
+      // otherwise decides this.
+      const w = 500, h = 400;
       const svg = svgRoot(host, w, h);
-      const ox = 118, oy = 46, S0 = 300;
+      svg.classList.add('chart--square');
+      const ox = 96, oy = 40, S0 = 330;
       const cell = S0 / P;
 
       el('image', { x: ox, y: oy, width: S0, height: S0,
@@ -1306,9 +1311,7 @@
       const hit = el('rect', { x: ox, y: oy, width: S0, height: S0, fill: 'transparent',
         style: 'cursor:crosshair' }, svg);
       hit.addEventListener('pointermove', (ev) => {
-        const box = svg.getBoundingClientRect();
-        const fx = ((ev.clientX - box.left) / box.width) * w;
-        const fy = ((ev.clientY - box.top) / box.height) * h;
+        const { x: fx, y: fy } = clientToViewBox(svg, ev);
         const j = Math.floor((fx - ox) / cell), i = Math.floor((fy - oy) / cell);
         if (i < 0 || i >= P || j < 0 || j >= P) return;
         const nm = (k) => `electrode <b>${ELECS[k / NBIN | 0]}</b>, `
