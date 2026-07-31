@@ -427,8 +427,12 @@
           (<em>d</em><sub>1</sub> − <em>r</em>·<em>d</em><sub>2</sub>) instead of just
           <em>d</em><sub>1</sub>, where the <em>d</em>'s are their two differences. Give
           both features the same difference and set <em>r</em> = 0.9, and each weight
-          lands at about half what it would be if the two were independent — so the pair
-          contributes roughly what one feature alone would.
+          lands at about <strong>half</strong> what it would be if the two were
+          independent — so the pair contributes roughly what one feature alone would.
+          Not a tenth, which is the tempting guess: the subtraction does leave only
+          <em>d</em> − 0.9<em>d</em> = a tenth of the raw difference, but the whole
+          expression is then divided by (1 − <em>r</em><sup>2</sup>) = 0.19, which is the
+          variance the two features share being handed back. 0.1 ÷ 0.19 = 0.53.
         </li>
       </ul>
       <p>
@@ -439,6 +443,41 @@
         space the naive rule is correct; the multiplication is what gets you there and
         back.
       </p>
+    </div>
+
+    <div class="figure figure--wide">
+      <div class="figure__title">Stretching the space until the naive rule is right <em>· live</em></div>
+      <div class="figure__sub">
+        Drag the whitening slider. The clouds go from tilted to round, and the two rules,
+        which disagree at the left-hand end, become the same line.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Correlation between the two features
+          <input type="range" id="wh-rho" min="0" max="95" value="85">
+          <output id="wh-rho-out"></output>
+        </label>
+        <label class="field">
+          Whitening
+          <input type="range" id="wh-t" min="0" max="100" value="0">
+          <output id="wh-t-out"></output>
+        </label>
+      </div>
+      <div id="wh-plot" class="plot--square"></div>
+      <div class="stats" id="wh-out"></div>
+      <div class="figure__note">
+        The dashed ellipses are the measured noise. Whitening is finished when they are
+        circles, and that is exactly when the yellow and purple lines coincide — the
+        naive rule and LDA agree in a space with no correlation left to exploit, because
+        with the redundancy gone there is no longer any double-counting to undo. Nothing
+        here is arranged: at every slider position the points are transformed, both
+        classes are re-measured from the transformed points, and both rules are derived
+        there. Set the correlation to 0 and the slider does nothing, because the space
+        was already white.
+      </div>
+    </div>
+
+    <div class="prose">
 
       <h3>Part 3 — so where does one individual weight come from?</h3>
       <p>
@@ -493,23 +532,74 @@
         <li>Remembered trials centre at <em>μ</em><sub>1</sub> = (1, 1). So the difference of means is (1, 1) — both features shifted equally.</li>
         <li>
           Both features scatter with variance 1, and they are correlated at 0.9 —
-          they mostly move together. So
-          <strong>Σ</strong> = [[1, 0.9], [0.9, 1]].
+          they mostly move together.
+        </li>
+      </ul>
+      <p>
+        Those three numbers are already Σ, once you know where each one sits. Σ has one
+        row and one column per feature, so with two features it is a 2 × 2 grid of four
+        numbers:
+      </p>
+      <div class="formula">
+        <strong>Σ</strong> = [[1, 0.9], [0.9, 1]]
+        <span class="lbl">read as [[top-left, top-right], [bottom-left, bottom-right]]</span>
+      </div>
+      <ul>
+        <li>
+          <strong>Top-left</strong> is where row 1 meets column 1 — feature 1 against
+          itself, which is its own variance. That is the 1.
+        </li>
+        <li>
+          <strong>Bottom-right</strong> is feature 2 against itself: the other 1.
+        </li>
+        <li>
+          <strong>The two off-diagonal entries</strong> are feature 1 against feature 2,
+          which is their <em>covariance</em> — correlation multiplied by both standard
+          deviations. Variance 1 means a standard deviation of 1 for each, so the
+          covariance is 0.9 × 1 × 1 = 0.9, and the correlation and the covariance happen
+          to be the same number here. They would not be if the variances were not 1.
+        </li>
+        <li>
+          Both off-diagonal entries are 0.9 because "how 1 moves with 2" and "how 2 moves
+          with 1" are the same question. Σ is always symmetric across its diagonal.
         </li>
       </ul>
       <p><strong>The naive answer</strong> weights both features equally: <em>w</em> = (1, 1).</p>
       <p>
-        <strong>The LDA answer</strong> inverts Σ first. For a 2 × 2 matrix
-        [[a, b], [b, a]] the inverse is [[a, −b], [−b, a]] ÷ (a² − b²). Here
-        a² − b² = 1 − 0.81 = 0.19, so
+        <strong>The LDA answer</strong> inverts Σ first. An <strong>inverse</strong> is
+        the matrix version of a reciprocal: dividing by 4 is multiplying by ¼, and
+        "dividing by Σ" is multiplying by Σ<sup>−1</sup>. For the shape we have here,
+        [[a, b], [b, a]], there is a recipe with two steps.
       </p>
+      <ol>
+        <li>
+          <strong>Flip the sign of the two off-diagonal entries</strong>, leaving the
+          diagonal alone: [[1, 0.9], [0.9, 1]] becomes [[1, −0.9], [−0.9, 1]].
+        </li>
+        <li>
+          <strong>Divide every one of the four entries by a² − b²</strong>, which here is
+          1 − 0.81 = <strong>0.19</strong>. Dividing a matrix by a number means dividing
+          each entry separately: 1 ÷ 0.19 = 5.26, and −0.9 ÷ 0.19 = −4.74.
+        </li>
+      </ol>
       <div class="formula">
         <strong>Σ</strong><sup>−1</sup> = [[1, −0.9], [−0.9, 1]] ÷ 0.19
         = [[5.26, −4.74], [−4.74, 5.26]]
       </div>
-      <p>and multiplying by the difference of means (1, 1):</p>
+      <p>
+        Now multiply that by the difference of means, (1, 1). Multiplying a matrix by a
+        pair of numbers has its own rule, and it is only addition and multiplication:
+        <em>to get the first number of the answer, take the first row of the matrix, pair
+        its entries with the pair you are multiplying, multiply each pair together, and
+        add.</em> Then do the same with the second row to get the second number.
+      </p>
       <div class="formula">
-        <em>w</em> = (5.26 − 4.74, &nbsp; −4.74 + 5.26) = (0.53, 0.53)
+        first number = 5.26 × 1 + (−4.74) × 1 = 0.53<br>
+        second number = (−4.74) × 1 + 5.26 × 1 = 0.53
+        <span class="lbl">row 1 against (1, 1), then row 2 against (1, 1)</span>
+      </div>
+      <div class="formula">
+        <em>w</em> = (0.53, 0.53)
         <span class="lbl">same direction as the naive answer, but only 0.53 as large</span>
       </div>
       <p>
@@ -544,14 +634,9 @@
     <div class="figure figure--wide">
       <div class="figure__title">The two rules, and when they part company <em>· live</em></div>
       <div class="figure__sub">
-        Build it up one step at a time, then raise the correlation.
+        Raise the correlation and watch the two rules separate.
       </div>
       <div class="controls">
-        <div class="segmented" id="lda-steps" role="group" aria-label="Build up">
-          <button class="btn" data-step="1">1 · difference of means</button>
-          <button class="btn" data-step="2">2 · shape of the noise</button>
-          <button class="btn btn--primary" data-step="3">3 · LDA</button>
-        </div>
         <label class="field">
           Correlation between features
           <input type="range" id="lda-rho" min="0" max="95" value="75">
@@ -566,9 +651,9 @@
       <div id="lda-plot" class="plot--square"></div>
       <div class="stats" id="lda-out"></div>
       <div class="figure__note">
-        Step 2 draws the dashed ellipses — the measured shape of each class. Step 3
-        divides by it. The &Gamma; slider belongs to the shrinkage section below; leave it
-        at 0 for now.
+        The dashed ellipses are the measured shape of each class; LDA is the yellow
+        rule divided by them. The &Gamma; slider belongs to the shrinkage section below;
+        leave it at 0 for now.
       </div>
     </div>
   </section>
@@ -1021,7 +1106,7 @@
   import {
     initChrome, svgRoot, el, token, responsive, loadJSON, loadBin, tooltip, clientToViewBox,
   } from './assets/site.js';
-  import { ldaMechanics, smallN, weightGeometry } from './assets/simulation.js';
+  import { ldaMechanics, smallN, weightGeometry, whitening } from './assets/simulation.js';
 
   /* ---------- the data both figures below are drawn from ----------
      Participant 58's study phase: 225 studied words, each 10 electrodes x 12
@@ -1152,6 +1237,23 @@
         document.getElementById(`${id}-out`).textContent = v.toFixed(2);
       }
       wg.refresh();
+    };
+    for (const [id] of ids) document.getElementById(id).addEventListener('input', sync);
+    sync();
+  }
+
+  /* ---------- whitening ---------- */
+  {
+    const wh = whitening(document.getElementById('wh-plot'),
+      document.getElementById('wh-out'));
+    const ids = [['wh-rho', 'rho'], ['wh-t', 't']];
+    const sync = () => {
+      for (const [id, key] of ids) {
+        const v = +document.getElementById(id).value / 100;
+        wh.state[key] = v;
+        document.getElementById(`${id}-out`).textContent = v.toFixed(2);
+      }
+      wh.refresh();
     };
     for (const [id] of ids) document.getElementById(id).addEventListener('input', sync);
     sync();
@@ -1336,13 +1438,6 @@
     lda.refresh();
   };
   [ldaRho, ldaGam].forEach((s) => s.addEventListener('input', syncLda));
-  document.querySelectorAll('#lda-steps .btn').forEach((b) => {
-    b.addEventListener('click', () => {
-      lda.state.step = +b.dataset.step;
-      document.querySelectorAll('#lda-steps .btn').forEach((o) => o.classList.toggle('btn--primary', o === b));
-      lda.refresh();
-    });
-  });
   syncLda();
 
   /* ---------- small-sample drift ---------- */

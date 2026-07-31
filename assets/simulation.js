@@ -2,7 +2,7 @@
 
    Four figures, in the order the argument runs:
      1  trialCurve    how achieved AUC depends on trials, features and effect size
-     2  ldaMechanics  what LDA actually computes, step by step
+     2  ldaMechanics  what LDA actually computes, against the naive rule
      3  svmMargin     what an SVM actually computes, step by step
      4  smallN        why the two behave differently when trials are scarce
 
@@ -295,7 +295,7 @@ export function trialCurve(host, out) {
 /* ============================== figure 2 ================================= */
 
 export function ldaMechanics(host, out) {
-  const state = { rho: 0.75, gamma: 0, step: 3 };
+  const state = { rho: 0.75, gamma: 0 };
   const R = 4.6;
 
   const draw = () => {
@@ -317,7 +317,7 @@ export function ldaMechanics(host, out) {
 
     const { w, m, S, d } = ldaWeights(pts, state.gamma);
 
-    if (state.step >= 2) {
+    {
       const tr = S[0][0] + S[1][1];
       const det = S[0][0] * S[1][1] - S[0][1] * S[1][0];
       const disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
@@ -345,8 +345,8 @@ export function ldaMechanics(host, out) {
 
     const mid = [(m[0][0] + m[1][0]) / 2, (m[0][1] + m[1][1]) / 2];
     const clip = clipped(svg, W, H, PAD);
-    if (state.step >= 1) boundary(svg, xs, ys, mid, d, token('--series-4'), '5 4', 'difference of means', clip);
-    if (state.step >= 3) boundary(svg, xs, ys, mid, w, token('--series-7'), null, 'LDA', clip);
+    boundary(svg, xs, ys, mid, d, token('--series-4'), '5 4', 'difference of means', clip);
+    boundary(svg, xs, ys, mid, w, token('--series-7'), null, 'LDA', clip);
 
     let ang = Math.abs(Math.atan2(w[1], w[0]) - Math.atan2(d[1], d[0])) * 180 / Math.PI;
     if (ang > 180) ang = 360 - ang;
@@ -354,6 +354,119 @@ export function ldaMechanics(host, out) {
     out.innerHTML = stat('correlation', state.rho.toFixed(2))
       + stat('shrinkage &Gamma;', state.gamma.toFixed(2))
       + stat('angle between the rules', `${ang.toFixed(0)}&deg;`);
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
+/* ============================== whitening ================================
+
+   The claim this figure has to make good: in the whitened space the naive rule
+   IS the right rule. So it does not draw a before and an after -- it drags the
+   space continuously from one to the other and draws both rules the whole way,
+   because the fact worth seeing is the two lines converging, not two pictures
+   side by side.
+
+   Nothing is precomputed. At every slider position the points are transformed,
+   the moments are recomputed FROM the transformed points, and both rules are
+   derived there. So the lines coinciding at the far end is an outcome, not a
+   thing the code arranges.                                                   */
+
+/** Sigma^(-t/2) for a 2x2 symmetric positive-definite matrix. t=0 identity. */
+function invSqrtPow(S, t) {
+  const [a, b, c] = [S[0][0], S[0][1], S[1][1]];
+  const tr = a + c, det = a * c - b * b;
+  const disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+  const l1 = Math.max(1e-12, tr / 2 + disc);
+  const l2 = Math.max(1e-12, tr / 2 - disc);
+  // eigenvectors: for a symmetric 2x2, (b, l-a) unless b is ~0
+  let v1, v2;
+  if (Math.abs(b) > 1e-12) {
+    const n1 = Math.hypot(b, l1 - a), n2 = Math.hypot(b, l2 - a);
+    v1 = [b / n1, (l1 - a) / n1]; v2 = [b / n2, (l2 - a) / n2];
+  } else { v1 = [1, 0]; v2 = [0, 1]; }
+  const f1 = Math.pow(l1, -t / 2), f2 = Math.pow(l2, -t / 2);
+  return [
+    [f1 * v1[0] * v1[0] + f2 * v2[0] * v2[0], f1 * v1[0] * v1[1] + f2 * v2[0] * v2[1]],
+    [f1 * v1[0] * v1[1] + f2 * v2[0] * v2[1], f1 * v1[1] * v1[1] + f2 * v2[1] * v2[1]],
+  ];
+}
+
+export function whitening(host, out) {
+  const state = { rho: 0.85, t: 0 };
+  const R = 4.6;
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    const xs = scale(-R, R, PAD.l, W - PAD.r);
+    const ys = scale(-R, R, H - PAD.b, PAD.t);
+
+    const raw = twoClouds({ n: 80, sep: 1.9, sx: 1, sy: 1, rho: state.rho, seed: 17 });
+    const A = invSqrtPow(moments(raw).S, state.t);
+    let pts = raw.map((p) => ({
+      x: A[0][0] * p.x + A[0][1] * p.y, y: A[1][0] * p.x + A[1][1] * p.y, c: p.c,
+    }));
+    // Hold the cloud at a constant apparent size so only its SHAPE changes.
+    const S0 = moments(pts).S;
+    const k = Math.sqrt(Math.max(1e-12, (S0[0][0] + S0[1][1]) / 2));
+    pts = pts.map((p) => ({ x: p.x / k, y: p.y / k, c: p.c }));
+
+    frame(svg, W, H, PAD, xs, ys, {
+      xTicks: [], yTicks: [],
+      xLabel: 'a feature', yLabel: 'another feature',
+    });
+
+    // everything below is measured in the CURRENT space
+    const { m, S } = moments(pts);
+    const d = [m[1][0] - m[0][0], m[1][1] - m[0][1]];
+    const det = S[0][0] * S[1][1] - S[0][1] * S[1][0] || 1e-12;
+    const inv = [[S[1][1] / det, -S[0][1] / det], [-S[1][0] / det, S[0][0] / det]];
+    const w = [inv[0][0] * d[0] + inv[0][1] * d[1], inv[1][0] * d[0] + inv[1][1] * d[1]];
+    const rNow = S[0][1] / Math.sqrt(Math.max(1e-12, S[0][0] * S[1][1]));
+
+    // the noise, as an ellipse: round exactly when the space is white
+    const tr = S[0][0] + S[1][1];
+    const dsc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const e1 = Math.sqrt(Math.max(1e-9, tr / 2 + dsc));
+    const e2 = Math.sqrt(Math.max(1e-9, tr / 2 - dsc));
+    const th = 0.5 * Math.atan2(2 * S[0][1], S[0][0] - S[1][1]);
+    const unit = xs(1) - xs(0);
+    for (const c of [0, 1]) {
+      el('ellipse', {
+        cx: xs(m[c][0]), cy: ys(m[c][1]), rx: e1 * unit, ry: e2 * unit,
+        transform: `rotate(${-th * 180 / Math.PI} ${xs(m[c][0])} ${ys(m[c][1])})`,
+        fill: 'none', stroke: token('--text-muted'), 'stroke-width': 1.5,
+        'stroke-dasharray': '4 3',
+      }, svg);
+    }
+
+    for (const p of pts) {
+      el('circle', { cx: xs(p.x), cy: ys(p.y), r: 3.4,
+        fill: token(p.c === 1 ? '--c-hit' : '--c-miss'), opacity: 0.5 }, svg);
+    }
+    for (const c of [0, 1]) {
+      el('circle', { cx: xs(m[c][0]), cy: ys(m[c][1]), r: 7,
+        fill: token(c === 1 ? '--c-hit' : '--c-miss'),
+        stroke: token('--surface-1'), 'stroke-width': 2.5 }, svg);
+    }
+
+    let ang = Math.abs(Math.atan2(w[1], w[0]) - Math.atan2(d[1], d[0])) * 180 / Math.PI;
+    if (ang > 180) ang = 360 - ang;
+    if (ang > 90) ang = 180 - ang;
+
+    const mid = [(m[0][0] + m[1][0]) / 2, (m[0][1] + m[1][1]) / 2];
+    const clip = clipped(svg, W, H, PAD);
+    // Once the rules agree the two lines sit on top of each other, so two labels
+    // would too. Say so instead.
+    const together = ang < 1.5;
+    boundary(svg, xs, ys, mid, d, token('--series-4'), '5 4',
+      together ? null : 'difference of means', clip);
+    boundary(svg, xs, ys, mid, w, token('--series-7'), null,
+      together ? 'both rules, now the same line' : 'LDA', clip);
+    out.innerHTML = stat('whitening applied', `${(state.t * 100).toFixed(0)}%`)
+      + stat('correlation left in the data', rNow.toFixed(2))
+      + stat('angle between the two rules', `${ang.toFixed(1)}&deg;`);
   };
 
   responsive(host, draw);
