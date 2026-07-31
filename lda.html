@@ -108,7 +108,7 @@
     <div class="figure" style="max-width: 44rem;">
       <div class="figure__title">The shape of one participant's data</div>
       <div id="design-matrix"></div>
-      <div class="figure__note">
+      <div class="figure__note" id="dm-note">
         Everything below happens inside this table. A weight is one number per
         <em>column</em>; a prediction is made from one <em>row</em>. Cross-validation
         holds some rows back, so only about 202 of them are ever trained on — and the
@@ -291,14 +291,17 @@
       </p>
       <ul>
         <li>
-          <strong>On the diagonal</strong> — how much feature <em>i</em> varies across
-          trials, on its own. A noisy electrode has a big number here.
+          <strong>On the diagonal</strong> — the 120 entries where a feature meets
+          <em>itself</em>: row 7 against column 7, and so on. Each is how much that one
+          feature varies across trials, on its own. A noisy electrode has a big number
+          here.
         </li>
         <li>
-          <strong>Off the diagonal</strong> — whether features <em>i</em> and <em>j</em>
-          move together. Two neighbouring electrodes pick up much of the same activity,
-          so when one goes up the other usually does too: a large positive entry.
-          Adjacent time bins do the same thing.
+          <strong>Off the diagonal</strong> — every one of the other 14,280 entries,
+          where <em>i</em> and <em>j</em> are two <em>different</em> features. Each says
+          whether those two move together. Two neighbouring electrodes pick up much of
+          the same activity, so when one goes up the other usually does too: a large
+          positive entry. Two time bins from the same electrode do the same thing.
         </li>
       </ul>
       <p>
@@ -1168,7 +1171,7 @@
       <h2><span class="steplabel">10</span>What this looks like on our data</h2>
       <div class="table-scroll">
         <table class="data data--prose">
-          <thead><tr><th></th><th>item recognition (Chakravarty 2020)</th><th>feedback task (Danyluik)</th></tr></thead>
+          <thead><tr><th></th><th>item recognition (Chakravarty 2020)</th><th>feedback task (Danyluik 2025)</th></tr></thead>
           <tbody>
             <tr><td>trials per participant</td><td>225 (about 202 for training)</td><td>717</td></tr>
             <tr><td>features</td><td>120</td><td>30</td></tr>
@@ -1322,7 +1325,17 @@
      of twelve.                                                                */
   {
     const host = document.getElementById('design-matrix');
-    const lim = 12;                       // uV, clips the rare large excursion
+    /* Colour saturates at the 90th percentile of |value| rather than at the
+       extreme. The values are roughly Gaussian around zero -- median 1.4 uV
+       against a maximum of 20 -- so scaling to the maximum puts four cells in
+       five within the middle quarter of the scale, where the two hues are
+       almost the same grey. Clipping the top tenth costs nothing here, because
+       this figure is about the table's shape and not about reading a value off
+       it, and it is what makes the structure visible at all. */
+    const mags = [];
+    for (let t = 0; t < NTRIAL; t++) for (let c = 0; c < NFEAT; c++) mags.push(Math.abs(V(t, c)));
+    mags.sort((a, b) => a - b);
+    const lim = mags[Math.floor(mags.length * 0.90)];
     responsive(host, () => {
       const w = 620, h = 300;
       const svg = svgRoot(host, w, h);
@@ -1388,6 +1401,11 @@
       el('text', { x: w / 2, y: h - 8, 'text-anchor': 'middle', class: 'tick' }, svg)
         .textContent = '225 × 120 = 27,000 voltage values, beside a column of 225 labels';
     });
+    document.getElementById('dm-note').insertAdjacentHTML('beforeend',
+      ` Red is a positive voltage and blue a negative one, saturating at `
+      + `±${lim.toFixed(1)} µV so that the middle of the range is not all one grey; `
+      + 'the largest tenth of the excursions clip. Blue and red in the label column are '
+      + 'the two classes, remembered and forgotten.');
   }
 
   /* ---------- build the rule by hand ---------- */
@@ -1493,7 +1511,10 @@
     document.getElementById('cov-sub').textContent =
       `Participant ${F.participant}, ${NTRIAL} studied words. Correlation between every `
       + 'pair of the 120 features, pooled within class. Ten electrodes, each split into '
-      + '12 time bins, so the matrix reads as a 10 × 10 grid of squares.';
+      + '12 time bins, so the matrix reads as a 10 × 10 grid of squares. Those squares '
+      + 'are blocks of 144 entries, not single ones: the matrix\'s own diagonal is the '
+      + 'thin line of 1.00s running corner to corner through them, where a feature meets '
+      + 'itself.';
     const stat = (label, value) =>
       `<div class="stat"><div class="stat__label">${label}</div>`
       + `<div class="stat__value">${value}</div></div>`;
