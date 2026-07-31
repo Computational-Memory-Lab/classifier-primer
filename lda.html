@@ -219,6 +219,52 @@
       </div>
     </div>
 
+    <div class="figure figure--wide">
+      <div class="figure__title">Add a third feature and the line becomes a plane <em>· live</em></div>
+      <div class="figure__sub">
+        The same rule with one more term, <em>w</em><sub>3</sub><em>x</em><sub>3</sub>.
+        Turn the box to see that the boundary really is a flat sheet rather than a line
+        seen edge-on.
+      </div>
+      <div class="controls">
+        <label class="field">
+          <em>w</em><sub>1</sub>
+          <input type="range" id="p3-w1" min="-100" max="100" value="70">
+          <output id="p3-w1-out"></output>
+        </label>
+        <label class="field">
+          <em>w</em><sub>2</sub>
+          <input type="range" id="p3-w2" min="-100" max="100" value="51">
+          <output id="p3-w2-out"></output>
+        </label>
+        <label class="field">
+          <em>w</em><sub>3</sub>
+          <input type="range" id="p3-w3" min="-100" max="100" value="50">
+          <output id="p3-w3-out"></output>
+        </label>
+        <label class="field">
+          <em>b</em>
+          <input type="range" id="p3-b" min="-300" max="300" value="0">
+          <output id="p3-b-out"></output>
+        </label>
+        <label class="field">
+          Turn the box
+          <input type="range" id="p3-az" min="0" max="628" value="60">
+          <output id="p3-az-out"></output>
+        </label>
+      </div>
+      <div id="p3-plot" class="plot--square"></div>
+      <div class="stats" id="p3-out"></div>
+      <div class="figure__note">
+        One equation, one dimension gone. On a page it left a line, here it leaves a
+        sheet, and the arithmetic that produced both is the same weighted sum with one
+        more term in it. Dots behind the sheet are faded, so turning the box shows the
+        boundary passing through the cloud rather than sitting in front of it. Setting
+        <em>w</em><sub>3</sub> to 0 makes the sheet vertical: feature 3 stops affecting
+        the score, and the rule becomes the two-feature one above, extruded.
+      </div>
+    </div>
+
     <div class="prose">
       <p>
         With 120 features the same thing happens in a 120-dimensional space, and the
@@ -256,7 +302,7 @@
         LDA starts from an assumption about how the data were <em>generated</em>, and
         then derives the best possible rule under that assumption. That is unusual: it is not
         searching for a line that works well. It is computing the line that would be
-        provably optimal <em>if its assumptions held</em>.
+        provably optimal <em>if the data fits the model's assumptions</em>.
       </p>
 
       <h3>The assumption</h3>
@@ -1278,7 +1324,7 @@
   import {
     initChrome, svgRoot, el, token, responsive, loadJSON, loadBin, tooltip, clientToViewBox,
   } from './assets/site.js';
-  import { ldaMechanics, smallN, weightGeometry, whitening } from './assets/simulation.js';
+  import { ldaMechanics, smallN, weightGeometry, whitening, planeIn3d } from './assets/simulation.js';
 
   // Chapter nav and the theme toggle. Must run before the first `await` below:
   // a top-level await suspends the module, and anything after it is wired late.
@@ -1445,6 +1491,25 @@
         document.getElementById(`${id}-out`).textContent = v.toFixed(2);
       }
       wh.refresh();
+    };
+    for (const [id] of ids) document.getElementById(id).addEventListener('input', sync);
+    sync();
+  }
+
+  /* ---------- the same rule with a third feature ---------- */
+  {
+    const p3 = planeIn3d(document.getElementById('p3-plot'),
+      document.getElementById('p3-out'));
+    const ids = [['p3-w1', 'w1', 100], ['p3-w2', 'w2', 100], ['p3-w3', 'w3', 100],
+      ['p3-b', 'b', 100], ['p3-az', 'az', 100]];
+    const sync = () => {
+      for (const [id, key, div] of ids) {
+        const v = +document.getElementById(id).value / div;
+        p3.state[key] = v;
+        document.getElementById(`${id}-out`).textContent =
+          key === 'az' ? `${(v * 180 / Math.PI).toFixed(0)}°` : v.toFixed(2);
+      }
+      p3.refresh();
     };
     for (const [id] of ids) document.getElementById(id).addEventListener('input', sync);
     sync();

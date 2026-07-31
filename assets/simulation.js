@@ -485,6 +485,156 @@ export function whitening(host, out) {
    makes an error read as a dot sitting on the wrong background rather than as a
    number in a readout.                                                        */
 
+/* ========================== the plane, in a volume =======================
+
+   The companion to weightGeometry(), one feature further along. Two features
+   give a line, three give a plane, and the page's claim is that 120 give a
+   119-dimensional hyperplane by the same arithmetic. A plane the reader can turn
+   in a box is the last step that can actually be drawn, so it carries the whole
+   extrapolation.
+
+   Everything is hand-projected: no 3-D library, and the site ships no
+   dependencies. Orthographic, because perspective would make equal weights look
+   unequal, and this figure is about the weights.                              */
+
+/** Two Gaussian clouds in 3-D, separated along a diagonal so all three weights matter. */
+function threeClouds({ n = 60, sep = 2.4, seed = 23 }) {
+  const g = makeGauss(makeRand(seed));
+  const u = [0.70, 0.51, 0.50];                    // unit-ish separation direction
+  const pts = [];
+  for (let c = 0; c < 2; c++) {
+    const k = (c === 0 ? -sep / 2 : sep / 2);
+    for (let i = 0; i < n; i++) {
+      pts.push({ x: k * u[0] + g(), y: k * u[1] + g(), z: k * u[2] + g(), c });
+    }
+  }
+  return pts;
+}
+
+export function planeIn3d(host, out) {
+  const state = { w1: 0.70, w2: 0.51, w3: 0.50, b: 0, az: 0.6 };
+  const R = 3.4;                                   // half-width of the box
+  const pts = threeClouds({});
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    const el2 = 0.42;                              // fixed elevation
+    const ca = Math.cos(state.az), sa = Math.sin(state.az);
+    const ce = Math.cos(el2), se = Math.sin(el2);
+
+    /* World -> screen. `depth` grows away from the viewer, which both the
+       painter's ordering and the plane's front/back test below rely on. */
+    const proj = (x, y, z) => {
+      const rx = x * ca + y * sa;
+      const ry = -x * sa + y * ca;
+      return { x: rx, y: -(z * ce - ry * se), depth: ry * ce + z * se };
+    };
+    const xs = scale(-R * 1.6, R * 1.6, PAD.l, W - PAD.r);
+    const ys = scale(-R * 1.6, R * 1.6, H - PAD.b, PAD.t);
+    const P = (x, y, z) => { const q = proj(x, y, z); return [xs(q.x), ys(q.y)]; };
+
+    const { w1, w2, w3, b } = state;
+    const score = (p) => w1 * p.x + w2 * p.y + w3 * p.z + b;
+    // the viewing direction in world coordinates, from the depth expression above
+    const dot = w1 * (-sa * ce) + w2 * (ca * ce) + w3 * se;
+
+    // ---- the box ----
+    const C = [];
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) C.push([sx * R, sy * R, sz * R]);
+    const EDGES = [];
+    for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) {
+      let diff = 0;
+      for (let k = 0; k < 3; k++) if (C[i][k] !== C[j][k]) diff += 1;
+      if (diff === 1) EDGES.push([i, j]);
+    }
+    for (const [i, j] of EDGES) {
+      const a = P(...C[i]), c = P(...C[j]);
+      const far = (proj(...C[i]).depth + proj(...C[j]).depth) / 2 > 0;
+      el('line', { x1: a[0], y1: a[1], x2: c[0], y2: c[1], stroke: token('--border-strong'),
+        'stroke-width': 1, opacity: far ? 0.35 : 0.85 }, svg);
+    }
+
+    // ---- the plane, clipped to the box: where it crosses each of the 12 edges ----
+    const hits = [];
+    for (const [i, j] of EDGES) {
+      const A = { x: C[i][0], y: C[i][1], z: C[i][2] }, B = { x: C[j][0], y: C[j][1], z: C[j][2] };
+      const sA = score(A), sB = score(B);
+      if ((sA > 0) === (sB > 0)) continue;
+      const t = sA / (sA - sB);
+      hits.push([A.x + t * (B.x - A.x), A.y + t * (B.y - A.y), A.z + t * (B.z - A.z)]);
+    }
+    let poly = null;
+    if (hits.length >= 3) {
+      // order them around their own centroid so the polygon is not a bowtie
+      const cx = hits.reduce((s, h) => s + h[0], 0) / hits.length;
+      const cy = hits.reduce((s, h) => s + h[1], 0) / hits.length;
+      const cz = hits.reduce((s, h) => s + h[2], 0) / hits.length;
+      const n = Math.hypot(w1, w2, w3) || 1;
+      const nz = [w1 / n, w2 / n, w3 / n];
+      let e1 = Math.abs(nz[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+      const d1 = e1[0] * nz[0] + e1[1] * nz[1] + e1[2] * nz[2];
+      e1 = [e1[0] - d1 * nz[0], e1[1] - d1 * nz[1], e1[2] - d1 * nz[2]];
+      const n1 = Math.hypot(...e1) || 1; e1 = e1.map((v) => v / n1);
+      const e2 = [nz[1] * e1[2] - nz[2] * e1[1], nz[2] * e1[0] - nz[0] * e1[2], nz[0] * e1[1] - nz[1] * e1[0]];
+      hits.sort((h, k) => {
+        const ang = (q) => Math.atan2(
+          (q[0] - cx) * e2[0] + (q[1] - cy) * e2[1] + (q[2] - cz) * e2[2],
+          (q[0] - cx) * e1[0] + (q[1] - cy) * e1[1] + (q[2] - cz) * e1[2]);
+        return ang(h) - ang(k);
+      });
+      poly = hits.map((h) => P(...h)).map((q) => q.join(',')).join(' ');
+    }
+
+    /* Painter's algorithm, in three passes: the points the plane hides, the
+       plane, then the points in front of it. Without this the plane reads as a
+       flat shape pasted over the cloud rather than cutting through it. */
+    const far = [], near = [];
+    for (const p of pts) ((score(p) * dot > 0) ? far : near).push(p);
+    const dot3 = (p, front) => {
+      const q = P(p.x, p.y, p.z);
+      el('circle', { cx: q[0], cy: q[1], r: front ? 4 : 3.2,
+        fill: token(p.c === 1 ? '--series-1' : '--series-8'),
+        opacity: front ? 0.92 : 0.34 }, svg);
+    };
+    far.sort((a, c) => proj(c.x, c.y, c.z).depth - proj(a.x, a.y, a.z).depth).forEach((p) => dot3(p, false));
+    if (poly) {
+      el('polygon', { points: poly, fill: token('--series-7'), opacity: 0.30,
+        stroke: token('--series-7'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+    }
+    near.sort((a, c) => proj(c.x, c.y, c.z).depth - proj(a.x, a.y, a.z).depth).forEach((p) => dot3(p, true));
+
+    /* Axis labels ride the three edges leaving the FARTHEST corner, nudged away
+       from the box's centre on screen. Anchoring them to a fixed corner puts them
+       inside the cloud for half of the rotations, since the corner nearest the
+       viewer projects to the middle of the picture. */
+    let fi = 0, fd = -Infinity;
+    C.forEach((c, i) => { const d = proj(c[0], c[1], c[2]).depth; if (d > fd) { fd = d; fi = i; } });
+    const mid0 = P(0, 0, 0);
+    ['feature 1', 'feature 2', 'feature 3'].forEach((name, k) => {
+      const o = C[fi].slice(); o[k] = -o[k];
+      const m = [(C[fi][0] + o[0]) / 2, (C[fi][1] + o[1]) / 2, (C[fi][2] + o[2]) / 2];
+      const q = P(m[0], m[1], m[2]);
+      const dx = q[0] - mid0[0], dy = q[1] - mid0[1];
+      const n = Math.hypot(dx, dy) || 1;
+      el('text', { x: q[0] + (dx / n) * 20, y: q[1] + (dy / n) * 20 + 4,
+        'text-anchor': 'middle', class: 'axis-label',
+        fill: token('--text-secondary') }, svg).textContent = name;
+    });
+
+    let right = 0;
+    for (const p of pts) if ((score(p) >= 0 ? 1 : 0) === p.c) right += 1;
+    const sg = (v) => (v < 0 ? '−' : '+');
+    out.innerHTML = stat('the rule you have built',
+      `<span style="font-size:0.52em">${w1.toFixed(2)}·x₁ ${sg(w2)} ${Math.abs(w2).toFixed(2)}·x₂ `
+      + `${sg(w3)} ${Math.abs(w3).toFixed(2)}·x₃ ${sg(b)} ${Math.abs(b).toFixed(2)}</span>`)
+      + stat('dots on the right side', `${(100 * right / pts.length).toFixed(0)}%`)
+      + stat('space → boundary', '3-D → 2-D');
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
 export function weightGeometry(host, out) {
   const state = { w1: 0.9, w2: 0.45, b: 0 };
   const R = 4.6;
