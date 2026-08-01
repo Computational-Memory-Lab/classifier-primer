@@ -343,14 +343,19 @@ export function ldaMechanics(host, out) {
       }, svg);
     }
 
-    const mid = [(m[0][0] + m[1][0]) / 2, (m[0][1] + m[1][1]) / 2];
-    const clip = clipped(svg, W, H, PAD);
-    boundary(svg, xs, ys, mid, d, token('--series-4'), '5 4', 'difference of means', clip);
-    boundary(svg, xs, ys, mid, w, token('--series-7'), null, 'LDA', clip);
-
     let ang = Math.abs(Math.atan2(w[1], w[0]) - Math.atan2(d[1], d[0])) * 180 / Math.PI;
     if (ang > 180) ang = 360 - ang;
     if (ang > 90) ang = 180 - ang;
+
+    const mid = [(m[0][0] + m[1][0]) / 2, (m[0][1] + m[1][1]) / 2];
+    const clip = clipped(svg, W, H, PAD);
+    // At zero correlation, and again at full shrinkage, the two rules land on the
+    // same line and two labels would sit on top of each other. Say so instead.
+    const together = ang < 1.5;
+    boundary(svg, xs, ys, mid, d, token('--series-4'), '5 4',
+      together ? null : 'difference of means', clip);
+    boundary(svg, xs, ys, mid, w, token('--series-7'), null,
+      together ? 'both rules, now the same line' : 'LDA', clip);
     out.innerHTML = stat('correlation', state.rho.toFixed(2))
       + stat('shrinkage &Gamma;', state.gamma.toFixed(2))
       + stat('angle between the rules', `${ang.toFixed(0)}&deg;`);
@@ -414,7 +419,7 @@ export function whitening(host, out) {
 
     frame(svg, W, H, PAD, xs, ys, {
       xTicks: [], yTicks: [],
-      xLabel: 'a feature', yLabel: 'another feature',
+      xLabel: 'a feature (say, Pz at 500 ms)', yLabel: 'another feature',
     });
 
     // everything below is measured in the CURRENT space
@@ -675,8 +680,7 @@ export function weightGeometry(host, out) {
 
     frame(svg, W, H, PAD, xs, ys, {
       xTicks: [], yTicks: [],
-      xLabel: 'feature 1 — its value on this trial',
-      yLabel: 'feature 2',
+      xLabel: 'a feature (say, Pz at 500 ms)', yLabel: 'another feature',
     });
 
     let right = 0;
@@ -737,7 +741,7 @@ export function svmMargin(host, out) {
     const ys = scale(-R, R, H - PAD.b, PAD.t);
     frame(svg, W, H, PAD, xs, ys, {
       xTicks: [], yTicks: [],
-      xLabel: 'a feature', yLabel: 'another feature',
+      xLabel: 'a feature (say, Pz at 500 ms)', yLabel: 'another feature',
     });
 
     const pts = twoClouds({ n: state.n, sep: state.sep, sx: 0.85, sy: 0.85, rho: 0.1, seed: 23 });
@@ -819,7 +823,7 @@ export function smallN(host, out) {
     const ys = scale(-R, R, H - PAD.b, PAD.t);
     frame(svg, W, H, PAD, xs, ys, {
       xTicks: [], yTicks: [],
-      xLabel: 'a feature', yLabel: 'another feature',
+      xLabel: 'a feature (say, Pz at 500 ms)', yLabel: 'another feature',
     });
 
     // The answer unlimited data would give. Nobody in a real study sees this.

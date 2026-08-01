@@ -543,7 +543,7 @@
       </div>
       <div class="controls">
         <label class="field">
-          Correlation between the two features
+          Correlation between features
           <input type="range" id="wh-rho" min="0" max="95" value="85">
           <output id="wh-rho-out"></output>
         </label>
@@ -763,19 +763,32 @@
         order of magnitude.
       </p>
       <p>
-        To see what that does, take the easiest case there is. Suppose the truth were a
-        perfectly round cloud: every feature with variance 1, every pair uncorrelated —
-        120 numbers to get right and 7,140 zeros. Draw 202 trials from exactly that and
-        measure the covariance. Along the direction that comes out quietest, the measured
-        variance averages <strong>0.06</strong>; along the loudest, <strong>3.1</strong>.
-        The true answer is 1.0 in every direction.
+        To see what that does, take the easiest case there is: suppose the truth is a
+        perfectly round cloud. Every feature has variance 1, and no pair of features
+        correlates at all. There is nothing subtle to discover — 120 ones down the
+        diagonal, 7,140 zeros off it.
       </p>
       <p>
-        The total is not wrong — average the measured variance across all directions and
-        you get 1.00, as you should. What the estimate invents is the <em>spread</em>: a
-        cloud that is genuinely a sphere is measured as fifty times longer in one
-        direction than another. And 202 trials cannot tell that invented spread from a
-        real one, because a real elongation would leave exactly the same evidence.
+        Round means the cloud is equally wide whichever way you measure across it, and
+        you may measure any way you like. A <strong>direction</strong> is any mixture of
+        the 120 features: feature 3 on its own is one, so is feature 3 minus feature 47,
+        and so is any other combination. Each has a variance — how far the trials scatter
+        along it — and the full set of those variances is what "the shape of the cloud"
+        means. For a true sphere every one of them is 1.
+      </p>
+      <p>
+        Now draw 202 trials from exactly that sphere and measure. Go looking for the
+        direction the trials scatter along <em>most</em>, and its variance comes out at
+        <strong>3.1</strong>. Go looking for the one they scatter along <em>least</em>,
+        and it comes out at <strong>0.06</strong>. The true answer was 1.0 both times.
+      </p>
+      <p>
+        The total is not wrong: average the measured variance over all directions and it
+        comes to 1.00, as it should. What the estimate invents is the <em>spread</em>. A
+        cloud that is genuinely a sphere gets measured as <strong>fifty times wider</strong>
+        in one direction than another — a rugby ball, from perfectly round data. And
+        nothing in 202 trials separates that invented shape from a real one, because a
+        genuinely elongated cloud would produce the very same measurements.
       </p>
 
       <h3>How the estimate fails — specifically</h3>
