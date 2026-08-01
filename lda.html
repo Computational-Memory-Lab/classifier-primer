@@ -783,12 +783,14 @@
         and it comes out at <strong>0.06</strong>. The true answer was 1.0 both times.
       </p>
       <p>
-        The total is not wrong: average the measured variance over all directions and it
-        comes to 1.00, as it should. What the estimate invents is the <em>spread</em>. A
-        cloud that is genuinely a sphere gets measured as <strong>fifty times wider</strong>
-        in one direction than another — a rugby ball, from perfectly round data. And
-        nothing in 202 trials separates that invented shape from a real one, because a
-        genuinely elongated cloud would produce the very same measurements.
+        Average those measured variances over all directions and you get 1.00, which is
+        correct. So the average is right and the shape is wrong. On these measurements
+        the cloud is <strong>fifty times wider</strong> in one direction than another.
+        It is really a sphere.
+      </p>
+      <p>
+        Nothing in the 202 trials can catch that. A cloud that genuinely was fifty times
+        longer one way would have produced the same numbers.
       </p>
 
       <h3>How the estimate fails — specifically</h3>
@@ -901,14 +903,6 @@
         Ledoit &amp; Wolf (2004), in the form given by Schäfer &amp; Strimmer (2005),
         derive the &Gamma; that minimises expected error directly from the data, with
         no cross-validation. That combination is what people mean by "shrinkage LDA".
-      </p>
-      <p class="small muted">
-        The idea is older than any of those. Fisher himself recommended, when the two
-        classes have different covariances but data are scarce, using a blend
-        <em>τ</em><strong>Σ</strong><sub>1</sub> + (1 − <em>τ</em>)<strong>Σ</strong><sub>2</sub>
-        rather than either alone — regularisation by mixing, in 1936. We have this
-        second-hand, from the opening pages of Cortes &amp; Vapnik (1995), rather than
-        from Fisher directly.
       </p>
       <div class="callout callout--warn">
         <p>
