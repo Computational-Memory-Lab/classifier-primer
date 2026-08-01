@@ -105,7 +105,7 @@
       </div>
     </div>
 
-    <div class="figure" style="max-width: 44rem;">
+    <div class="figure">
       <div class="figure__title">The shape of one participant's data</div>
       <div id="design-matrix"></div>
       <div class="figure__note" id="dm-note">
@@ -184,7 +184,7 @@
       </p>
     </div>
 
-    <div class="figure" style="max-width: 40rem;">
+    <div class="figure">
       <div class="figure__title">Two features, and a rule you build by hand <em>· live</em></div>
       <div class="figure__sub">
         Each dot is a trial. The shaded side is what the rule predicts there; a dot
@@ -219,7 +219,7 @@
       </div>
     </div>
 
-    <div class="figure figure--wide">
+    <div class="figure">
       <div class="figure__title">Add a third feature and the line becomes a plane <em>· live</em></div>
       <div class="figure__sub">
         The same rule with one more term, <em>w</em><sub>3</sub><em>x</em><sub>3</sub>.
@@ -359,7 +359,7 @@
       </p>
     </div>
 
-    <div class="figure" style="max-width: 44rem;">
+    <div class="figure">
       <div class="figure__title">Σ for one participant, all 120 × 120 of it</div>
       <div class="figure__sub" id="cov-sub"></div>
       <div id="cov-plot"></div>
@@ -535,7 +535,7 @@
       </p>
     </div>
 
-    <div class="figure figure--wide">
+    <div class="figure">
       <div class="figure__title">Stretching the space until the naive rule is right <em>· live</em></div>
       <div class="figure__sub">
         Drag the whitening slider. The clouds go from tilted to round, and the two rules,
@@ -721,7 +721,7 @@
       </p>
     </div>
 
-    <div class="figure figure--wide">
+    <div class="figure">
       <div class="figure__title">The two rules, and when they part company <em>· live</em></div>
       <div class="figure__sub">
         Raise the correlation and watch the two rules separate.
@@ -1031,8 +1031,7 @@
         rule that has memorised this particular sample.
       </p>
       <p>
-        How little that is has a sharp statement. In 120 dimensions, any 121 points can
-        be split perfectly by some hyperplane, <em>whatever</em> labels you attach to
+        In 120 dimensions, any 121 points can be split perfectly by some hyperplane, <em>whatever</em> labels you attach to
         them — including labels you produced by flipping a coin. A rule with 120 weights
         can separate 121 arbitrary trials into two groups with zero training errors and
         have learned exactly nothing. We have 202, which is not far above 121. Fitting
@@ -1082,7 +1081,7 @@
       </p>
     </div>
 
-    <div class="figure figure--wide">
+    <div class="figure">
       <div class="figure__title">How wrong the learned direction is <em>· live</em></div>
       <div class="figure__sub">
         <strong>Each model is fitted five times, to five separate samples drawn from the
@@ -1245,15 +1244,6 @@
         setting. Where there are 1.7, it does not, and the pipeline has been driven to
         maximum shrinkage — which is to say, driven back to the naive difference-of-means
         rule.
-      </p>
-      <p>
-        We also tested whether compressing 120 features down to ~10 before classifying
-        helps, which would attack the problem directly. On the study data it gave
-        +0.012, in the predicted shape, but with too little power to confirm. On the
-        feedback data — which has the power — it gave +0.0002, which is what the mechanism
-        predicts. That dataset has 19 trials per weight, so there is no estimation
-        problem there for a compression to fix, and compressing changed nothing. That reasoning is laid out on
-        <a href="simulation.html">the trial-count page</a>.
       </p>
     </div>
   </section>
