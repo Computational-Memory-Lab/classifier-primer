@@ -640,15 +640,15 @@ function threeClouds({ n = 60, sep = 2.4, seed = 23 }) {
 }
 
 export function planeIn3d(host, out) {
-  const state = { w1: 0.70, w2: 0.51, w3: 0.50, b: 0, az: 0.6 };
+  const state = { w1: 0.70, w2: 0.51, w3: 0.50, b: 0, az: 0.6, el: 0.42 };
   const R = 3.4;                                   // half-width of the box
   const pts = threeClouds({});
 
   const draw = () => {
     const svg = svgRoot(host, W, H);
-    const el2 = 0.42;                              // fixed elevation
+    svg.style.touchAction = 'none';                // or a drag scrolls the page
     const ca = Math.cos(state.az), sa = Math.sin(state.az);
-    const ce = Math.cos(el2), se = Math.sin(el2);
+    const ce = Math.cos(state.el), se = Math.sin(state.el);
 
     /* World -> screen. `depth` grows away from the viewer, which both the
        painter's ordering and the plane's front/back test below rely on. */
@@ -749,6 +749,28 @@ export function planeIn3d(host, out) {
         fill: token('--text-secondary') }, svg).textContent = name;
     });
 
+    /* Drag to turn it. pointermove and pointerup go on the window rather than on
+       the SVG, because each redraw replaces the SVG and a listener attached to it
+       would be destroyed under the cursor half a frame into the gesture. */
+    const grab = el('rect', { x: 0, y: 0, width: W, height: H, fill: 'transparent',
+      style: 'cursor:grab' }, svg);
+    grab.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      const x0 = ev.clientX, y0 = ev.clientY, az0 = state.az, el0 = state.el;
+      const move = (e) => {
+        state.az = az0 + (e.clientX - x0) * 0.011;
+        // clamped short of the poles, where the box degenerates to a flat outline
+        state.el = Math.max(-1.3, Math.min(1.3, el0 - (e.clientY - y0) * 0.011));
+        draw();
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+
     let right = 0;
     for (const p of pts) if ((score(p) >= 0 ? 1 : 0) === p.c) right += 1;
     const sg = (v) => (v < 0 ? '−' : '+');
@@ -845,7 +867,8 @@ export function weightGeometry(host, out) {
     out.innerHTML = stat('the rule you have built',
       `<span style="font-size:0.62em">${w1.toFixed(2)}·x₁ ${sign(w2)} ${Math.abs(w2).toFixed(2)}·x₂ `
       + `${sign(b)} ${Math.abs(b).toFixed(2)}</span>`)
-      + stat('dots on the right side', `${(100 * right / pts.length).toFixed(0)}%`);
+      + stat('dots on the right side', `${(100 * right / pts.length).toFixed(0)}%`)
+      + stat('space → boundary', '2-D → 1-D');
   };
 
   responsive(host, draw);

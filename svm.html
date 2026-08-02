@@ -199,7 +199,7 @@
     </div>
 
     <div class="figure">
-      <div class="figure__title">Two features, and a rule you build by hand <em>· live</em></div>
+      <div class="figure__title">Two features, and a rule you build by hand</div>
       <div class="figure__sub">
         Each dot is a trial. The shaded side is what the rule predicts there; a dot
         ringed in white is one it gets wrong.
@@ -234,11 +234,11 @@
     </div>
 
     <div class="figure">
-      <div class="figure__title">Add a third feature and the line becomes a plane <em>· live</em></div>
+      <div class="figure__title">Add a third feature and the line becomes a plane</div>
       <div class="figure__sub">
         The same rule with one more term, <em>w</em><sub>3</sub><em>x</em><sub>3</sub>.
-        Turn the box to see that the boundary really is a flat sheet rather than a line
-        seen edge-on.
+        <strong>Drag the box to turn it</strong>, in any direction, and the boundary
+        shows itself to be a flat sheet rather than a line seen edge-on.
       </div>
       <div class="controls">
         <label class="field">
@@ -260,11 +260,6 @@
           <em>b</em>
           <input type="range" id="p3-b" min="-300" max="300" value="0">
           <output id="p3-b-out"></output>
-        </label>
-        <label class="field">
-          Turn the box
-          <input type="range" id="p3-az" min="0" max="628" value="60">
-          <output id="p3-az-out"></output>
         </label>
       </div>
       <div id="p3-plot" class="plot--square"></div>
@@ -462,7 +457,7 @@
     </div>
 
     <div class="figure">
-      <div class="figure__title">Throwing away the comfortable majority <em>· live</em></div>
+      <div class="figure__title">Throwing away the comfortable majority</div>
       <div class="figure__sub">
         Ringed points are the support vectors. Switch the discard on and every other
         trial is dropped, then the whole problem is solved again from what is left.
@@ -592,7 +587,7 @@
     </div>
 
     <div class="figure figure--wide">
-      <div class="figure__title">The margin, and which points hold it up <em>· live</em></div>
+      <div class="figure__title">The margin, and which points hold it up</div>
       <div class="figure__sub">
         Ringed points are support vectors — the only ones with a non-zero coefficient.
       </div>
@@ -842,7 +837,7 @@
     </div>
 
     <div class="figure figure--wide">
-      <div class="figure__title">How wrong the learned direction is <em>· live</em></div>
+      <div class="figure__title">How wrong the learned direction is</div>
       <div class="figure__sub">
         Both models get the same data. The dashed line is the truth they are trying to
         find; the error is the average angle they miss it by.
@@ -1128,14 +1123,12 @@
   {
     const p3 = planeIn3d(document.getElementById('p3-plot'),
       document.getElementById('p3-out'));
-    const ids = [['p3-w1', 'w1', 100], ['p3-w2', 'w2', 100], ['p3-w3', 'w3', 100],
-      ['p3-b', 'b', 100], ['p3-az', 'az', 100]];
+    const ids = [['p3-w1', 'w1'], ['p3-w2', 'w2'], ['p3-w3', 'w3'], ['p3-b', 'b']];
     const sync = () => {
-      for (const [id, key, div] of ids) {
-        const v = +document.getElementById(id).value / div;
+      for (const [id, key] of ids) {
+        const v = +document.getElementById(id).value / 100;
         p3.state[key] = v;
-        document.getElementById(`${id}-out`).textContent =
-          key === 'az' ? `${(v * 180 / Math.PI).toFixed(0)}°` : v.toFixed(2);
+        document.getElementById(`${id}-out`).textContent = v.toFixed(2);
       }
       p3.refresh();
     };
