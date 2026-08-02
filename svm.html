@@ -61,34 +61,66 @@
     <div class="prose">
       <h2><span class="steplabel">1</span>What one trial looks like to the model</h2>
       <p>
-        Identical to the LDA page, because the input is identical — the models differ
-        only in what they do with it.
+        A participant sees a word. We record voltage from electrodes on the scalp. For
+        our study-phase analysis we look at <strong>10 electrodes</strong> and cut the
+        <strong>1,200 ms</strong> after word onset into <strong>12 time bins</strong> of
+        100 ms each, averaging the voltage inside every bin. The bins run end to end and
+        do not overlap, so each one is a separate slice of the trial. That gives
+        10 × 12 = <strong>120 numbers</strong> for each word.
       </p>
       <p>
-        A participant sees a word. We look at <strong>10 electrodes</strong> and chop the
-        time after word onset into <strong>12 time bins</strong>, averaging the
-        voltage inside each. That gives 10 × 12 = <strong>120 numbers</strong> for each
-        word. The model never sees a scalp or a waveform — it sees a list of 120
-        numbers per trial, called <strong><em>x</em></strong>, whose individual entries
-        are <em>x</em><sub>1</sub> … <em>x</em><sub>120</sub>. How many there are is
-        called <strong><em>p</em></strong> = 120.
+        Those 120 numbers are the trial, as far as the model is concerned. The model
+        never sees a scalp, a waveform, or a word. It sees a list of 120 numbers per
+        trial. In the notation everyone uses, the whole list is called
+        <strong><em>x</em></strong>, and the individual numbers in it are
+        <em>x</em><sub>1</sub>, <em>x</em><sub>2</sub>, … <em>x</em><sub>120</sub> — so
+        "feature 47" is <em>x</em><sub>47</sub>. How many of them there are is called
+        <strong><em>p</em></strong>, so here <em>p</em> = 120.
       </p>
       <p>
-        Each trial carries a <strong>label</strong>: later remembered or later
-        forgotten. For SVM the labels are conventionally written
-        <strong><em>y</em> = +1 and <em>y</em> = −1</strong> rather than 1 and 0. This
-        is not a different problem, just a convention that makes the algebra tidier —
-        multiplying by <em>y</em> then flips the sign for one class, which lets both
-        classes be written in one equation.
+        Each trial also carries a <strong>label</strong>: was that word later remembered,
+        or later forgotten? The two groups those labels carve the trials into — all the
+        remembered ones, all the forgotten ones — are the <strong>classes</strong>.
+        Classifying a trial means deciding which of the two it belongs to, and the word
+        never means more than that.
+      </p>
+      <p>
+        <strong>One notation difference from LDA.</strong> There the two labels were
+        written <em>y</em> = 1 and <em>y</em> = 0. For SVM they are conventionally
+        <strong><em>y</em> = +1 and <em>y</em> = −1</strong>. Not a different problem,
+        just a choice that makes the algebra tidier: multiplying by <em>y</em> flips the
+        sign for one class, so a single equation can cover both at once instead of
+        needing one for each.
+      </p>
+      <p>
+        A participant studies 225 words, so that participant gives us 225 trials — and
+        a trial is an entire list of 120 numbers with one label attached, not a single
+        number. Laid out flat, one participant's data is a table of
+        <strong>225 rows × 120 columns</strong> — 27,000 voltage values — beside a
+        column of 225 labels. Every row is one studied word; every column is one
+        feature. The number of trials is written <strong><em>n</em></strong>, so here
+        <em>n</em> = 225 and <em>p</em> = 120.
       </p>
       <div class="keypoint">
         <p>
           A <strong>feature</strong> is one of those 120 numbers — one electrode at one
-          time bin, so <em>p</em> = the number of features. A participant studies 225
-          words, so that participant's data is a table of 225 rows × 120 columns beside
-          a column of 225 labels — <em>n</em> = 225 trials, of which about 202 are used
-          for training on any given fold.
+          time bin. "Feature 47" means something concrete: the average voltage at, say,
+          electrode 4 during time bin 7. When a model "puts weight on a feature", it
+          multiplies that one number by something. Each feature is an <em>x</em> with a
+          number on it, and <em>p</em> counts them rather than naming one:
+          <em>p</em> = the number of features = 120.
         </p>
+      </div>
+    </div>
+
+    <div class="figure">
+      <div class="figure__title">The shape of one participant's data</div>
+      <div id="design-matrix"></div>
+      <div class="figure__note" id="dm-note">
+        A weight is one number per <em>column</em>; a prediction is made from one
+        <em>row</em>. Cross-validation holds some rows back, so only about 202 of them
+        are ever trained on — and the whole small-sample problem is that 202 rows have to
+        pin down 120 weights.
       </div>
     </div>
   </section>
@@ -97,13 +129,17 @@
   <section class="chapter">
     <div class="prose">
       <h2><span class="steplabel">2</span>What a weight is</h2>
-      <p>Also identical to the LDA page. This is the shared ground.</p>
       <p>
-        The model produces <strong>one number per feature</strong> — the
-        <strong>weights</strong> <em>w</em><sub>1</sub> … <em>w</em><sub>120</sub> — plus
-        one constant <em>b</em>, the <strong>bias</strong>. To classify a new trial,
+        LDA and SVM produce the same kind of object at the end. They differ in how they
+        choose it, not in what it is.
+      </p>
+      <p>
+        The model produces <strong>one number per feature</strong>. Those numbers are
+        the <strong>weights</strong>, written <em>w</em><sub>1</sub>,
+        <em>w</em><sub>2</sub>, … <em>w</em><sub>120</sub>. To classify a new trial,
         multiply each feature (<em>x</em><sub>1</sub> … <em>x</em><sub>120</sub>) by its
-        weight (<em>w</em><sub>1</sub> … <em>w</em><sub>120</sub>), sum, add the bias:
+        weight (<em>w</em><sub>1</sub> … <em>w</em><sub>120</sub>), add them all up, and
+        add one final constant <em>b</em> called the <strong>bias</strong> or intercept:
       </p>
       <div class="formula">
         score = <em>w</em><sub>1</sub><em>x</em><sub>1</sub>
@@ -112,32 +148,154 @@
         <span class="lbl">written compactly as score = <em>w</em>ᵀ<em>x</em> + <em>b</em></span>
       </div>
       <p>
-        Positive score, predict one class; negative, the other. A weight is a
-        <strong>multiplier applied to one feature</strong>, and the set of them is the
-        entire learned content of the model.
+        Positive score, predict "remembered". Negative, predict "forgotten". That is the
+        whole prediction rule. It is a weighted sum and a comparison against zero.
+      </p>
+      <p>
+        So a weight is a <strong>multiplier applied to one feature</strong>, and the set
+        of 120 of them is the entire learned content of the model. When we say a
+        classifier was "trained", we mean: those 120 weights plus <em>b</em> were chosen.
+        When we say it is "linear", we mean the score is a weighted sum with no squares,
+        products, or thresholds inside it.
       </p>
       <div class="callout">
         <p>
           <strong>Which axis the weights live on.</strong> There are 120 weights because
           there are 120 features — one per electrode-and-time-bin — and the
-          <em>same</em> 120 are applied to every trial. There is no weight per trial. A
-          weight belongs to a column of the data table; the weighted sum collapses those
-          columns into one score for one row at a time.
+          <em>same</em> 120 are applied to every trial. There is no weight per trial.
+          Look back at the table of one participant's data above: a weight belongs to a
+          <em>column</em>, and the weighted sum collapses those columns into a single
+          score for one <em>row</em> at a time.
         </p>
         <p>
-          §5 produces a number that
-          <em>is</em> one per trial — the coefficient <em>α<sub>i</sub></em> — and the
-          two are easy to blur. The <em>α</em>'s are indexed by trial and most of them
-          are zero; the <em>w</em>'s are indexed by feature and there are always exactly
-          120. §5 is the recipe for building the second out of the first.
+          This page produces a second set of numbers later on, the coefficients
+          <em>α<sub>i</sub></em>, and those really are one per trial. The two are easy to
+          blur. The <em>α</em>'s are indexed by trial and most of them are zero; the
+          <em>w</em>'s are indexed by feature and there are always exactly 120.
         </p>
       </div>
+
+      <h3>The geometry, in two dimensions</h3>
       <p>
-        Geometrically: with two features each trial is a dot on a page and the rule
-        "score = 0" is a straight line; with 120 it is a flat <strong>hyperplane</strong>
-        in 120-dimensional space. The weights set the orientation, the bias slides it
-        without rotating it.
+        With 120 features you cannot picture this, so picture two. Each trial is a dot
+        on a page. The rule "<em>w</em><sub>1</sub><em>x</em><sub>1</sub> +
+        <em>w</em><sub>2</sub><em>x</em><sub>2</sub> + <em>b</em> = 0" is a straight
+        line across that page. Trials on one side score positive, trials on the other
+        score negative. The weights control the line's <em>direction</em>; the bias
+        <em>b</em> slides it back and forth without rotating it.
       </p>
+      <p>
+        Set them yourself and watch which does what.
+      </p>
+    </div>
+
+    <div class="figure">
+      <div class="figure__title">Two features, and a rule you build by hand <em>· live</em></div>
+      <div class="figure__sub">
+        Each dot is a trial. The shaded side is what the rule predicts there; a dot
+        ringed in white is one it gets wrong.
+      </div>
+      <div class="controls">
+        <label class="field">
+          <em>w</em><sub>1</sub> — weight on feature 1
+          <input type="range" id="wg-w1" min="-100" max="100" value="90">
+          <output id="wg-w1-out"></output>
+        </label>
+        <label class="field">
+          <em>w</em><sub>2</sub> — weight on feature 2
+          <input type="range" id="wg-w2" min="-100" max="100" value="45">
+          <output id="wg-w2-out"></output>
+        </label>
+        <label class="field">
+          <em>b</em> — the bias
+          <input type="range" id="wg-b" min="-300" max="300" value="0">
+          <output id="wg-b-out"></output>
+        </label>
+      </div>
+      <div id="wg-plot" class="plot--square"></div>
+      <div class="stats" id="wg-out"></div>
+      <div class="figure__note">
+        Move the two weights and the line turns. Move the bias and it slides without
+        turning — the same line, in a different place. That is the whole difference
+        between them. The arrow is <em>w</em> itself, and it stays perpendicular to the
+        line no matter what you do to it. Setting
+        both weights to zero leaves no rule at all: the score is <em>b</em> everywhere,
+        so every trial gets the same answer.
+      </div>
+    </div>
+
+    <div class="figure">
+      <div class="figure__title">Add a third feature and the line becomes a plane <em>· live</em></div>
+      <div class="figure__sub">
+        The same rule with one more term, <em>w</em><sub>3</sub><em>x</em><sub>3</sub>.
+        Turn the box to see that the boundary really is a flat sheet rather than a line
+        seen edge-on.
+      </div>
+      <div class="controls">
+        <label class="field">
+          <em>w</em><sub>1</sub>
+          <input type="range" id="p3-w1" min="-100" max="100" value="70">
+          <output id="p3-w1-out"></output>
+        </label>
+        <label class="field">
+          <em>w</em><sub>2</sub>
+          <input type="range" id="p3-w2" min="-100" max="100" value="51">
+          <output id="p3-w2-out"></output>
+        </label>
+        <label class="field">
+          <em>w</em><sub>3</sub>
+          <input type="range" id="p3-w3" min="-100" max="100" value="50">
+          <output id="p3-w3-out"></output>
+        </label>
+        <label class="field">
+          <em>b</em>
+          <input type="range" id="p3-b" min="-300" max="300" value="0">
+          <output id="p3-b-out"></output>
+        </label>
+        <label class="field">
+          Turn the box
+          <input type="range" id="p3-az" min="0" max="628" value="60">
+          <output id="p3-az-out"></output>
+        </label>
+      </div>
+      <div id="p3-plot" class="plot--square"></div>
+      <div class="stats" id="p3-out"></div>
+      <div class="figure__note">
+        One equation, one dimension gone. On a page it left a line, here it leaves a
+        sheet, and the arithmetic that produced both is the same weighted sum with one
+        more term in it. Dots behind the sheet are faded, so turning the box shows the
+        boundary passing through the cloud rather than sitting in front of it. Setting
+        <em>w</em><sub>3</sub> to 0 makes the sheet vertical: feature 3 stops affecting
+        the score, and the rule becomes the two-feature one above, extruded.
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>
+        With 120 features the same thing happens in a 120-dimensional space, and the
+        dividing surface is a <strong>hyperplane</strong> — the flat thing one
+        dimension below whatever space you are in. Nothing about the arithmetic
+        changes. Only your ability to visualize it does.
+      </p>
+      <p>
+        Why exactly one dimension below: the boundary is one equation, and one equation
+        fixes one feature. Solve "score = 0" for the last feature and you get
+        <em>x</em><sub>120</sub> = −(<em>w</em><sub>1</sub><em>x</em><sub>1</sub> + … +
+        <em>w</em><sub>119</sub><em>x</em><sub>119</sub> + <em>b</em>) /
+        <em>w</em><sub>120</sub>. Choose the other 119 however you like and the last one
+        is then decided for you. 119 free choices is what makes it 119-dimensional. The
+        same count on a page: choose <em>x</em><sub>1</sub>, and
+        <em>x</em><sub>2</sub> is forced — one free choice, a line.
+      </p>
+      <div class="callout">
+        <p>
+          <strong>The weights are also a direction.</strong>
+          The weight vector <em>w</em> also points in a direction — the direction
+          perpendicular to that dividing line. Moving along that direction changes the
+          score fastest. So "what the classifier learned" and "which direction through
+          the data separates the classes" are the same statement.
+        </p>
+      </div>
       <p>
         <strong>So a trained LDA and a trained linear SVM are the same kind of
         object.</strong> Handed only the final numbers you could not tell which produced
@@ -150,7 +308,7 @@
           w", is the square root of the sum of the squared weights. For LDA this is
           irrelevant — scaling every weight by 2 doubles all scores, flips nothing, and
           changes no prediction. For SVM the scale is load-bearing, because it is what
-          sets the width of the clearance in §3.
+          sets the width of the clearance the next section is built around.
         </p>
       </div>
     </div>
@@ -835,10 +993,56 @@
 </footer>
 
 <script type="module">
-  import { initChrome } from './assets/site.js';
-  import { svmMargin, smallN } from './assets/simulation.js';
+  import { initChrome, loadJSON, loadBin } from './assets/site.js';
+  import {
+    svmMargin, smallN, weightGeometry, planeIn3d, designMatrix,
+  } from './assets/simulation.js';
 
+  // Chapter nav and the theme toggle. Must run before the first `await` below:
+  // a top-level await suspends the module, and anything after it is wired late.
   initChrome();
+
+  /* The same participant, the same table, as the LDA page. */
+  const F = await loadJSON('data/study_58.json');
+  const RAW = new Int16Array(await loadBin('data/study_58.bin'));
+  designMatrix(document.getElementById('design-matrix'),
+    document.getElementById('dm-note'), F, RAW);
+
+  /* ---------- build the rule by hand ---------- */
+  {
+    const wg = weightGeometry(document.getElementById('wg-plot'),
+      document.getElementById('wg-out'));
+    const ids = [['wg-w1', 'w1', 100], ['wg-w2', 'w2', 100], ['wg-b', 'b', 100]];
+    const sync = () => {
+      for (const [id, key, div] of ids) {
+        const v = +document.getElementById(id).value / div;
+        wg.state[key] = v;
+        document.getElementById(`${id}-out`).textContent = v.toFixed(2);
+      }
+      wg.refresh();
+    };
+    for (const [id] of ids) document.getElementById(id).addEventListener('input', sync);
+    sync();
+  }
+
+  /* ---------- the same rule with a third feature ---------- */
+  {
+    const p3 = planeIn3d(document.getElementById('p3-plot'),
+      document.getElementById('p3-out'));
+    const ids = [['p3-w1', 'w1', 100], ['p3-w2', 'w2', 100], ['p3-w3', 'w3', 100],
+      ['p3-b', 'b', 100], ['p3-az', 'az', 100]];
+    const sync = () => {
+      for (const [id, key, div] of ids) {
+        const v = +document.getElementById(id).value / div;
+        p3.state[key] = v;
+        document.getElementById(`${id}-out`).textContent =
+          key === 'az' ? `${(v * 180 / Math.PI).toFixed(0)}°` : v.toFixed(2);
+      }
+      p3.refresh();
+    };
+    for (const [id] of ids) document.getElementById(id).addEventListener('input', sync);
+    sync();
+  }
 
   /* ---------- the margin ---------- */
   const svm = svmMargin(document.getElementById('svm-plot'), document.getElementById('svm-out'));

@@ -365,6 +365,129 @@ export function ldaMechanics(host, out) {
   return { state, refresh: draw };
 }
 
+/* ===================== the data table, drawn ============================
+
+   Shared by both deep-dive pages: the same participant, the same figure, one
+   implementation. F and RAW come from data/study_58.{json,bin}, loaded by the
+   page so it can hand the same arrays to the covariance figure.
+
+   Colour saturates at the 90th percentile of |value| rather than at the extreme.
+   The values are roughly Gaussian around zero -- median 1.4 uV against a maximum
+   of 20 -- so scaling to the maximum puts four cells in five within the middle
+   quarter of the scale, where the two hues are almost the same grey.           */
+
+/** Diverging blue -> neutral -> red, matching chapter 3's feature matrix. */
+export function diverge(u) {
+  const t = Math.max(0, Math.min(1, (u + 1) / 2));
+  if (t < 0.5) { const k = t * 2; return [42 + 108 * k, 120 + 30 * k, 214 - 66 * k]; }
+  const k = (t - 0.5) * 2; return [150 + 58 * k, 150 - 91 * k, 148 - 89 * k];
+}
+
+/** An off-screen canvas of w x h cells, coloured by valueAt(row, col) in [-1, 1]. */
+export function paint(w, h, valueAt) {
+  const cvs = document.createElement('canvas');
+  cvs.width = w; cvs.height = h;
+  const ctx = cvs.getContext('2d'), img = ctx.createImageData(w, h);
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      const [R, G, B] = diverge(valueAt(r, c));
+      const o = (r * w + c) * 4;
+      img.data[o] = R; img.data[o + 1] = G; img.data[o + 2] = B; img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cvs;
+}
+
+export function designMatrix(host, noteEl, F, RAW) {
+  const [NTRIAL, NFEAT] = F.shape;
+  const NBIN = F.nBins, ELECS = F.electrodes, LABELS = F.labels;
+  const V = (t, c) => RAW[t * NFEAT + c] * F.scale;
+
+        /* Colour saturates at the 90th percentile of |value| rather than at the
+       extreme. The values are roughly Gaussian around zero -- median 1.4 uV
+       against a maximum of 20 -- so scaling to the maximum puts four cells in
+       five within the middle quarter of the scale, where the two hues are
+       almost the same grey. Clipping the top tenth costs nothing here, because
+       this figure is about the table's shape and not about reading a value off
+       it, and it is what makes the structure visible at all. */
+    const mags = [];
+    for (let t = 0; t < NTRIAL; t++) for (let c = 0; c < NFEAT; c++) mags.push(Math.abs(V(t, c)));
+    mags.sort((a, b) => a - b);
+    const lim = mags[Math.floor(mags.length * 0.90)];
+    responsive(host, () => {
+      const w = 620, h = 300;
+      const svg = svgRoot(host, w, h);
+      const ox = 126, oy = 56, bw = 300, bh = 168;
+      const lx = ox + bw + 16, lw = 22;   // the label column
+      const rowH = bh / NTRIAL;
+
+      const lab = (x, y, t, anchor = 'middle', weight = 600, size = 12, fill = '--text-primary') =>
+        el('text', { x, y, 'text-anchor': anchor, 'font-size': size, 'font-weight': weight,
+          fill: token(fill) }, svg).textContent = t;
+
+      el('image', { x: ox, y: oy, width: bw, height: bh,
+        href: paint(NFEAT, NTRIAL, (r, c) => V(r, c) / lim).toDataURL(),
+        preserveAspectRatio: 'none' }, svg);
+      for (let e = 1; e < ELECS.length; e++) {
+        const x = ox + (e * NBIN / NFEAT) * bw;
+        el('line', { x1: x, x2: x, y1: oy, y2: oy + bh, stroke: token('--surface-1'),
+          'stroke-width': 0.75, opacity: 0.5 }, svg);
+      }
+      el('rect', { x: ox, y: oy, width: bw, height: bh, fill: 'none',
+        stroke: token('--border-strong') }, svg);
+      for (let e = 0; e < ELECS.length; e++) {
+        el('text', { x: ox + (e + 0.5) * NBIN / NFEAT * bw, y: oy - 7,
+          'text-anchor': 'middle', class: 'tick' }, svg).textContent = ELECS[e];
+      }
+      lab(ox + bw / 2, oy - 24, 'electrodes', 'middle', 400, 10.5, '--text-muted');
+
+      // the labels, as a column: remembered against forgotten
+      const lc = document.createElement('canvas');
+      lc.width = 1; lc.height = NTRIAL;
+      const lctx = lc.getContext('2d'), limg = lctx.createImageData(1, NTRIAL);
+      for (let t = 0; t < NTRIAL; t++) {
+        const [R, G, B] = LABELS[t] === 1 ? [42, 120, 214] : [208, 59, 59];
+        limg.data[t * 4] = R; limg.data[t * 4 + 1] = G; limg.data[t * 4 + 2] = B;
+        limg.data[t * 4 + 3] = 255;
+      }
+      lctx.putImageData(limg, 0, 0);
+      el('image', { x: lx, y: oy, width: lw, height: bh, href: lc.toDataURL(),
+        preserveAspectRatio: 'none' }, svg);
+      el('rect', { x: lx, y: oy, width: lw, height: bh, fill: 'none',
+        stroke: token('--border-strong') }, svg);
+      lab(lx + lw / 2, oy - 7, 'y', 'middle', 700, 11.5, '--text-primary');
+
+      // one trial, picked out. 7px tall so it can be seen -- a row is 0.75px.
+      const pick = 78;
+      const ry = oy + Math.round(pick * rowH) - 3;
+      for (const x of [[ox, bw], [lx, lw]]) {
+        el('rect', { x: x[0], y: ry, width: x[1], height: 7, fill: 'none',
+          stroke: token('--text-primary'), 'stroke-width': 1.6 }, svg);
+      }
+      const tx = lx + lw + 12;
+      lab(tx, ry + 1, 'one trial', 'start', 700, 11);
+      lab(tx, ry + 14, '120 numbers,', 'start', 400, 10, '--text-muted');
+      lab(tx, ry + 25, 'plus its label', 'start', 400, 10, '--text-muted');
+
+      lab(ox - 12, oy + bh / 2 - 4, '225 rows', 'end', 620);
+      lab(ox - 12, oy + bh / 2 + 11, 'one per studied word', 'end', 400, 10.5, '--text-muted');
+      lab(ox - 12, oy + bh / 2 + 24, 'n = 225', 'end', 400, 10.5, '--text-muted');
+      lab(ox + bw / 2, oy + bh + 22, '120 columns — 10 electrodes × 12 time bins each', 'middle', 620);
+      lab(ox + bw / 2, oy + bh + 37, 'p = 120', 'middle', 400, 10.5, '--text-muted');
+      lab(lx + lw / 2, oy + bh + 14, 'label', 'middle', 400, 10, '--text-muted');
+
+      el('text', { x: w / 2, y: h - 8, 'text-anchor': 'middle', class: 'tick' }, svg)
+        .textContent = '225 × 120 = 27,000 voltage values, beside a column of 225 labels';
+    });
+    noteEl.insertAdjacentHTML('beforeend',
+      ` Red is a positive voltage and blue a negative one, saturating at `
+      + `±${lim.toFixed(1)} µV, so the largest tenth of the excursions clip. Blue and `
+      + 'red in the label column are '
+      + 'the two classes, remembered and forgotten.');
+  
+}
+
 /* ============================== whitening ================================
 
    The claim this figure has to make good: in the whitened space the naive rule
