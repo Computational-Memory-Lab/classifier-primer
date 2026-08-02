@@ -140,6 +140,15 @@
         <span class="lbl">written compactly as score = <em>w</em>ᵀ<em>x</em> + <em>b</em></span>
       </div>
       <p>
+        The compact form is worth decoding once, since it is how the rule is written
+        everywhere else. <em>w</em>ᵀ<em>x</em> means: line the two lists up, multiply
+        each weight by the feature underneath it, and add the 120 results. The raised
+        ᵀ is a <strong>transpose</strong>, which is the piece of notation that makes
+        that operation the legal one to write — it turns the column of weights on its
+        side so it can meet the column of features. Nothing happens beyond the
+        multiply-and-add the long form already spells out.
+      </p>
+      <p>
         If the score comes out positive, predict "remembered". If negative, predict
         "forgotten". That is the whole prediction rule. It is a weighted sum and a
         comparison against zero.

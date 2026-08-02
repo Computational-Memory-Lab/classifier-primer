@@ -148,6 +148,15 @@
         <span class="lbl">written compactly as score = <em>w</em>ᵀ<em>x</em> + <em>b</em></span>
       </div>
       <p>
+        The compact form is worth decoding once, since it is how the rule is written
+        everywhere else. <em>w</em>ᵀ<em>x</em> means: line the two lists up, multiply
+        each weight by the feature underneath it, and add the 120 results. The raised
+        ᵀ is a <strong>transpose</strong>, which is the piece of notation that makes
+        that operation the legal one to write — it turns the column of weights on its
+        side so it can meet the column of features. Nothing happens beyond the
+        multiply-and-add the long form already spells out.
+      </p>
+      <p>
         Positive score, predict "remembered". Negative, predict "forgotten". That is the
         whole prediction rule. It is a weighted sum and a comparison against zero.
       </p>
@@ -405,6 +414,16 @@
 
       <h3>The weights are a blend of a handful of trials</h3>
       <p>Solving that optimisation yields the weight vector in this form:</p>
+      <div class="callout callout--warn">
+        <p>
+          <strong>Σ means something different here than on the LDA page.</strong> There
+          it is the covariance matrix, a 120 × 120 table of numbers. In the formula
+          below it is the summation sign: Σ<sub><em>i</em></sub> means "add up the
+          following, once for every trial <em>i</em>". Same symbol, unrelated jobs, and
+          the collision is inherited from the two literatures rather than chosen. On
+          this page every Σ is a summation.
+        </p>
+      </div>
       <div class="formula">
         <em>w</em> = Σ<sub><em>i</em></sub> <em>α</em><sub><em>i</em></sub>
         <em>y</em><sub><em>i</em></sub> <em>x</em><sub><em>i</em></sub>
