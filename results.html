@@ -132,8 +132,7 @@
     <div class="figure figure--wide">
       <div class="figure__title">Preprocessing variants</div>
       <div class="figure__sub">
-        Recorded runs from <code>docs/multivariate_parameter_testing_results.txt</code>.
-        Click a task to compare.
+        Recorded runs from the lab's own parameter sweeps. Click a task to compare.
       </div>
       <div class="controls" id="pipe-controls"></div>
       <div id="pipe-chart"></div>
@@ -420,7 +419,7 @@ const TASKS = [
     el('text', { x: pad.l, y: 13, class: 'axis-label', 'font-weight': 620 }, svg)
       .textContent = `${clf.toUpperCase()} · raw time-domain features · box = 95% CI of the mean`;
     note.innerHTML = `${clf.toUpperCase()}: ${lines.join(' · ')}. `
-      + `Recomputed live from <code>outputs/${clf.toUpperCase()}/${clf.toUpperCase()}_results_raw.mat</code>. `
+      + 'Recomputed live from the committed per-subject results. '
       + `Grey dots fell below chance — expected when the true effect is this small.`;
   };
   responsive(host, draw);
