@@ -852,6 +852,75 @@ export function weightGeometry(host, out) {
   return { state, refresh: draw };
 }
 
+/* ==================== delete the comfortable majority ====================
+
+   Section 5 makes a strong claim -- throw away every trial that is not a support
+   vector, refit, and the classifier is unchanged -- and the reader has no reason
+   to believe it. This fits both: all the trials, and the support vectors alone.
+   Both boundaries are drawn. They land on top of each other, and the readout
+   gives the angle between them so "on top of each other" is a number rather than
+   an impression.
+
+   Nothing is reused between the two fits. The second call to svmTrain sees only
+   the surviving points and has no memory of the first.                        */
+
+export function svKeep(host, out) {
+  const state = { C: 1, sep: 1.9, n: 30, drop: 0 };
+  const R = 4.2;
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    const xs = scale(-R, R, PAD.l, W - PAD.r);
+    const ys = scale(-R, R, H - PAD.b, PAD.t);
+    frame(svg, W, H, PAD, xs, ys, {
+      xTicks: [], yTicks: [],
+      xLabel: 'a feature (say, Pz at 500 ms)', yLabel: 'another feature',
+    });
+
+    const pts = twoClouds({ n: state.n, sep: state.sep, sx: 0.85, sy: 0.85, rho: 0.1, seed: 31 });
+    const full = svmTrain(pts, state.C);
+    const svSet = new Set(full.sv);
+    const kept = state.drop ? pts.filter((q) => svSet.has(q)) : pts;
+    const refit = svmTrain(kept, state.C);
+
+    const clip = clipped(svg, W, H, PAD);
+    for (const q of pts) {
+      const isSv = svSet.has(q);
+      if (state.drop && !isSv) {
+        // a discarded trial: outline only, so its absence is visible
+        el('circle', { cx: xs(q.x), cy: ys(q.y), r: 3.4, fill: 'none',
+          stroke: token('--text-muted'), 'stroke-width': 1, opacity: 0.30 }, svg);
+        continue;
+      }
+      el('circle', { cx: xs(q.x), cy: ys(q.y), r: isSv ? 4.4 : 3.4,
+        fill: token(q.c === 1 ? '--c-hit' : '--c-miss'),
+        opacity: isSv ? 0.95 : 0.45,
+        stroke: isSv ? token('--text-primary') : 'none', 'stroke-width': isSv ? 1.4 : 0 }, svg);
+    }
+
+    const line = (w, b, colour, dash, label) => {
+      const n = Math.hypot(w[0], w[1]) || 1e-9;
+      const foot = [-b * w[0] / (n * n), -b * w[1] / (n * n)];
+      boundary(svg, xs, ys, foot, w, colour, dash, label, clip);
+    };
+    line(full.w, full.b, token('--series-6'), null, state.drop ? 'fitted on all trials' : null);
+    if (state.drop) line(refit.w, refit.b, token('--series-7'), '6 4', 'fitted on the survivors');
+
+    let ang = Math.abs(Math.atan2(full.w[1], full.w[0]) - Math.atan2(refit.w[1], refit.w[0]))
+      * 180 / Math.PI;
+    if (ang > 180) ang = 360 - ang;
+    if (ang > 90) ang = 180 - ang;
+
+    out.innerHTML = stat('trials', `${pts.length}`)
+      + stat('support vectors', `${full.sv.length}`)
+      + stat('trials discarded', state.drop ? `${pts.length - kept.length}` : '0')
+      + stat('angle between the two rules', state.drop ? `${ang.toFixed(1)}&deg;` : '—');
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
 /* ============================== figure 3 ================================= */
 
 export function svmMargin(host, out) {

@@ -168,7 +168,7 @@
           score for one <em>row</em> at a time.
         </p>
         <p>
-          This page produces a second set of numbers later on, the coefficients
+          SVM also produces a second set of numbers, the coefficients
           <em>α<sub>i</sub></em>, and those really are one per trial. The two are easy to
           blur. The <em>α</em>'s are indexed by trial and most of them are zero; the
           <em>w</em>'s are indexed by feature and there are always exactly 120.
@@ -352,8 +352,7 @@
           with margins but with Fisher (1936) and linear discriminant analysis. Their
           equations 1 and 2 are QDA and LDA; their first observation is that estimating
           a covariance takes on the order of <em>p</em>² numbers and that this is
-          unreliable when observations are few. SVM was proposed as an answer to a
-          problem the LDA page spends its §6 and §8 on.
+          unreliable when observations are few. SVM was proposed as an answer to exactly that problem.
         </p>
       </div>
 
@@ -367,8 +366,12 @@
         <span class="lbl">for every trial <em>i</em>; the <em>y</em> = ±1 convention makes one line cover both classes</span>
       </div>
       <p>
-        With that pinning, the total width of the clear strip works out to
-        <strong>2 ÷ ‖<em>w</em>‖</strong>. So making the margin as wide as possible means
+        With that pinning, the total width of the clear strip is
+        <strong>2 ÷ ‖<em>w</em>‖</strong>. Take a point on one margin edge, where the score is exactly +1, and step across
+        to the other edge, where it is −1. The score has changed by 2. Now, the score
+        changes fastest along the direction <em>w</em>, and moving one unit that way
+        changes it by ‖<em>w</em>‖. To change the score by 2 you must therefore travel
+        2 ÷ ‖<em>w</em>‖. So making the margin as wide as possible means
         making ‖<em>w</em>‖ as <em>small</em> as possible. The whole training problem
         becomes:
       </p>
@@ -401,7 +404,7 @@
       </p>
 
       <h3>The weights are a blend of a handful of trials</h3>
-      <p>Solving the problem in §3 yields the weight vector in this form:</p>
+      <p>Solving that optimisation yields the weight vector in this form:</p>
       <div class="formula">
         <em>w</em> = Σ<sub><em>i</em></sub> <em>α</em><sub><em>i</em></sub>
         <em>y</em><sub><em>i</em></sub> <em>x</em><sub><em>i</em></sub>
@@ -416,7 +419,7 @@
         them up.</em>
       </p>
       <p>
-        That sum is where the two axes of §2 meet. The <em>α</em>'s run over trials, one
+        That sum is where the two axes meet. The <em>α</em>'s run over trials, one
         each; the sum runs across all of them; and what drops out is a single number
         attached to feature 47. However many trials you had, you end up with 120
         weights.
@@ -436,6 +439,45 @@
           points nearest the boundary. The comfortable majority contribute nothing.
         </p>
       </div>
+      <p>Throw them away and see.</p>
+    </div>
+
+    <div class="figure">
+      <div class="figure__title">Throwing away the comfortable majority <em>· live</em></div>
+      <div class="figure__sub">
+        Ringed points are the support vectors. Switch the discard on and every other
+        trial is dropped, then the whole problem is solved again from what is left.
+      </div>
+      <div class="controls">
+        <div class="segmented" id="sk-drop" role="group" aria-label="Which trials to fit on">
+          <button class="btn btn--primary" data-drop="0">fit on all trials</button>
+          <button class="btn" data-drop="1">fit on the support vectors alone</button>
+        </div>
+        <label class="field">
+          How separable
+          <input type="range" id="sk-sep" min="20" max="340" value="190">
+          <output id="sk-sep-out"></output>
+        </label>
+        <label class="field">
+          C (tolerance for error)
+          <input type="range" id="sk-c" min="0" max="100" value="50">
+          <output id="sk-c-out"></output>
+        </label>
+      </div>
+      <div id="sk-plot" class="plot--square"></div>
+      <div class="stats" id="sk-out"></div>
+      <div class="figure__note">
+        The dashed rule is fitted only to the survivors and lands on the solid one, which
+        was fitted to everything. The angle between them is in the readout, so agreement
+        is a number rather than an impression. Hollow circles are the discarded trials,
+        drawn where they used to be. Push the clouds together and the property decays in
+        front of you: as the classes overlap, nearly every trial becomes a support vector
+        and there is almost nothing left to discard, which is the situation our data is
+        in.
+      </div>
+    </div>
+
+    <div class="prose">
       <p>
         The contrast with LDA is total. LDA's answer depends on the average of all
         trials, so a single outlier moves it a little and every trial moves it a little.
@@ -460,7 +502,7 @@
       </p>
       <p>
         <strong>We use the linear kernel</strong> — the plain dot product — throughout,
-        for a reason §8 makes clear: with 1.7 trials per weight, more flexibility is the
+        for a reason that comes down to scarcity: with 1.7 trials per weight, more flexibility is the
         opposite of what the problem needs. This lab has an RBF-kernel arm and it does
         not beat the linear one.
       </p>
@@ -569,7 +611,7 @@
       <p>
         Section 3 assumed the two classes can be separated perfectly. Real data —
         certainly ours, where the effect is worth about 0.53 AUC — cannot be. The
-        constraints of §3 have no solution at all, and the method as stated simply
+        hard-margin constraints have no solution at all, and the method as stated simply
         fails.
       </p>
 
@@ -595,7 +637,7 @@
           <tbody>
             <tr><td><strong>small</strong></td><td>violations are cheap; keep the margin wide</td><td>a smooth, stable boundary that tolerates errors; many support vectors</td></tr>
             <tr><td><strong>large</strong></td><td>violations are expensive; classify the training data</td><td>a boundary contorted to catch every point; overfits</td></tr>
-            <tr><td>→ ∞</td><td>no violations allowed at all</td><td>back to §3, and no solution if the classes overlap</td></tr>
+            <tr><td>→ ∞</td><td>no violations allowed at all</td><td>back to the hard margin, and no solution if the classes overlap</td></tr>
           </tbody>
         </table>
       </div>
@@ -631,7 +673,7 @@
     <div class="prose">
       <h2><span class="steplabel">7</span>Reading the weights — the same trap, plus one more</h2>
       <p>
-        Everything the LDA page says in its §7 applies here unchanged, and for the same
+        Everything the LDA page says about reading weights applies here unchanged, and for the same
         reason. The weight vector is a <strong>filter</strong> — a recipe for extracting
         a signal — not a <strong>pattern</strong> showing where the signal is. A feature
         with no class information can carry a large weight because it provides a clean
@@ -684,15 +726,31 @@
     <div class="prose">
       <h2><span class="steplabel">8</span>What breaks when trials are scarce</h2>
       <p>
-        This section appears on both deep-dive pages, because the problem is shared —
-        but the way each model suffers is different, and that difference is the useful
-        part.
+        The classifier has to pin down 120 weights from about 202 trials — fewer than
+        two trials per weight.
       </p>
       <p>
-        The classifier has to pin down 120 weights from about 202 trials. For LDA the
-        damage is concentrated in one place: the 7,260-entry covariance matrix it cannot
-        estimate. SVM never estimates a covariance, so it might seem immune. It is not —
-        it fails a different way.
+        That ratio invites an immediate objection, and the objection is correct: every
+        weight <em>is</em> computed from all 202 trials, and the data is not being
+        divided up between them. The ratio measures something else — how much room the
+        model has to bend. 202 trials are 202 constraints; 120 weights are 120 numbers
+        free to take any value at all. What is left over after the fitting, 82 trials'
+        worth, is the only thing standing between a rule that has found a pattern and a
+        rule that has memorised this particular sample.
+      </p>
+      <p>
+        In 120 dimensions, any 121 points can be split perfectly by some hyperplane,
+        <em>whatever</em> labels you attach to them — including labels you produced by
+        flipping a coin. A rule with 120 weights can separate 121 arbitrary trials into
+        two groups with zero training errors and have learned exactly nothing. We have
+        202, which is not far above 121. Fitting the training data is therefore weak
+        evidence of anything, which is why every number reported here comes from held-out
+        trials.
+      </p>
+      <p>
+        For LDA the damage is concentrated in one place: the 7,260-entry covariance
+        matrix it cannot estimate. SVM never estimates a covariance, so it might seem
+        immune. It is not — it fails a different way.
       </p>
       <div class="table-scroll">
         <table class="data data--prose">
@@ -788,7 +846,7 @@
         At high correlation LDA suffers more, because correlation is precisely what it
         is trying to estimate. Drag trials down and the two converge on being equally
         bad — which is what we see on our study-phase data, where they agree to about
-        0.01 AUC. On a dataset with enough trials they separate: see §10.
+        0.01 AUC. On a dataset with enough trials they separate.
       </div>
     </div>
   </section>
@@ -813,13 +871,13 @@
         standard trade, and at 1.7 trials per weight it does not obviously favour SVM —
         which is consistent with what we see on the study-phase data, where the two land
         within about 0.01 AUC of each other. Where there <em>are</em> enough trials, the
-        trade resolves in LDA's favour; §10 has the numbers.
+        trade resolves in LDA's favour.
       </p>
 
       <h3>Where it genuinely fails</h3>
       <ul>
         <li>
-          <strong>Unstandardised features</strong> — see §7. A silent, serious failure.
+          <strong>Unstandardised features.</strong> A silent, serious failure.
         </li>
         <li>
           <strong>Heavily unbalanced classes.</strong> The majority class dominates the
@@ -891,7 +949,7 @@
             <tr><td>features</td><td>120</td><td>30</td></tr>
             <tr><td>trials per weight</td><td><strong>1.7</strong></td><td>19</td></tr>
             <tr><td>kernel</td><td>linear</td><td>linear</td></tr>
-            <tr><td>standardised</td><td>yes — required, see §7</td><td>yes</td></tr>
+            <tr><td>standardised</td><td>yes — required</td><td>yes</td></tr>
             <tr><td>AUC</td><td>≈ 0.53</td><td><strong>0.658</strong> (time–frequency features)</td></tr>
             <tr><td>LDA on the same data</td><td>≈ 0.53</td><td><strong>0.722</strong></td></tr>
           </tbody>
@@ -910,7 +968,7 @@
           <strong>So the two models look equivalent only when both are starved.</strong>
           At 1.7 examples per weight neither can estimate anything and they tie at the
           floor. Give them enough data and a real difference appears, in LDA's favour —
-          which fits §9: LDA's Gaussian assumption is a genuine constraint that does work
+          which fits: LDA's Gaussian assumption is a genuine constraint that does work
           once there is enough data to make its covariance estimate worth having, while
           SVM's assumption-light margin has nothing extra to offer these features.
         </p>
@@ -918,7 +976,7 @@
       <p>
         The lab also maintains an RBF-kernel arm. Once standardised it reaches 0.658 —
         <em>exactly tied with the linear SVM</em>, and well below LDA. So the extra
-        flexibility of a curved boundary buys nothing at all here, which is what §9
+        flexibility of a curved boundary buys nothing at all here, which is what the
         predicts at this much data: it is not that the nonlinearity hurts, it is that
         there is nothing nonlinear for it to find.
       </p>
@@ -939,11 +997,11 @@
             </tr>
             <tr>
               <td><strong>Boser, Guyon &amp; Vapnik (1992)</strong></td>
-              <td>The hard-margin algorithm of §3, and the kernel trick.</td>
+              <td>The hard-margin algorithm, and the kernel trick.</td>
             </tr>
             <tr>
               <td><strong>Cortes &amp; Vapnik (1995)</strong></td>
-              <td>The soft margin and <em>C</em> — what makes SVM usable on overlapping data, and the support-vector bound of §8. The citation to use for a modern SVM.</td>
+              <td>The soft margin and <em>C</em> — what makes SVM usable on overlapping data, and the support-vector bound. The citation to use for a modern SVM.</td>
             </tr>
             <tr>
               <td><strong>Burges (1998)</strong></td>
@@ -959,7 +1017,7 @@
             </tr>
             <tr>
               <td><strong>Raudys &amp; Jain (1991)</strong></td>
-              <td>The small-sample scaling of §8. Predates SVM, but the linear-in-features result applies to linear models generally.</td>
+              <td>The small-sample scaling. Predates SVM, but the linear-in-features result applies to linear models generally.</td>
             </tr>
             <tr>
               <td><strong>Haufe et al. (2014)</strong></td>
@@ -970,8 +1028,8 @@
       </div>
       <p class="small muted">
         Cortes &amp; Vapnik, Burges, Raudys &amp; Jain and Haufe et al. are filed in
-        this repository. The soft-margin formulation of §6 and the support-vector bound
-        of §8 are read directly from Cortes &amp; Vapnik; the SMO seed sensitivity in §9
+        this repository. The soft-margin formulation and the support-vector bound are
+        read directly from Cortes &amp; Vapnik; the SMO seed sensitivity
         is a property of our own pipeline, observed here rather than taken from Platt.
         Boser, Guyon &amp; Vapnik (1992), Platt (1998) and Müller et al. (2001) are
         cited from the standard literature and are not filed.
@@ -995,7 +1053,7 @@
 <script type="module">
   import { initChrome, loadJSON, loadBin } from './assets/site.js';
   import {
-    svmMargin, smallN, weightGeometry, planeIn3d, designMatrix,
+    svmMargin, smallN, weightGeometry, planeIn3d, designMatrix, svKeep,
   } from './assets/simulation.js';
 
   // Chapter nav and the theme toggle. Must run before the first `await` below:
@@ -1022,6 +1080,28 @@
       wg.refresh();
     };
     for (const [id] of ids) document.getElementById(id).addEventListener('input', sync);
+    sync();
+  }
+
+  /* ---------- delete the comfortable majority ---------- */
+  {
+    const sk = svKeep(document.getElementById('sk-plot'), document.getElementById('sk-out'));
+    const sync = () => {
+      sk.state.sep = +document.getElementById('sk-sep').value / 100;
+      sk.state.C = Math.max(0.02, +document.getElementById('sk-c').value / 50);
+      document.getElementById('sk-sep-out').textContent = sk.state.sep.toFixed(2);
+      document.getElementById('sk-c-out').textContent = sk.state.C.toFixed(2);
+      sk.refresh();
+    };
+    ['sk-sep', 'sk-c'].forEach((id) => document.getElementById(id).addEventListener('input', sync));
+    document.querySelectorAll('#sk-drop .btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        sk.state.drop = +btn.dataset.drop;
+        document.querySelectorAll('#sk-drop .btn')
+          .forEach((o) => o.classList.toggle('btn--primary', o === btn));
+        sk.refresh();
+      });
+    });
     sync();
   }
 
