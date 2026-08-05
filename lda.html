@@ -529,6 +529,71 @@
           variance the two features share being handed back. 0.1 ÷ 0.19 = 0.53.
         </li>
       </ul>
+      <h3>Why inverting Σ discounts anything at all</h3>
+      <p>
+        That second bullet states a result without saying where it comes from. Nothing
+        about the phrase "matrix inverse" suggests subtraction, and the discount looks
+        like something extra the method does. It is not. It falls out of what an inverse
+        <em>is</em>, once the formula is read the other way round.
+      </p>
+      <p>
+        <em>w</em> = <strong>Σ</strong><sup>−1</sup><em>d</em> is another way of writing
+        <strong>Σ</strong><em>w</em> = <em>d</em>. Inverting and multiplying is how you
+        solve that equation, so the weights are not being handed a discount — they are
+        whatever numbers make that equation true. And the equation has a plain reading.
+        Take its first row, for two features with unit variance and correlation
+        <em>r</em>:
+      </p>
+      <div class="formula">
+        <em>w</em><sub>1</sub> &nbsp;+&nbsp; <em>r</em> · <em>w</em><sub>2</sub>
+        &nbsp;=&nbsp; <em>d</em><sub>1</sub>
+        <span class="lbl">what feature 1 shows must be accounted for by both weights</span>
+      </div>
+      <p>
+        Feature 1's measured difference has to be produced by the weights. Its own weight
+        produces part of it directly. But feature 2's weight also produces some of it,
+        because the two features move together — put weight on feature 2 and feature 1
+        shifts along with it, by the fraction <em>r</em>. So <em>w</em><sub>1</sub> is
+        only asked to supply the <em>remainder</em>: whatever feature 2 has not already
+        supplied through the correlation.
+      </p>
+      <p>
+        That is the whole mechanism. The discount is not applied to the weights, it is
+        what solving the equation produces, because the equation never asks a feature to
+        account for evidence its neighbours have already accounted for. Redundant
+        features share the work instead of each doing all of it, which is the same thing
+        as not counting the shared evidence twice.
+      </p>
+    </div>
+
+    <div class="figure">
+      <div class="figure__title">Who supplies the measured difference</div>
+      <div class="figure__sub">
+        Both features show a difference of 1.00 between the classes. Each bar splits that
+        1.00 into the part the feature's own weight supplies and the part that arrives
+        through the other feature, and the two always sum to exactly the measured value.
+      </div>
+      <div class="controls">
+        <label class="field">
+          Correlation between the two features
+          <input type="range" id="rd-rho" min="0" max="95" value="90">
+          <output id="rd-rho-out"></output>
+        </label>
+      </div>
+      <div id="rd-plot"></div>
+      <div class="stats" id="rd-out"></div>
+      <div class="figure__note">
+        At zero correlation the orange segment vanishes: nothing arrives through the other
+        feature, each weight is the full 1.00, and the pair counts as two features because
+        it is two features. Push the correlation up and the orange segment grows, the
+        weights shrink to match, and the pair's total contribution falls toward 1.00 —
+        the evidence of a single feature, which is what two copies of one measurement are
+        worth. Nothing is being suppressed; each weight is simply solving for what is left
+        over.
+      </div>
+    </div>
+
+    <div class="prose">
       <p>
         A useful way to hold it: <strong>Σ</strong><sup>−1</sup> stretches the space
         until all the noise is round and equal in every direction — a transformation
@@ -1327,6 +1392,7 @@
   } from './assets/site.js';
   import {
     ldaMechanics, smallN, weightGeometry, whitening, planeIn3d, designMatrix, paint,
+    redundancy,
   } from './assets/simulation.js';
 
   // Chapter nav and the theme toggle. Must run before the first `await` below:
@@ -1369,6 +1435,20 @@
       wg.refresh();
     };
     for (const [id] of ids) document.getElementById(id).addEventListener('input', sync);
+    sync();
+  }
+
+  /* ---------- who supplies the measured difference ---------- */
+  {
+    const rd = redundancy(document.getElementById('rd-plot'),
+      document.getElementById('rd-out'));
+    const inp = document.getElementById('rd-rho');
+    const sync = () => {
+      rd.state.rho = +inp.value / 100;
+      document.getElementById('rd-rho-out').textContent = rd.state.rho.toFixed(2);
+      rd.refresh();
+    };
+    inp.addEventListener('input', sync);
     sync();
   }
 

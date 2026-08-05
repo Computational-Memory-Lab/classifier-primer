@@ -488,6 +488,78 @@ export function designMatrix(host, noteEl, F, RAW) {
   
 }
 
+/* ===================== where the double-counting goes ====================
+
+   The page asserts that Sigma^-1 discounts redundant evidence, and shows the
+   algebra coming out as (d1 - r*d2). Neither says WHY inverting a matrix does
+   that. This figure is the why, and it turns on one reframing: w = Sigma^-1 d is
+   the solution of Sigma w = d, so row i reads
+
+       w_i * 1  +  w_j * r   =   d_i
+
+   -- the difference measured on feature i has to be accounted for by feature i's
+   own weight PLUS whatever feature j's weight already supplies through the
+   correlation between them. Each bar below is one row of that equation, split
+   into those two parts. Feature i's weight only has to cover the remainder,
+   which is the discount, arrived at rather than asserted.                     */
+
+export function redundancy(host, out) {
+  const state = { rho: 0.9 };
+
+  const draw = () => {
+    const w = 470, h = 300;
+    const svg = svgRoot(host, w, h);
+    const r = state.rho;
+    // d = (1, 1): both features show the same raw difference
+    const wi = 1 / (1 + r);                       // solves w + r*w = 1
+    const direct = wi, via = r * wi;              // the two halves of one row
+
+    const x0 = 132, x1 = w - 34, BW = x1 - x0;
+    const rows = [['feature 1', 'feature 2'], ['feature 2', 'feature 1']];
+    rows.forEach(([me, other], k) => {
+      const y = 64 + k * 92, bh = 46;
+      el('text', { x: x0 - 12, y: y + bh / 2 + 4, 'text-anchor': 'end',
+        'font-size': 12, 'font-weight': 620, fill: token('--text-primary') }, svg)
+        .textContent = me;
+      el('text', { x: x0 - 12, y: y + bh / 2 + 19, 'text-anchor': 'end',
+        'font-size': 10, fill: token('--text-muted') }, svg)
+        .textContent = 'measured difference 1.00';
+
+      const wA = BW * direct;
+      el('rect', { x: x0, y, width: wA, height: bh, fill: token('--series-1'),
+        opacity: 0.85 }, svg);
+      el('rect', { x: x0 + wA, y, width: BW - wA, height: bh,
+        fill: token('--series-6'), opacity: 0.85 }, svg);
+      const lab = (cx, t, sub) => {
+        if (BW - wA < 46 && t.startsWith('via')) return;
+        el('text', { x: cx, y: y + bh / 2 - 1, 'text-anchor': 'middle',
+          'font-size': 12, 'font-weight': 660, fill: '#fff' }, svg).textContent = t;
+        el('text', { x: cx, y: y + bh / 2 + 14, 'text-anchor': 'middle',
+          'font-size': 10, fill: '#fff', opacity: 0.85 }, svg).textContent = sub;
+      };
+      lab(x0 + wA / 2, direct.toFixed(2), `${me}'s own weight`);
+      lab(x0 + wA + (BW - wA) / 2, via.toFixed(2), `via ${other}`);
+    });
+
+    el('text', { x: w / 2, y: 30, 'text-anchor': 'middle', 'font-size': 12.5,
+      fill: token('--text-secondary') }, svg)
+      .textContent = 'each measured difference, split by what supplies it';
+
+    el('text', { x: w / 2, y: h - 34, 'text-anchor': 'middle', 'font-size': 13,
+      fill: token('--text-primary') }, svg)
+      .textContent = `${direct.toFixed(2)}  +  ${r.toFixed(2)} × ${wi.toFixed(2)}  =  1.00`;
+    el('text', { x: w / 2, y: h - 16, 'text-anchor': 'middle', class: 'tick' }, svg)
+      .textContent = 'one row of Σw = d, which is the equation w = Σ⁻¹d solves';
+
+    out.innerHTML = stat('correlation', r.toFixed(2))
+      + stat('weight on each feature', wi.toFixed(2))
+      + stat('the pair contributes', `${(2 * wi).toFixed(2)}× one feature`);
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
 /* ============================== whitening ================================
 
    The claim this figure has to make good: in the whitened space the naive rule
