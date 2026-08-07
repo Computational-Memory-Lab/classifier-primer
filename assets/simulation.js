@@ -560,6 +560,154 @@ export function redundancy(host, out) {
   return { state, refresh: draw };
 }
 
+/* ====================== the margin, and why 2 / ||w|| =====================
+
+   The derivation in the prose is four sentences of arithmetic and lands on a
+   result the reader has no way to check: shrink ||w|| and the street widens.
+   Here the street is drawn. Nothing is fitted -- w's direction is fixed and only
+   its length moves -- so the width on screen can be read against the formula.  */
+
+export function marginWidth(host, out) {
+  const state = { norm: 0.7 };
+  const R = 4.6;
+  const U = [Math.SQRT1_2, Math.SQRT1_2];         // fixed direction for w
+  const pts = twoClouds({ n: 46, sep: 3.4, sx: 0.62, sy: 0.62, rho: 0, seed: 31 });
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    const xs = scale(-R, R, PAD.l, W - PAD.r);
+    const ys = scale(-R, R, H - PAD.b, PAD.t);
+    frame(svg, W, H, PAD, xs, ys, {
+      xTicks: [], yTicks: [], xLabel: 'a feature', yLabel: 'another feature',
+    });
+    const clip = clipped(svg, W, H, PAD);
+    const n = state.norm;
+    const off = 1 / n;                             // where score = +-1 sits
+    const width = 2 / n;
+
+    // the clear strip between the two edges
+    const T = [-U[1], U[0]];                       // along the boundary
+    const corner = (s, t) => [U[0] * s + T[0] * t, U[1] * s + T[1] * t];
+    el('polygon', {
+      points: [corner(-off, -14), corner(off, -14), corner(off, 14), corner(-off, 14)]
+        .map(([x, y]) => `${xs(x)},${ys(y)}`).join(' '),
+      fill: token('--series-6'), opacity: 0.13,
+    }, clip);
+
+    for (const p of pts) {
+      el('circle', { cx: xs(p.x), cy: ys(p.y), r: 3.6,
+        fill: token(p.c === 1 ? '--series-1' : '--series-8'), opacity: 0.55 }, svg);
+    }
+
+    const rule = (s, colour, dash, label) => {
+      const a = corner(s, -14), b2 = corner(s, 14);
+      el('line', { x1: xs(a[0]), y1: ys(a[1]), x2: xs(b2[0]), y2: ys(b2[1]),
+        stroke: colour, 'stroke-width': dash ? 2 : 2.6, 'stroke-dasharray': dash,
+        'stroke-linecap': 'round' }, clip);
+      const at = corner(s, 3.1);
+      el('text', { x: xs(at[0]) + 8, y: ys(at[1]), class: 'axis-label', fill: colour }, svg)
+        .textContent = label;
+    };
+    rule(0, token('--text-primary'), null, 'score 0');
+    rule(off, token('--series-6'), '5 4', 'score +1');
+    rule(-off, token('--series-6'), '5 4', 'score −1');
+
+    // the width, measured across the strip along w
+    const m0 = corner(-off, -1.9), m1 = corner(off, -1.9);
+    const defs = el('defs', {}, svg);
+    ['s', 'e'].forEach((k) => {
+      const mk = el('marker', { id: `mw-${k}`, viewBox: '0 0 10 10', refX: '8', refY: '5',
+        markerWidth: '5', markerHeight: '5', orient: 'auto-start-reverse' }, defs);
+      el('path', { d: 'M 0 1 L 9 5 L 0 9 z', fill: token('--text-primary') }, mk);
+    });
+    el('line', { x1: xs(m0[0]), y1: ys(m0[1]), x2: xs(m1[0]), y2: ys(m1[1]),
+      stroke: token('--text-primary'), 'stroke-width': 1.8,
+      'marker-start': 'url(#mw-s)', 'marker-end': 'url(#mw-e)' }, clip);
+    const mid = corner(0, -1.9);
+    el('text', { x: xs(mid[0]), y: ys(mid[1]) - 10, 'text-anchor': 'middle',
+      'font-size': 12, 'font-weight': 660, fill: token('--text-primary') }, svg)
+      .textContent = width.toFixed(2);
+
+    out.innerHTML = stat('‖w‖', n.toFixed(2))
+      + stat('score gained per unit step along w', n.toFixed(2))
+      + stat('street width, 2 ÷ ‖w‖', width.toFixed(2));
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
+/* ========================== convex, and what it buys =====================
+
+   "One bottom, no local traps" is a claim about a shape, and a shape can be
+   shown. Both curves are descended by the same gradient step from the same
+   start, so the difference on screen is the landscape rather than the method. */
+
+export function convexity(host, out) {
+  const state = { wiggly: 0, start: -2.6 };
+  const A = 0.30, B = 1.5, C = 2.1;               // the bumpy one's parameters
+
+  const draw = () => {
+    const svg = svgRoot(host, W, H);
+    // wide enough to hold the leftmost basin of the bumpy curve, which sits near
+    // -3.4 and rolled off the edge at 3.2
+    const R = 3.9;
+    const wig = state.wiggly > 0.5;
+    const f = (x) => (wig ? A * x * x + B * Math.sin(C * x) : 0.5 * x * x);
+    const df = (x) => (wig ? 2 * A * x + B * C * Math.cos(C * x) : x);
+    const lo = -1.6, hi = wig ? 6.2 : 5.4;
+    const xs = scale(-R, R, PAD.l, W - PAD.r);
+    const ys = scale(lo, hi, H - PAD.b, PAD.t);
+    frame(svg, W, H, PAD, xs, ys, {
+      xTicks: [], yTicks: [],
+      xLabel: 'the weights, as one number', yLabel: 'what you are minimising',
+    });
+    const clip = clipped(svg, W, H, PAD);
+
+    const curve = [];
+    for (let i = 0; i <= 240; i++) {
+      const x = -R + (2 * R * i) / 240;
+      curve.push([xs(x), ys(f(x))]);
+    }
+    el('path', { d: linePath(curve), fill: 'none', stroke: token('--text-muted'),
+      'stroke-width': 2 }, clip);
+
+    // five faint descents, so the pattern is not one anecdote
+    const run = (x0) => {
+      let x = x0; const path = [[xs(x), ys(f(x))]];
+      for (let i = 0; i < 260; i++) { x -= 0.055 * df(x); path.push([xs(x), ys(f(x))]); }
+      return { path, end: x };
+    };
+    const ghosts = [-2.9, -1.4, 0.4, 1.7, 2.9];
+    const ends = [];
+    for (const g of ghosts) {
+      const { path, end } = run(g);
+      ends.push(end);
+      el('circle', { cx: xs(end), cy: ys(f(end)), r: 4,
+        fill: token('--series-7'), opacity: 0.32 }, clip);
+      el('circle', { cx: path[0][0], cy: path[0][1], r: 3,
+        fill: token('--text-muted'), opacity: 0.5 }, clip);
+    }
+
+    // the one the reader controls
+    const { path, end } = run(state.start);
+    el('path', { d: linePath(path), fill: 'none', stroke: token('--series-6'),
+      'stroke-width': 2, 'stroke-dasharray': '3 3', opacity: 0.85 }, clip);
+    el('circle', { cx: xs(state.start), cy: ys(f(state.start)), r: 6,
+      fill: 'none', stroke: token('--series-6'), 'stroke-width': 2 }, clip);
+    el('circle', { cx: xs(end), cy: ys(f(end)), r: 6.5,
+      fill: token('--series-6') }, clip);
+
+    const spread = Math.max(...ends) - Math.min(...ends);
+    out.innerHTML = stat('started at', state.start.toFixed(2))
+      + stat('stopped at', end.toFixed(2))
+      + stat('five starts, how many bottoms', spread < 0.05 ? 'one' : 'three');
+  };
+
+  responsive(host, draw);
+  return { state, refresh: draw };
+}
+
 /* ============================== whitening ================================
 
    The claim this figure has to make good: in the whitened space the naive rule

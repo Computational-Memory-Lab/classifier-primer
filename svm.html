@@ -88,9 +88,11 @@
         <strong>One notation difference from LDA.</strong> There the two labels were
         written <em>y</em> = 1 and <em>y</em> = 0. For SVM they are conventionally
         <strong><em>y</em> = +1 and <em>y</em> = −1</strong>. Not a different problem,
-        just a choice that makes the algebra tidier: multiplying by <em>y</em> flips the
-        sign for one class, so a single equation can cover both at once instead of
-        needing one for each.
+        just a choice that makes the algebra tidier. Getting a trial right means a
+        positive score for one class and a negative score for the other, which is two
+        different things to check. Multiply the score by that trial's own <em>y</em> and
+        the two collapse into one: <em>y</em> × score comes out positive whenever the
+        answer is right, whichever class it was. One condition instead of two.
       </p>
       <p>
         A participant studies 225 words, so that participant gives us 225 trials — and
@@ -337,15 +339,15 @@
       </p>
       <div class="keypoint">
         <p>
-          Choose the boundary that maximises the <strong>margin</strong> — the
-          perpendicular distance from the boundary to the nearest training point of
+          Choose the line that maximises the <strong>margin</strong> — the
+          perpendicular distance from the line to the nearest training point of
           either class.
         </p>
       </div>
       <p>
-        The reasoning is about generalisation rather than fit. A boundary squeezed
+        The reasoning is about generalisation rather than fit. A line squeezed
         against a training point will misclassify a future point that lands slightly on
-        the wrong side. A boundary with clearance on both sides tolerates that jitter.
+        the wrong side. A line with clearance on both sides tolerates that jitter.
         Since every future trial is a noisy version of the same underlying thing,
         clearance is insurance.
       </p>
@@ -388,11 +390,72 @@
         Read plainly: <em>make the weights as small as you can while still getting every
         training trial right by a clear margin.</em> Small weights mean a wide street.
       </p>
+    </div>
+
+    <div class="figure">
+      <div class="figure__title">Why the street is 2 ÷ ‖w‖ wide</div>
+      <div class="figure__sub">
+        The direction of <em>w</em> is fixed here; only its length changes. Watch what
+        that does to the distance between the two dashed edges.
+      </div>
+      <div class="controls">
+        <label class="field">
+          ‖<em>w</em>‖
+          <input type="range" id="mw-n" min="35" max="200" value="70">
+          <output id="mw-n-out"></output>
+        </label>
+      </div>
+      <div id="mw-plot" class="plot--square"></div>
+      <div class="stats" id="mw-out"></div>
+      <div class="figure__note">
+        The middle number is the whole argument. Moving one unit along <em>w</em> changes
+        the score by ‖<em>w</em>‖, so a bigger ‖<em>w</em>‖ means the score runs from −1
+        to +1 over a shorter distance and the street is narrow. Shrink ‖<em>w</em>‖ and
+        the same change in score has to be spread over more ground, so the street widens.
+        The two edges are always where the score reads exactly ±1 — that is fixed by the
+        pinning, not by the slider — which is why maximising the width and minimising
+        ‖<em>w</em>‖ are the same instruction.
+      </div>
+    </div>
+
+    <div class="prose">
       <p>
         This is a <strong>convex</strong> problem — bowl-shaped, one bottom, no local
         traps. There is exactly one answer and an algorithm will find it. That property
         is a large part of why SVMs became standard.
       </p>
+    </div>
+
+    <div class="figure">
+      <div class="figure__title">One bottom, or several</div>
+      <div class="figure__sub">
+        Both curves are walked downhill by the same rule: look at the slope underfoot,
+        step downhill, repeat. The only difference is the shape of the ground.
+      </div>
+      <div class="controls">
+        <div class="segmented" id="cx-mode" role="group" aria-label="Landscape">
+          <button class="btn btn--primary" data-w="0">convex, like ½‖w‖²</button>
+          <button class="btn" data-w="1">not convex</button>
+        </div>
+        <label class="field">
+          Where the walk starts
+          <input type="range" id="cx-start" min="-300" max="300" value="-260">
+          <output id="cx-start-out"></output>
+        </label>
+      </div>
+      <div id="cx-plot" class="plot--square"></div>
+      <div class="stats" id="cx-out"></div>
+      <div class="figure__note">
+        Grey dots are five other starting points and the faint purple dots are where each
+        of them stopped. On the convex curve all five stop in the same place, and so does
+        yours wherever you begin, so "the answer" is a well-defined thing and any downhill
+        algorithm finds it. On the other curve they stop in three different places and the
+        answer you get depends on where you happened to start. SVM's objective is the
+        first kind, which is why nobody reports an SVM's random seed.
+      </div>
+    </div>
+
+    <div class="prose">
     </div>
   </section>
 
@@ -1068,6 +1131,7 @@
   import { initChrome, loadJSON, loadBin } from './assets/site.js';
   import {
     svmMargin, smallN, weightGeometry, planeIn3d, designMatrix, svKeep,
+    marginWidth, convexity,
   } from './assets/simulation.js';
 
   // Chapter nav and the theme toggle. Must run before the first `await` below:
@@ -1114,6 +1178,42 @@
         document.querySelectorAll('#sk-drop .btn')
           .forEach((o) => o.classList.toggle('btn--primary', o === btn));
         sk.refresh();
+      });
+    });
+    sync();
+  }
+
+  /* ---------- why the street is 2 / ||w|| ---------- */
+  {
+    const mw = marginWidth(document.getElementById('mw-plot'),
+      document.getElementById('mw-out'));
+    const inp = document.getElementById('mw-n');
+    const sync = () => {
+      mw.state.norm = +inp.value / 100;
+      document.getElementById('mw-n-out').textContent = mw.state.norm.toFixed(2);
+      mw.refresh();
+    };
+    inp.addEventListener('input', sync);
+    sync();
+  }
+
+  /* ---------- one bottom, or several ---------- */
+  {
+    const cx = convexity(document.getElementById('cx-plot'),
+      document.getElementById('cx-out'));
+    const inp = document.getElementById('cx-start');
+    const sync = () => {
+      cx.state.start = +inp.value / 100;
+      document.getElementById('cx-start-out').textContent = cx.state.start.toFixed(2);
+      cx.refresh();
+    };
+    inp.addEventListener('input', sync);
+    document.querySelectorAll('#cx-mode .btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        cx.state.wiggly = +btn.dataset.w;
+        document.querySelectorAll('#cx-mode .btn')
+          .forEach((o) => o.classList.toggle('btn--primary', o === btn));
+        cx.refresh();
       });
     });
     sync();
